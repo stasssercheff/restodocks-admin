@@ -1,65 +1,270 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase, PromoCode } from '@/lib/supabase'
+
+function formatDate(iso: string | null) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function isExpired(iso: string | null) {
+  if (!iso) return false
+  return new Date(iso) < new Date()
+}
+
+export default function AdminPage() {
+  const router = useRouter()
+  const [codes, setCodes] = useState<PromoCode[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [newCode, setNewCode] = useState('')
+  const [newNote, setNewNote] = useState('')
+  const [newExpiry, setNewExpiry] = useState('')
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired'>('all')
+
+  const loadCodes = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('promo_codes')
+      .select('*, establishments:used_by_establishment_id(name)')
+      .order('created_at', { ascending: false })
+    setCodes((data as PromoCode[]) ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadCodes() }, [loadCodes])
+
+  async function addCode() {
+    if (!newCode.trim()) return
+    setSaving(true)
+    await supabase.from('promo_codes').insert({
+      code: newCode.trim().toUpperCase(),
+      note: newNote.trim() || null,
+      expires_at: newExpiry || null,
+    })
+    setNewCode('')
+    setNewNote('')
+    setNewExpiry('')
+    await loadCodes()
+    setSaving(false)
+  }
+
+  async function deleteCode(id: number) {
+    if (!confirm('Удалить промокод?')) return
+    await supabase.from('promo_codes').delete().eq('id', id)
+    await loadCodes()
+  }
+
+  async function toggleUsed(row: PromoCode) {
+    await supabase.from('promo_codes').update({
+      is_used: !row.is_used,
+      used_at: !row.is_used ? new Date().toISOString() : null,
+      used_by_establishment_id: row.is_used ? null : row.used_by_establishment_id,
+    }).eq('id', row.id)
+    await loadCodes()
+  }
+
+  async function setExpiry(id: number) {
+    const val = prompt('Дата окончания (YYYY-MM-DD), пусто — без срока:')
+    if (val === null) return
+    await supabase.from('promo_codes').update({ expires_at: val || null }).eq('id', id)
+    await loadCodes()
+  }
+
+  async function logout() {
+    await fetch('/api/auth', { method: 'DELETE' })
+    router.push('/login')
+  }
+
+  const filtered = codes.filter(c => {
+    const matchSearch = c.code.includes(search.toUpperCase()) || (c.note ?? '').toLowerCase().includes(search.toLowerCase())
+    if (!matchSearch) return false
+    if (filter === 'free') return !c.is_used && !isExpired(c.expires_at)
+    if (filter === 'used') return c.is_used
+    if (filter === 'expired') return isExpired(c.expires_at) && !c.is_used
+    return true
+  })
+
+  const total = codes.length
+  const usedCount = codes.filter(c => c.is_used).length
+  const freeCount = codes.filter(c => !c.is_used && !isExpired(c.expires_at)).length
+  const expiredCount = codes.filter(c => isExpired(c.expires_at) && !c.is_used).length
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-gray-950 text-white">
+      {/* Header */}
+      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+        <div>
+          <span className="font-bold text-lg">Restodocks</span>
+          <span className="text-gray-500 ml-2 text-sm">/ Admin</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+        <button onClick={logout} className="text-sm text-gray-500 hover:text-white transition">
+          Выйти
+        </button>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-3 mb-8">
+          {[
+            { label: 'Всего', value: total, color: 'indigo' },
+            { label: 'Свободно', value: freeCount, color: 'emerald' },
+            { label: 'Использовано', value: usedCount, color: 'blue' },
+            { label: 'Истекло', value: expiredCount, color: 'red' },
+          ].map(s => (
+            <div key={s.label} className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <div className="text-2xl font-bold">{s.value}</div>
+              <div className="text-gray-500 text-sm mt-1">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Add new code */}
+        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-6">
+          <h2 className="text-sm font-medium text-gray-400 mb-4 uppercase tracking-wide">Новый промокод</h2>
+          <div className="flex gap-3 flex-wrap">
+            <input
+              type="text"
+              value={newCode}
+              onChange={e => setNewCode(e.target.value.toUpperCase())}
+              placeholder="BETA001"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-36"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <input
+              type="text"
+              value={newNote}
+              onChange={e => setNewNote(e.target.value)}
+              placeholder="Заметка (для кого)"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-48"
+            />
+            <input
+              type="date"
+              value={newExpiry}
+              onChange={e => setNewExpiry(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+            />
+            <button
+              onClick={addCode}
+              disabled={saving || !newCode.trim()}
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 rounded-lg font-medium transition"
+            >
+              {saving ? '...' : '+ Создать'}
+            </button>
+          </div>
+        </div>
+
+        {/* Filters + search */}
+        <div className="flex gap-3 mb-4 flex-wrap items-center">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Поиск по коду или заметке..."
+            className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-48"
+          />
+          <div className="flex gap-2">
+            {(['all', 'free', 'used', 'expired'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-lg text-sm transition ${filter === f ? 'bg-indigo-600 text-white' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'}`}
+              >
+                {{ all: 'Все', free: 'Свободные', used: 'Использованные', expired: 'Истекшие' }[f]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          {loading ? (
+            <div className="p-12 text-center text-gray-500">Загрузка...</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">Промокодов нет</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left">Код</th>
+                  <th className="px-4 py-3 text-left">Статус</th>
+                  <th className="px-4 py-3 text-left">Заметка / Заведение</th>
+                  <th className="px-4 py-3 text-left">Срок</th>
+                  <th className="px-4 py-3 text-left">Создан</th>
+                  <th className="px-4 py-3 text-right">Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row, i) => {
+                  const expired = isExpired(row.expires_at)
+                  const status = row.is_used ? 'used' : expired ? 'expired' : 'free'
+                  const statusConfig = {
+                    used: { label: 'Использован', cls: 'bg-blue-900/40 text-blue-300' },
+                    expired: { label: 'Истёк', cls: 'bg-red-900/40 text-red-300' },
+                    free: { label: 'Свободен', cls: 'bg-emerald-900/40 text-emerald-300' },
+                  }[status]
+
+                  return (
+                    <tr key={row.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(row.code) }}
+                          title="Копировать"
+                          className="font-mono font-bold text-white hover:text-indigo-400 transition"
+                        >
+                          {row.code}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusConfig.cls}`}>
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        {row.is_used && row.establishments?.name
+                          ? <span className="text-white">{row.establishments.name}</span>
+                          : row.note || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-400">
+                        <button
+                          onClick={() => setExpiry(row.id)}
+                          className={`hover:text-white transition ${expired ? 'text-red-400' : ''}`}
+                        >
+                          {formatDate(row.expires_at)}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {formatDate(row.created_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => toggleUsed(row)}
+                            title={row.is_used ? 'Сбросить' : 'Отметить использованным'}
+                            className="text-gray-500 hover:text-white transition text-xs px-2 py-1 rounded border border-gray-700 hover:border-gray-500"
+                          >
+                            {row.is_used ? '↩ Сбросить' : '✓ Использован'}
+                          </button>
+                          <button
+                            onClick={() => deleteCode(row.id)}
+                            title="Удалить"
+                            className="text-gray-500 hover:text-red-400 transition text-xs px-2 py-1 rounded border border-gray-700 hover:border-red-800"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </main>
     </div>
-  );
+  )
 }
