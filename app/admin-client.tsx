@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, PromoCode } from '@/lib/supabase'
+import type { PromoCode } from '@/lib/supabase'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -194,11 +194,9 @@ function PromoTab() {
 
   const loadCodes = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('promo_codes')
-      .select('*, establishments:used_by_establishment_id(name)')
-      .order('created_at', { ascending: false })
-    setCodes((data as PromoCode[]) ?? [])
+    const res = await fetch('/api/promo')
+    const data = await res.json()
+    setCodes(Array.isArray(data) ? data : [])
     setLoading(false)
   }, [])
 
@@ -207,10 +205,14 @@ function PromoTab() {
   async function addCode() {
     if (!newCode.trim()) return
     setSaving(true)
-    await supabase.from('promo_codes').insert({
-      code: newCode.trim().toUpperCase(),
-      note: newNote.trim() || null,
-      expires_at: newExpiry || null,
+    await fetch('/api/promo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: newCode.trim().toUpperCase(),
+        note: newNote.trim() || null,
+        expires_at: newExpiry || null,
+      }),
     })
     setNewCode(''); setNewNote(''); setNewExpiry('')
     await loadCodes()
@@ -219,23 +221,36 @@ function PromoTab() {
 
   async function deleteCode(id: number) {
     if (!confirm('Удалить промокод?')) return
-    await supabase.from('promo_codes').delete().eq('id', id)
+    await fetch('/api/promo', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
     await loadCodes()
   }
 
   async function toggleUsed(row: PromoCode) {
-    await supabase.from('promo_codes').update({
-      is_used: !row.is_used,
-      used_at: !row.is_used ? new Date().toISOString() : null,
-      used_by_establishment_id: row.is_used ? null : row.used_by_establishment_id,
-    }).eq('id', row.id)
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: row.id,
+        is_used: !row.is_used,
+        used_at: !row.is_used ? new Date().toISOString() : null,
+        used_by_establishment_id: row.is_used ? null : row.used_by_establishment_id,
+      }),
+    })
     await loadCodes()
   }
 
   async function setExpiry(id: number) {
     const val = prompt('Дата (YYYY-MM-DD), пусто — без срока:')
     if (val === null) return
-    await supabase.from('promo_codes').update({ expires_at: val || null }).eq('id', id)
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, expires_at: val || null }),
+    })
     await loadCodes()
   }
 
