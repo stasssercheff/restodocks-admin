@@ -25,6 +25,7 @@ export type PromoCode = {
   used_at: string | null
   created_at: string
   note: string | null
+  starts_at: string | null
   expires_at: string | null
   establishments?: { name: string } | null
 }

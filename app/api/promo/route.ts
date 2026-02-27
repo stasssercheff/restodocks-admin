@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
     .insert({
       code: body.code,
       note: body.note || null,
+      starts_at: body.starts_at || null,
       expires_at: body.expires_at || null,
     })
     .select()
@@ -51,10 +52,14 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const { id, ...updates } = body
+  const allowed = ['code', 'note', 'starts_at', 'expires_at', 'is_used', 'used_at', 'used_by_establishment_id'] as const
+  const patch = Object.fromEntries(
+    Object.entries(updates).filter(([k]) => allowed.includes(k as typeof allowed[number]))
+  )
   const supabase = getServiceClient()
   const { error } = await supabase
     .from('promo_codes')
-    .update(updates)
+    .update(patch)
     .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

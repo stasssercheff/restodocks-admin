@@ -29,6 +29,17 @@ function isExpired(iso: string | null) {
   return new Date(iso) < new Date()
 }
 
+function isNotStarted(iso: string | null) {
+  if (!iso) return false
+  return new Date(iso) > new Date()
+}
+
+function isValidNow(startsAt: string | null, expiresAt: string | null) {
+  if (startsAt && new Date(startsAt) > new Date()) return false
+  if (expiresAt && new Date(expiresAt) < new Date()) return false
+  return true
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function AdminClient() {
@@ -188,7 +199,8 @@ function PromoTab() {
   const [saving, setSaving] = useState(false)
   const [newCode, setNewCode] = useState('')
   const [newNote, setNewNote] = useState('')
-  const [newExpiry, setNewExpiry] = useState('')
+  const [newStartDate, setNewStartDate] = useState('')
+  const [newEndDate, setNewEndDate] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired'>('all')
 
@@ -211,10 +223,11 @@ function PromoTab() {
       body: JSON.stringify({
         code: newCode.trim().toUpperCase(),
         note: newNote.trim() || null,
-        expires_at: newExpiry || null,
+        starts_at: newStartDate || null,
+        expires_at: newEndDate || null,
       }),
     })
-    setNewCode(''); setNewNote(''); setNewExpiry('')
+    setNewCode(''); setNewNote(''); setNewStartDate(''); setNewEndDate('')
     await loadCodes()
     setSaving(false)
   }
@@ -243,8 +256,19 @@ function PromoTab() {
     await loadCodes()
   }
 
-  async function setExpiry(id: number) {
-    const val = prompt('Дата (YYYY-MM-DD), пусто — без срока:')
+  async function setStartDate(id: number) {
+    const val = prompt('Действует с (YYYY-MM-DD), пусто — без ограничения:')
+    if (val === null) return
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, starts_at: val || null }),
+    })
+    await loadCodes()
+  }
+
+  async function setEndDate(id: number) {
+    const val = prompt('Действует до (YYYY-MM-DD), пусто — без срока:')
     if (val === null) return
     await fetch('/api/promo', {
       method: 'PATCH',
@@ -257,16 +281,16 @@ function PromoTab() {
   const filtered = codes.filter(c => {
     const match = c.code.includes(search.toUpperCase()) || (c.note ?? '').toLowerCase().includes(search.toLowerCase())
     if (!match) return false
-    if (filter === 'free') return !c.is_used && !isExpired(c.expires_at)
+    if (filter === 'free') return !c.is_used && isValidNow(c.starts_at, c.expires_at)
     if (filter === 'used') return c.is_used
-    if (filter === 'expired') return isExpired(c.expires_at) && !c.is_used
+    if (filter === 'expired') return !c.is_used && !isValidNow(c.starts_at, c.expires_at)
     return true
   })
 
   const total = codes.length
   const usedCount = codes.filter(c => c.is_used).length
-  const freeCount = codes.filter(c => !c.is_used && !isExpired(c.expires_at)).length
-  const expiredCount = codes.filter(c => isExpired(c.expires_at) && !c.is_used).length
+  const freeCount = codes.filter(c => !c.is_used && isValidNow(c.starts_at, c.expires_at)).length
+  const expiredCount = codes.filter(c => !c.is_used && !isValidNow(c.starts_at, c.expires_at)).length
 
   return (
     <>
@@ -296,12 +320,24 @@ function PromoTab() {
             placeholder="Заметка"
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-48"
           />
-          <input
-            type="date"
-            value={newExpiry}
-            onChange={e => setNewExpiry(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          />
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Действует с</label>
+            <input
+              type="date"
+              value={newStartDate}
+              onChange={e => setNewStartDate(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Действует до</label>
+            <input
+              type="date"
+              value={newEndDate}
+              onChange={e => setNewEndDate(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+            />
+          </div>
           <button
             onClick={addCode}
             disabled={saving || !newCode.trim()}
@@ -347,15 +383,15 @@ function PromoTab() {
                 <th className="px-4 py-3 text-left">Код</th>
                 <th className="px-4 py-3 text-left">Статус</th>
                 <th className="px-4 py-3 text-left">Заметка / Заведение</th>
-                <th className="px-4 py-3 text-left">Срок</th>
+                <th className="px-4 py-3 text-left">Действует с</th>
+                <th className="px-4 py-3 text-left">Действует до</th>
                 <th className="px-4 py-3 text-left">Создан</th>
                 <th className="px-4 py-3 text-right">Действия</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((row, i) => {
-                const expired = isExpired(row.expires_at)
-                const status = row.is_used ? 'used' : expired ? 'expired' : 'free'
+                const status = row.is_used ? 'used' : !isValidNow(row.starts_at, row.expires_at) ? 'expired' : 'free'
                 const statusCfg = {
                   used: { label: 'Использован', cls: 'bg-blue-900/40 text-blue-300' },
                   expired: { label: 'Истёк', cls: 'bg-red-900/40 text-red-300' },
@@ -383,7 +419,12 @@ function PromoTab() {
                         : row.note || '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-400">
-                      <button onClick={() => setExpiry(row.id)} className={`hover:text-white transition ${expired ? 'text-red-400' : ''}`}>
+                      <button onClick={() => setStartDate(row.id)} className={`hover:text-white transition ${isNotStarted(row.starts_at) ? 'text-amber-400' : ''}`} title="Изменить дату начала">
+                        {formatDate(row.starts_at)}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400">
+                      <button onClick={() => setEndDate(row.id)} className={`hover:text-white transition ${isExpired(row.expires_at) ? 'text-red-400' : ''}`} title="Изменить дату окончания">
                         {formatDate(row.expires_at)}
                       </button>
                     </td>
