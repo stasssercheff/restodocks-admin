@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
       note: body.note || null,
       starts_at: body.starts_at || null,
       expires_at: body.expires_at || null,
+      max_employees: body.max_employees ?? null,
     })
     .select()
     .single()
@@ -52,7 +53,7 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const { id, ...updates } = body
-  const allowed = ['code', 'note', 'starts_at', 'expires_at', 'is_used', 'used_at', 'used_by_establishment_id'] as const
+  const allowed = ['code', 'note', 'starts_at', 'expires_at', 'is_used', 'used_at', 'used_by_establishment_id', 'max_employees'] as const
   const patch = Object.fromEntries(
     Object.entries(updates).filter(([k]) => allowed.includes(k as typeof allowed[number]))
   )

@@ -201,6 +201,7 @@ function PromoTab() {
   const [newNote, setNewNote] = useState('')
   const [newStartDate, setNewStartDate] = useState('')
   const [newEndDate, setNewEndDate] = useState('')
+  const [newMaxEmployees, setNewMaxEmployees] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired'>('all')
 
@@ -225,9 +226,10 @@ function PromoTab() {
         note: newNote.trim() || null,
         starts_at: newStartDate || null,
         expires_at: newEndDate || null,
+        max_employees: newMaxEmployees ? parseInt(newMaxEmployees) : null,
       }),
     })
-    setNewCode(''); setNewNote(''); setNewStartDate(''); setNewEndDate('')
+    setNewCode(''); setNewNote(''); setNewStartDate(''); setNewEndDate(''); setNewMaxEmployees('')
     await loadCodes()
     setSaving(false)
   }
@@ -274,6 +276,19 @@ function PromoTab() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, expires_at: val || null }),
+    })
+    await loadCodes()
+  }
+
+  async function setMaxEmployees(id: number, current: number | null) {
+    const val = prompt(`Макс. сотрудников (пусто — без ограничений):`, current?.toString() ?? '')
+    if (val === null) return
+    const parsed = val.trim() ? parseInt(val.trim()) : null
+    if (val.trim() && (isNaN(parsed!) || parsed! < 1)) { alert('Введи целое число больше 0'); return }
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, max_employees: parsed }),
     })
     await loadCodes()
   }
@@ -338,6 +353,17 @@ function PromoTab() {
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
             />
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Макс. сотрудников</label>
+            <input
+              type="number"
+              min="1"
+              value={newMaxEmployees}
+              onChange={e => setNewMaxEmployees(e.target.value)}
+              placeholder="∞"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-32"
+            />
+          </div>
           <button
             onClick={addCode}
             disabled={saving || !newCode.trim()}
@@ -385,6 +411,7 @@ function PromoTab() {
                 <th className="px-4 py-3 text-left">Заметка / Заведение</th>
                 <th className="px-4 py-3 text-left">Действует с</th>
                 <th className="px-4 py-3 text-left">Действует до</th>
+                <th className="px-4 py-3 text-center">Сотрудники</th>
                 <th className="px-4 py-3 text-left">Создан</th>
                 <th className="px-4 py-3 text-right">Действия</th>
               </tr>
@@ -426,6 +453,17 @@ function PromoTab() {
                     <td className="px-4 py-3 text-gray-400">
                       <button onClick={() => setEndDate(row.id)} className={`hover:text-white transition ${isExpired(row.expires_at) ? 'text-red-400' : ''}`} title="Изменить дату окончания">
                         {formatDate(row.expires_at)}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => setMaxEmployees(row.id, row.max_employees)}
+                        title="Изменить лимит сотрудников"
+                        className="text-xs font-mono hover:text-indigo-400 transition"
+                      >
+                        {row.max_employees != null
+                          ? <span className="bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded">≤ {row.max_employees}</span>
+                          : <span className="text-gray-600">∞</span>}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
