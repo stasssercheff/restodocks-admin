@@ -19,18 +19,19 @@ function normalizeGrant(body: {
   grant_mode?: string | null
   grant_until?: string | null
   grant_days?: number | string | null
+  expires_at?: string | null
 }) {
   const mode: PromoGrantMode = body.grant_mode === 'days' ? 'days' : 'until_date'
   if (mode === 'until_date') {
-    const until = typeof body.grant_until === 'string' && body.grant_until.trim()
-      ? body.grant_until.trim()
-      : null
-    return { grant_mode: mode, grant_until: until, grant_days: null as number | null }
+    const raw = (typeof body.grant_until === 'string' && body.grant_until.trim())
+      || (typeof body.expires_at === 'string' && body.expires_at.trim())
+      || null
+    return { grant_mode: mode, grant_until: raw, grant_days: null as number | null }
   }
   const raw = body.grant_days
   const days = typeof raw === 'number' ? raw : raw != null && String(raw).trim() ? parseInt(String(raw), 10) : null
   if (days == null || isNaN(days) || days < 1) {
-    return { error: 'Для режима «дней с активации» укажи целое число дней > 0' }
+    return { error: 'Для режима «ограниченные дни» укажи целое число дней > 0 (или переключись на «как по подписке»)' }
   }
   return { grant_mode: mode, grant_until: null as string | null, grant_days: days }
 }
@@ -55,7 +56,9 @@ export async function POST(req: NextRequest) {
   const grant = normalizeGrant(body)
   if ('error' in grant) return NextResponse.json({ error: grant.error }, { status: 400 })
   if (grant.grant_mode === 'until_date' && !grant.grant_until) {
-    return NextResponse.json({ error: 'Укажи дату «Доступ до» — как конец подписки' }, { status: 400 })
+    return NextResponse.json({
+      error: 'Для режима «как по подписке» укажи дату окончания — дни вводить не нужно',
+    }, { status: 400 })
   }
 
   const supabase = getServiceClient()

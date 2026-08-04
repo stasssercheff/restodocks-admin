@@ -240,12 +240,14 @@ function PromoTab() {
 
   async function addCode() {
     if (!newCode.trim()) return
-    if (newGrantMode === 'until_date' && !newGrantUntil) {
-      setError('Укажи «Доступ до» — конец доступа как у подписки (например, 31.12)')
+    // Как подписка: конец доступа = «Действует до» (или отдельное поле grant_until)
+    const until = newGrantUntil || newEndDate
+    if (newGrantMode === 'until_date' && !until) {
+      setError('Для режима «как по подписке» укажи дату окончания (Действует до)')
       return
     }
     if (newGrantMode === 'days' && (!newGrantDays || parseInt(newGrantDays, 10) < 1)) {
-      setError('Укажи число дней с активации')
+      setError('Для режима «ограниченные дни» укажи целое число дней с активации')
       return
     }
     setSaving(true)
@@ -257,7 +259,7 @@ function PromoTab() {
         code: newCode.trim().toUpperCase(),
         note: newNote.trim() || null,
         grant_mode: newGrantMode,
-        grant_until: newGrantMode === 'until_date' ? newGrantUntil : null,
+        grant_until: newGrantMode === 'until_date' ? until : null,
         grant_days: newGrantMode === 'days' ? parseInt(newGrantDays, 10) : null,
         starts_at: newStartDate || null,
         expires_at: newEndDate || null,
@@ -383,7 +385,9 @@ function PromoTab() {
   const expiredCount = codes.filter(c => !c.is_used && !isValidNow(c.starts_at, c.expires_at)).length
   const canCreate =
     !!newCode.trim() &&
-    (newGrantMode === 'until_date' ? !!newGrantUntil : !!newGrantDays && parseInt(newGrantDays, 10) > 0)
+    (newGrantMode === 'until_date'
+      ? !!(newGrantUntil || newEndDate)
+      : !!newGrantDays && parseInt(newGrantDays, 10) > 0)
 
   return (
     <>
@@ -400,7 +404,7 @@ function PromoTab() {
         <div>
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Новый промокод</h2>
           <p className="text-xs text-gray-600 mt-1">
-            «Доступ до» — конец подписки по дате. «Активировать с/до» — только когда код ещё можно ввести, это не срок доступа.
+            Ultra до конца года → включи «как по подписке», поставь дату окончания. Дни вводить не нужно.
           </p>
         </div>
 
@@ -409,14 +413,14 @@ function PromoTab() {
             type="text"
             value={newCode}
             onChange={e => setNewCode(e.target.value.toUpperCase())}
-            placeholder="ULTRA2026"
+            placeholder="FERNI2026"
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-36"
           />
           <input
             type="text"
             value={newNote}
             onChange={e => setNewNote(e.target.value)}
-            placeholder="Заметка (напр. Ultra до НГ)"
+            placeholder="Заметка / тариф (Ultra…)"
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-48"
           />
           <div className="flex flex-col gap-1">
@@ -433,63 +437,50 @@ function PromoTab() {
         </div>
 
         <div className="border-t border-gray-800 pt-4 space-y-3">
-          <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">Доступ после активации</div>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setNewGrantMode('until_date')}
-              className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                newGrantMode === 'until_date'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
-              }`}
-            >
-              До даты (как подписка)
-            </button>
-            <button
-              type="button"
-              onClick={() => setNewGrantMode('days')}
-              className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                newGrantMode === 'days'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
-              }`}
-            >
-              Дней с активации
-            </button>
-          </div>
-          <div className="flex gap-3 flex-wrap items-end">
-            {newGrantMode === 'until_date' ? (
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500">Доступ до *</label>
-                <input
-                  type="date"
-                  value={newGrantUntil}
-                  onChange={e => setNewGrantUntil(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500">Дней с активации *</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={newGrantDays}
-                  onChange={e => setNewGrantDays(e.target.value)}
-                  placeholder="30"
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-32"
-                />
-              </div>
-            )}
-          </div>
-        </div>
+          <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">Срок доступа</div>
 
-        <div className="border-t border-gray-800 pt-4 space-y-3">
-          <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">Когда код можно активировать (опционально)</div>
-          <div className="flex gap-3 flex-wrap items-end">
+          <label className="flex items-start gap-3 cursor-pointer select-none max-w-xl">
+            <input
+              type="checkbox"
+              checked={newGrantMode === 'until_date'}
+              onChange={() => {
+                setNewGrantMode('until_date')
+                setNewGrantDays('')
+                setError(null)
+              }}
+              className="mt-1 h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500"
+            />
+            <span>
+              <span className="text-sm text-white">Как по подписке (до даты)</span>
+              <span className="block text-xs text-gray-500 mt-0.5">
+                Доступ до выбранной даты. Дни с активации не считаются и не нужны.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer select-none max-w-xl">
+            <input
+              type="checkbox"
+              checked={newGrantMode === 'days'}
+              onChange={() => {
+                setNewGrantMode('days')
+                setError(null)
+              }}
+              className="mt-1 h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500"
+            />
+            <span>
+              <span className="text-sm text-white">Ограниченное количество дней с активации</span>
+              <span className="block text-xs text-gray-500 mt-0.5">
+                Ровно N дней с момента применения кода.
+              </span>
+            </span>
+          </label>
+
+          <div className="flex gap-3 flex-wrap items-end pt-1">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">Активировать с</label>
+              <label className="text-xs text-gray-500">
+                {newGrantMode === 'until_date' ? 'Действует с' : 'Активировать с'}
+              </label>
               <input
                 type="date"
                 value={newStartDate}
@@ -498,14 +489,32 @@ function PromoTab() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">Активировать до</label>
+              <label className="text-xs text-gray-500">
+                {newGrantMode === 'until_date' ? 'Действует до *' : 'Активировать до'}
+              </label>
               <input
                 type="date"
                 value={newEndDate}
-                onChange={e => setNewEndDate(e.target.value)}
+                onChange={e => {
+                  setNewEndDate(e.target.value)
+                  if (newGrantMode === 'until_date') setNewGrantUntil(e.target.value)
+                }}
                 className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
+            {newGrantMode === 'days' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500">Дней с активации *</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={newGrantDays}
+                  onChange={e => setNewGrantDays(e.target.value)}
+                  placeholder="Напр. 30"
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-32"
+                />
+              </div>
+            )}
             <button
               onClick={addCode}
               disabled={saving || !canCreate}

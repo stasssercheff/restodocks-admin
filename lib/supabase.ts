@@ -27,11 +27,13 @@ export type PromoCode = {
   used_at: string | null
   created_at: string
   note: string | null
-  /** Окно, когда код ещё можно активировать — не срок доступа */
   starts_at: string | null
   expires_at: string | null
   max_employees: number | null
-  /** until_date = доступ до grant_until; days = grant_days с активации */
+  /**
+   * until_date — доступ до grant_until (как подписка), дни не нужны
+   * days — ровно grant_days дней с момента активации
+   */
   grant_mode: PromoGrantMode
   grant_until: string | null
   grant_days: number | null
