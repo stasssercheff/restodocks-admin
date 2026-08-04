@@ -17,6 +17,8 @@ export const supabase = new Proxy({} as SupabaseClient, {
   },
 })
 
+export type PromoGrantMode = 'until_date' | 'days'
+
 export type PromoCode = {
   id: number
   code: string
@@ -25,8 +27,13 @@ export type PromoCode = {
   used_at: string | null
   created_at: string
   note: string | null
+  /** Окно, когда код ещё можно активировать — не срок доступа */
   starts_at: string | null
   expires_at: string | null
   max_employees: number | null
+  /** until_date = доступ до grant_until; days = grant_days с активации */
+  grant_mode: PromoGrantMode
+  grant_until: string | null
+  grant_days: number | null
   establishments?: { name: string } | null
 }

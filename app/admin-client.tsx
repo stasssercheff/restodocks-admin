@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import type { PromoCode } from '@/lib/supabase'
+import type { PromoCode, PromoGrantMode } from '@/lib/supabase'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -193,12 +193,24 @@ function EstablishmentsTab() {
 
 // ─── Promo Tab ────────────────────────────────────────────────────────────────
 
+function grantLabel(row: PromoCode) {
+  const mode = row.grant_mode ?? 'until_date'
+  if (mode === 'days') {
+    return row.grant_days != null ? `${row.grant_days} дн. с активации` : 'дней — не задано'
+  }
+  return row.grant_until ? `до ${formatDate(row.grant_until)}` : 'до даты — не задано'
+}
+
 function PromoTab() {
   const [codes, setCodes] = useState<PromoCode[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [newCode, setNewCode] = useState('')
   const [newNote, setNewNote] = useState('')
+  const [newGrantMode, setNewGrantMode] = useState<PromoGrantMode>('until_date')
+  const [newGrantUntil, setNewGrantUntil] = useState('')
+  const [newGrantDays, setNewGrantDays] = useState('')
   const [newStartDate, setNewStartDate] = useState('')
   const [newEndDate, setNewEndDate] = useState('')
   const [newMaxEmployees, setNewMaxEmployees] = useState('')
@@ -215,21 +227,50 @@ function PromoTab() {
 
   useEffect(() => { loadCodes() }, [loadCodes])
 
+  function resetForm() {
+    setNewCode('')
+    setNewNote('')
+    setNewGrantMode('until_date')
+    setNewGrantUntil('')
+    setNewGrantDays('')
+    setNewStartDate('')
+    setNewEndDate('')
+    setNewMaxEmployees('')
+  }
+
   async function addCode() {
     if (!newCode.trim()) return
+    if (newGrantMode === 'until_date' && !newGrantUntil) {
+      setError('Укажи «Доступ до» — конец доступа как у подписки (например, 31.12)')
+      return
+    }
+    if (newGrantMode === 'days' && (!newGrantDays || parseInt(newGrantDays, 10) < 1)) {
+      setError('Укажи число дней с активации')
+      return
+    }
     setSaving(true)
-    await fetch('/api/promo', {
+    setError(null)
+    const res = await fetch('/api/promo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code: newCode.trim().toUpperCase(),
         note: newNote.trim() || null,
+        grant_mode: newGrantMode,
+        grant_until: newGrantMode === 'until_date' ? newGrantUntil : null,
+        grant_days: newGrantMode === 'days' ? parseInt(newGrantDays, 10) : null,
         starts_at: newStartDate || null,
         expires_at: newEndDate || null,
         max_employees: newMaxEmployees ? parseInt(newMaxEmployees) : null,
       }),
     })
-    setNewCode(''); setNewNote(''); setNewStartDate(''); setNewEndDate(''); setNewMaxEmployees('')
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      setError(typeof data.error === 'string' ? data.error : 'Не удалось создать промокод')
+      setSaving(false)
+      return
+    }
+    resetForm()
     await loadCodes()
     setSaving(false)
   }
@@ -259,7 +300,7 @@ function PromoTab() {
   }
 
   async function setStartDate(id: number) {
-    const val = prompt('Действует с (YYYY-MM-DD), пусто — без ограничения:')
+    const val = prompt('Код можно активировать с (YYYY-MM-DD), пусто — без ограничения:')
     if (val === null) return
     await fetch('/api/promo', {
       method: 'PATCH',
@@ -270,13 +311,47 @@ function PromoTab() {
   }
 
   async function setEndDate(id: number) {
-    const val = prompt('Действует до (YYYY-MM-DD), пусто — без срока:')
+    const val = prompt('Код можно активировать до (YYYY-MM-DD), пусто — без срока:')
     if (val === null) return
     await fetch('/api/promo', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, expires_at: val || null }),
     })
+    await loadCodes()
+  }
+
+  async function editGrant(row: PromoCode) {
+    const modePick = prompt(
+      'Режим доступа:\n1 — до даты (как подписка)\n2 — дней с активации\n\nВведи 1 или 2:',
+      (row.grant_mode ?? 'until_date') === 'days' ? '2' : '1'
+    )
+    if (modePick === null) return
+    const mode: PromoGrantMode = modePick.trim() === '2' ? 'days' : 'until_date'
+    if (mode === 'until_date') {
+      const until = prompt('Доступ до (YYYY-MM-DD) — конец как у подписки:', row.grant_until?.slice(0, 10) ?? '')
+      if (until === null) return
+      if (!until.trim()) { alert('Нужна дата окончания доступа'); return }
+      const res = await fetch('/api/promo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id, grant_mode: 'until_date', grant_until: until.trim(), grant_days: null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) alert(data.error || 'Ошибка')
+    } else {
+      const days = prompt('Дней с активации:', row.grant_days?.toString() ?? '')
+      if (days === null) return
+      const parsed = parseInt(days.trim(), 10)
+      if (isNaN(parsed) || parsed < 1) { alert('Введи целое число > 0'); return }
+      const res = await fetch('/api/promo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id, grant_mode: 'days', grant_days: parsed, grant_until: null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) alert(data.error || 'Ошибка')
+    }
     await loadCodes()
   }
 
@@ -306,6 +381,9 @@ function PromoTab() {
   const usedCount = codes.filter(c => c.is_used).length
   const freeCount = codes.filter(c => !c.is_used && isValidNow(c.starts_at, c.expires_at)).length
   const expiredCount = codes.filter(c => !c.is_used && !isValidNow(c.starts_at, c.expires_at)).length
+  const canCreate =
+    !!newCode.trim() &&
+    (newGrantMode === 'until_date' ? !!newGrantUntil : !!newGrantDays && parseInt(newGrantDays, 10) > 0)
 
   return (
     <>
@@ -318,41 +396,29 @@ function PromoTab() {
       </div>
 
       {/* Add form */}
-      <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-6">
-        <h2 className="text-xs font-medium text-gray-500 mb-4 uppercase tracking-wide">Новый промокод</h2>
+      <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-6 space-y-5">
+        <div>
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Новый промокод</h2>
+          <p className="text-xs text-gray-600 mt-1">
+            «Доступ до» — конец подписки по дате. «Активировать с/до» — только когда код ещё можно ввести, это не срок доступа.
+          </p>
+        </div>
+
         <div className="flex gap-3 flex-wrap items-end">
           <input
             type="text"
             value={newCode}
             onChange={e => setNewCode(e.target.value.toUpperCase())}
-            placeholder="BETA001"
+            placeholder="ULTRA2026"
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-36"
           />
           <input
             type="text"
             value={newNote}
             onChange={e => setNewNote(e.target.value)}
-            placeholder="Заметка"
+            placeholder="Заметка (напр. Ultra до НГ)"
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-48"
           />
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Действует с</label>
-            <input
-              type="date"
-              value={newStartDate}
-              onChange={e => setNewStartDate(e.target.value)}
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Действует до</label>
-            <input
-              type="date"
-              value={newEndDate}
-              onChange={e => setNewEndDate(e.target.value)}
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-            />
-          </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">Макс. сотрудников</label>
             <input
@@ -364,14 +430,93 @@ function PromoTab() {
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-32"
             />
           </div>
-          <button
-            onClick={addCode}
-            disabled={saving || !newCode.trim()}
-            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 rounded-lg font-medium transition"
-          >
-            {saving ? '...' : '+ Создать'}
-          </button>
         </div>
+
+        <div className="border-t border-gray-800 pt-4 space-y-3">
+          <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">Доступ после активации</div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setNewGrantMode('until_date')}
+              className={`px-3 py-1.5 rounded-lg text-sm transition ${
+                newGrantMode === 'until_date'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
+              }`}
+            >
+              До даты (как подписка)
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewGrantMode('days')}
+              className={`px-3 py-1.5 rounded-lg text-sm transition ${
+                newGrantMode === 'days'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white'
+              }`}
+            >
+              Дней с активации
+            </button>
+          </div>
+          <div className="flex gap-3 flex-wrap items-end">
+            {newGrantMode === 'until_date' ? (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500">Доступ до *</label>
+                <input
+                  type="date"
+                  value={newGrantUntil}
+                  onChange={e => setNewGrantUntil(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500">Дней с активации *</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={newGrantDays}
+                  onChange={e => setNewGrantDays(e.target.value)}
+                  placeholder="30"
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-32"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t border-gray-800 pt-4 space-y-3">
+          <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">Когда код можно активировать (опционально)</div>
+          <div className="flex gap-3 flex-wrap items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500">Активировать с</label>
+              <input
+                type="date"
+                value={newStartDate}
+                onChange={e => setNewStartDate(e.target.value)}
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500">Активировать до</label>
+              <input
+                type="date"
+                value={newEndDate}
+                onChange={e => setNewEndDate(e.target.value)}
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <button
+              onClick={addCode}
+              disabled={saving || !canCreate}
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 rounded-lg font-medium transition"
+            >
+              {saving ? '...' : '+ Создать'}
+            </button>
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-red-400">{error}</p>}
       </div>
 
       {/* Filters */}
@@ -397,20 +542,21 @@ function PromoTab() {
       </div>
 
       {/* Table */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden overflow-x-auto">
         {loading ? (
           <div className="p-12 text-center text-gray-500">Загрузка...</div>
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-gray-500">Промокодов нет</div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="px-4 py-3 text-left">Код</th>
                 <th className="px-4 py-3 text-left">Статус</th>
                 <th className="px-4 py-3 text-left">Заметка / Заведение</th>
-                <th className="px-4 py-3 text-left">Действует с</th>
-                <th className="px-4 py-3 text-left">Действует до</th>
+                <th className="px-4 py-3 text-left">Доступ</th>
+                <th className="px-4 py-3 text-left">Активировать с</th>
+                <th className="px-4 py-3 text-left">Активировать до</th>
                 <th className="px-4 py-3 text-center">Сотрудники</th>
                 <th className="px-4 py-3 text-left">Создан</th>
                 <th className="px-4 py-3 text-right">Действия</th>
@@ -424,6 +570,7 @@ function PromoTab() {
                   expired: { label: 'Истёк', cls: 'bg-red-900/40 text-red-300' },
                   free: { label: 'Свободен', cls: 'bg-emerald-900/40 text-emerald-300' },
                 }[status]
+                const mode = row.grant_mode ?? 'until_date'
                 return (
                   <tr key={row.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}>
                     <td className="px-4 py-3">
@@ -445,13 +592,24 @@ function PromoTab() {
                         ? <span className="text-white">{row.establishments.name}</span>
                         : row.note || '—'}
                     </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => editGrant(row)}
+                        title="Изменить доступ"
+                        className={`text-xs hover:text-indigo-300 transition ${
+                          mode === 'until_date' ? 'text-emerald-300' : 'text-amber-300'
+                        }`}
+                      >
+                        {grantLabel(row)}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-gray-400">
-                      <button onClick={() => setStartDate(row.id)} className={`hover:text-white transition ${isNotStarted(row.starts_at) ? 'text-amber-400' : ''}`} title="Изменить дату начала">
+                      <button onClick={() => setStartDate(row.id)} className={`hover:text-white transition ${isNotStarted(row.starts_at) ? 'text-amber-400' : ''}`} title="Окно активации: с">
                         {formatDate(row.starts_at)}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-gray-400">
-                      <button onClick={() => setEndDate(row.id)} className={`hover:text-white transition ${isExpired(row.expires_at) ? 'text-red-400' : ''}`} title="Изменить дату окончания">
+                      <button onClick={() => setEndDate(row.id)} className={`hover:text-white transition ${isExpired(row.expires_at) ? 'text-red-400' : ''}`} title="Окно активации: до">
                         {formatDate(row.expires_at)}
                       </button>
                     </td>
