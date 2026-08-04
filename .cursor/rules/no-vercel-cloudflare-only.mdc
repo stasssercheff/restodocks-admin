@@ -1,0 +1,26 @@
+---
+description: Deploy and hosting rules for restodocks-admin
+alwaysApply: true
+---
+
+# Hosting: Cloudflare only — Vercel forbidden
+
+This project is deployed **only** to Cloudflare Workers:
+
+- Production: `https://restodocks-admin.stassserchef.workers.dev`
+- Stack: Next.js + `@opennextjs/cloudflare` + Wrangler
+- Deploy: `npm run deploy` or GitHub Action `.github/workflows/deploy-cloudflare.yml`
+
+## Absolute ban on Vercel
+
+- Do **not** use, suggest, configure, or deploy to Vercel.
+- Do **not** run `vercel`, `npx vercel`, or add Vercel integrations.
+- Do **not** treat Vercel URLs, dashboards, or deploy status as production.
+- Do **not** add `vercel.json`, Vercel GitHub Actions, or Vercel env docs.
+- If a historical Vercel status appears on GitHub commits, **ignore it** — we left Vercel and do not use it.
+
+## What to do instead
+
+- Build/deploy with OpenNext Cloudflare (`opennextjs-cloudflare` / `wrangler`).
+- Need auth for non-interactive deploy: `CLOUDFLARE_API_TOKEN` (+ `CLOUDFLARE_ACCOUNT_ID` if required).
+- Runtime secrets stay in Cloudflare Worker settings, not Vercel.
