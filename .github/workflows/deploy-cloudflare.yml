@@ -8,6 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       deployments: write
@@ -27,14 +28,19 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          missing=0
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::Missing GitHub secret CLOUDFLARE_API_TOKEN — add it in repo Settings → Secrets and variables → Actions"
-            exit 1
+            echo "::error title=Missing CLOUDFLARE_API_TOKEN::Add GitHub Actions secret CLOUDFLARE_API_TOKEN (Cloudflare dashboard → My Profile → API Tokens → Create Token → Edit Cloudflare Workers)."
+            missing=1
           fi
           if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::Missing GitHub secret CLOUDFLARE_ACCOUNT_ID — add it in repo Settings → Secrets and variables → Actions"
+            echo "::error title=Missing CLOUDFLARE_ACCOUNT_ID::Add GitHub Actions secret CLOUDFLARE_ACCOUNT_ID (Workers dashboard → Account ID on the right)."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
             exit 1
           fi
+          echo "Cloudflare credentials present."
 
       - name: Build OpenNext
         env:
@@ -42,12 +48,11 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: npx opennextjs-cloudflare build
 
+      # Do not use cloudflare/wrangler-action here: OpenNext re-invokes wrangler
+      # in a nested process and the action's token wiring often fails. Pass env
+      # directly to opennextjs-cloudflare deploy instead.
       - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx opennextjs-cloudflare deploy
