@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { isAuthenticatedAdmin } from '@/lib/admin-auth'
+import { isAuthenticatedAdminRequest } from '@/lib/admin-auth'
 import type { PromoGrantMode } from '@/lib/supabase'
 
 function getServiceClient() {
@@ -31,8 +31,8 @@ function normalizeGrant(body: {
   return { grant_mode: mode, grant_until: null as string | null, grant_days: days }
 }
 
-export async function GET() {
-  if (!(await isAuthenticatedAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export async function GET(req: NextRequest) {
+  if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = getServiceClient()
   const { data, error } = await supabase
@@ -45,7 +45,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await isAuthenticatedAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const grant = normalizeGrant(body)
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!(await isAuthenticatedAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const { id, ...updates } = body
@@ -112,7 +112,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!(await isAuthenticatedAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await req.json()
   const supabase = getServiceClient()
