@@ -1,12 +1,24 @@
 import { requireAuth } from './auth-guard'
 import AdminClient from './admin-client'
-import { listEstablishments } from '@/lib/establishments'
+import { listEstablishments, type EstablishmentRow } from '@/lib/establishments'
 
 export default async function Page() {
   await requireAuth()
-  const result = await listEstablishments()
-  const initialEstablishments = 'data' in result ? result.data : []
-  const establishmentsError = 'error' in result ? result.error : null
+
+  let initialEstablishments: EstablishmentRow[] = []
+  let establishmentsError: string | null = null
+
+  try {
+    const result = await listEstablishments()
+    if ('data' in result) {
+      initialEstablishments = result.data
+    } else {
+      establishmentsError = result.error
+    }
+  } catch (err) {
+    establishmentsError = err instanceof Error ? err.message : 'Ошибка загрузки'
+  }
+
   return (
     <AdminClient
       initialEstablishments={initialEstablishments}

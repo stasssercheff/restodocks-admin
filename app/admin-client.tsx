@@ -135,6 +135,13 @@ function EstablishmentsTab({
     }
   }, [router])
 
+  // If SSR had no data (or env missing at first paint), retry once from the client.
+  useEffect(() => {
+    if ((!initialData || initialData.length === 0) && initialError) {
+      load()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const filtered = data.filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
     e.owner_email.toLowerCase().includes(search.toLowerCase()) ||

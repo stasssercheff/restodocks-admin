@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/lib/supabase-server'
 import { isAuthenticatedAdminRequest } from '@/lib/admin-auth'
 import type { PromoGrantMode } from '@/lib/supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-function getServiceClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+function getServiceClient(): { client: SupabaseClient } | { error: string } {
+  const client = createServiceClient()
+  if ('error' in client) return client
+  return { client }
 }
 
 function normalizeGrant(body: {
@@ -34,8 +34,10 @@ function normalizeGrant(body: {
 export async function GET(req: NextRequest) {
   if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = getServiceClient()
-  const { data, error } = await supabase
+  const svc = getServiceClient()
+  if ('error' in svc) return NextResponse.json({ error: svc.error }, { status: 500 })
+
+  const { data, error } = await svc.client
     .from('promo_codes')
     .select('*, establishments:used_by_establishment_id(name)')
     .order('created_at', { ascending: false })
@@ -56,8 +58,10 @@ export async function POST(req: NextRequest) {
     }, { status: 400 })
   }
 
-  const supabase = getServiceClient()
-  const { data, error } = await supabase
+  const svc = getServiceClient()
+  if ('error' in svc) return NextResponse.json({ error: svc.error }, { status: 500 })
+
+  const { data, error } = await svc.client
     .from('promo_codes')
     .insert({
       code: body.code,
@@ -101,8 +105,10 @@ export async function PATCH(req: NextRequest) {
     Object.assign(patch, grant)
   }
 
-  const supabase = getServiceClient()
-  const { error } = await supabase
+  const svc = getServiceClient()
+  if ('error' in svc) return NextResponse.json({ error: svc.error }, { status: 500 })
+
+  const { error } = await svc.client
     .from('promo_codes')
     .update(patch)
     .eq('id', id)
@@ -115,8 +121,10 @@ export async function DELETE(req: NextRequest) {
   if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await req.json()
-  const supabase = getServiceClient()
-  const { error } = await supabase
+  const svc = getServiceClient()
+  if ('error' in svc) return NextResponse.json({ error: svc.error }, { status: 500 })
+
+  const { error } = await svc.client
     .from('promo_codes')
     .delete()
     .eq('id', id)

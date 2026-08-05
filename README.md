@@ -33,8 +33,9 @@ Required GitHub / CI secrets (Settings → Secrets and variables → Actions):
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-Worker runtime secrets (Cloudflare dashboard / `wrangler secret`):
+Worker runtime secrets (Cloudflare dashboard → Workers & Pages → `restodocks-admin` → Settings → Variables and Secrets):
 
-- `SUPABASE_SERVICE_ROLE_KEY`
 - `ADMIN_PASSWORD`
-- plus the same `NEXT_PUBLIC_*` if not baked at build time
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_URL` (или `NEXT_PUBLIC_SUPABASE_URL`) — URL проекта Supabase, вида `https://xxxx.supabase.co`
+- optionally `NEXT_PUBLIC_SUPABASE_ANON_KEY`
