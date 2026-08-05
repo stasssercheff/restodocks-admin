@@ -95,17 +95,35 @@ export default function AdminClient() {
 // ─── Establishments Tab ───────────────────────────────────────────────────────
 
 function EstablishmentsTab() {
+  const router = useRouter()
   const [data, setData] = useState<Establishment[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await fetch('/api/establishments')
-    const json = await res.json()
-    setData(json)
-    setLoading(false)
-  }, [])
+    setError(null)
+    try {
+      const res = await fetch('/api/establishments')
+      if (res.status === 401) {
+        router.push('/login')
+        return
+      }
+      const json = await res.json()
+      if (!res.ok) {
+        setData([])
+        setError(typeof json.error === 'string' ? json.error : 'Не удалось загрузить заведения')
+        return
+      }
+      setData(Array.isArray(json) ? json : [])
+    } catch {
+      setData([])
+      setError('Не удалось загрузить заведения')
+    } finally {
+      setLoading(false)
+    }
+  }, [router])
 
   useEffect(() => { load() }, [load])
 
@@ -141,12 +159,20 @@ function EstablishmentsTab() {
         </button>
       </div>
 
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-gray-500">Загрузка...</div>
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">Заведений нет</div>
+          <div className="p-12 text-center text-gray-500">
+            {error ? 'Нет данных' : 'Заведений нет'}
+          </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -217,13 +243,24 @@ function PromoTab() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired'>('all')
 
+  const router = useRouter()
+
   const loadCodes = useCallback(async () => {
     setLoading(true)
-    const res = await fetch('/api/promo')
-    const data = await res.json()
-    setCodes(Array.isArray(data) ? data : [])
-    setLoading(false)
-  }, [])
+    try {
+      const res = await fetch('/api/promo')
+      if (res.status === 401) {
+        router.push('/login')
+        return
+      }
+      const data = await res.json()
+      setCodes(Array.isArray(data) ? data : [])
+    } catch {
+      setCodes([])
+    } finally {
+      setLoading(false)
+    }
+  }, [router])
 
   useEffect(() => { loadCodes() }, [loadCodes])
 

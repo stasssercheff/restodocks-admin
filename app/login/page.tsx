@@ -1,10 +1,8 @@
-import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { isAuthenticatedAdmin } from '@/lib/admin-auth'
 import LoginClient from './login-client'
 
 export default async function LoginPage() {
-  const cookieStore = await cookies()
-  const session = cookieStore.get('admin_session')?.value
-  if (session) redirect('/')
+  if (await isAuthenticatedAdmin()) redirect('/')
   return <LoginClient />
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { isAuthenticatedAdmin } from '@/lib/admin-auth'
 import type { PromoGrantMode } from '@/lib/supabase'
 
 function getServiceClient() {
@@ -8,11 +8,6 @@ function getServiceClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
-}
-
-async function checkAuth() {
-  const cookieStore = await cookies()
-  return cookieStore.get('admin_session')?.value === 'authenticated'
 }
 
 function normalizeGrant(body: {
@@ -37,7 +32,7 @@ function normalizeGrant(body: {
 }
 
 export async function GET() {
-  if (!await checkAuth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isAuthenticatedAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = getServiceClient()
   const { data, error } = await supabase
@@ -50,7 +45,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!await checkAuth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isAuthenticatedAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const grant = normalizeGrant(body)
@@ -82,7 +77,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!await checkAuth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isAuthenticatedAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const { id, ...updates } = body
@@ -117,7 +112,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!await checkAuth()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await isAuthenticatedAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await req.json()
   const supabase = getServiceClient()
