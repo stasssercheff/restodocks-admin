@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function LoginClient() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,11 +19,11 @@ export default function LoginClient() {
     })
 
     if (res.ok) {
-      router.push('/')
+      window.location.href = '/'
     } else {
       setError('Неверный пароль')
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (

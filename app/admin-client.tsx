@@ -3,19 +3,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PromoCode, PromoGrantMode } from '@/lib/supabase'
+import type { EstablishmentRow } from '@/lib/establishments'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Establishment = {
-  id: string
-  name: string
-  address: string | null
-  created_at: string
-  default_currency: string
-  employee_count: number
-  owner_name: string
-  owner_email: string
-}
+type Establishment = EstablishmentRow
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -42,13 +34,18 @@ function isValidNow(startsAt: string | null, expiresAt: string | null) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function AdminClient() {
-  const router = useRouter()
+export default function AdminClient({
+  initialEstablishments = [],
+  establishmentsError = null,
+}: {
+  initialEstablishments?: Establishment[]
+  establishmentsError?: string | null
+}) {
   const [tab, setTab] = useState<'establishments' | 'promo'>('establishments')
 
   async function logout() {
     await fetch('/api/auth', { method: 'DELETE' })
-    router.push('/login')
+    window.location.href = '/login'
   }
 
   return (
@@ -86,7 +83,14 @@ export default function AdminClient() {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {tab === 'establishments' ? <EstablishmentsTab /> : <PromoTab />}
+        {tab === 'establishments' ? (
+          <EstablishmentsTab
+            initialData={initialEstablishments}
+            initialError={establishmentsError}
+          />
+        ) : (
+          <PromoTab />
+        )}
       </main>
     </div>
   )
@@ -94,11 +98,17 @@ export default function AdminClient() {
 
 // ─── Establishments Tab ───────────────────────────────────────────────────────
 
-function EstablishmentsTab() {
+function EstablishmentsTab({
+  initialData,
+  initialError,
+}: {
+  initialData: Establishment[]
+  initialError: string | null
+}) {
   const router = useRouter()
-  const [data, setData] = useState<Establishment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<Establishment[]>(Array.isArray(initialData) ? initialData : [])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(initialError)
   const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
@@ -124,8 +134,6 @@ function EstablishmentsTab() {
       setLoading(false)
     }
   }, [router])
-
-  useEffect(() => { load() }, [load])
 
   const filtered = data.filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||

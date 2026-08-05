@@ -26,9 +26,9 @@ npm run deploy
 
 Or push to `main` — GitHub Action `.github/workflows/deploy-cloudflare.yml` builds OpenNext and deploys the Worker.
 
-Required GitHub / CI secrets:
+Required GitHub / CI secrets (Settings → Secrets and variables → Actions):
 
-- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_API_TOKEN` — **required**; without it every deploy fails
 - `CLOUDFLARE_ACCOUNT_ID`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
