@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase-server'
-import { isAuthenticatedAdminRequest } from '@/lib/admin-auth'
+import { requireAdminRequest } from '@/lib/admin-auth'
 import type { PromoGrantMode } from '@/lib/supabase'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -32,7 +32,8 @@ function normalizeGrant(body: {
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAdminRequest(req, 'promo')
+  if ('response' in auth) return auth.response
 
   const svc = getServiceClient()
   if ('error' in svc) return NextResponse.json({ error: svc.error }, { status: 500 })
@@ -47,7 +48,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAdminRequest(req, 'promo')
+  if ('response' in auth) return auth.response
 
   const body = await req.json()
   const grant = normalizeGrant(body)
@@ -81,7 +83,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAdminRequest(req, 'promo')
+  if ('response' in auth) return auth.response
 
   const body = await req.json()
   const { id, ...updates } = body
@@ -118,7 +121,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!isAuthenticatedAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await requireAdminRequest(req, 'promo')
+  if ('response' in auth) return auth.response
 
   const { id } = await req.json()
   const svc = getServiceClient()

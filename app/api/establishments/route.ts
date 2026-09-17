@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isAuthenticatedAdminRequest } from '@/lib/admin-auth'
+import { requireAdminRequest } from '@/lib/admin-auth'
 import { listEstablishments } from '@/lib/establishments'
 
 export async function GET(req: NextRequest) {
-  if (!isAuthenticatedAdminRequest(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = await requireAdminRequest(req, 'establishments')
+  if ('response' in auth) return auth.response
 
   const result = await listEstablishments()
   if ('error' in result) {

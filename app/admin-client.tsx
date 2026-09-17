@@ -4,6 +4,10 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PromoCode, PromoGrantMode } from '@/lib/supabase'
 import type { EstablishmentRow } from '@/lib/establishments'
+import { ADMIN_PAGES, canAccessPage, type AdminPageKey, type PublicAdminUser } from '@/lib/admin-pages'
+import StaffTab from './staff-tab'
+
+type TabKey = AdminPageKey | 'staff'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,14 +38,26 @@ function isValidNow(startsAt: string | null, expiresAt: string | null) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
+function visibleTabs(user: PublicAdminUser): { key: TabKey; label: string }[] {
+  const pages: { key: TabKey; label: string }[] = ADMIN_PAGES
+    .filter(page => canAccessPage(user, page.key))
+    .map(page => ({ key: page.key, label: page.label }))
+  if (user.isOwner) pages.push({ key: 'staff', label: 'Сотрудники' })
+  return pages
+}
+
 export default function AdminClient({
+  user,
   initialEstablishments = [],
   establishmentsError = null,
 }: {
+  user: PublicAdminUser
   initialEstablishments?: Establishment[]
   establishmentsError?: string | null
 }) {
-  const [tab, setTab] = useState<'establishments' | 'promo'>('establishments')
+  const tabs = visibleTabs(user)
+  const [tab, setTab] = useState<TabKey>(tabs[0]?.key ?? 'establishments')
+  const activeTab = tabs.some(item => item.key === tab) ? tab : tabs[0]?.key
 
   async function logout() {
     await fetch('/api/auth', { method: 'DELETE' })
@@ -55,41 +71,48 @@ export default function AdminClient({
           <span className="font-bold text-lg">Restodocks</span>
           <span className="text-gray-500 ml-2 text-sm">/ Admin</span>
         </div>
-        <button onClick={logout} className="text-sm text-gray-500 hover:text-white transition">
-          Выйти
-        </button>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-500">{user.email}</span>
+          <button onClick={logout} className="text-sm text-gray-500 hover:text-white transition">
+            Выйти
+          </button>
+        </div>
       </header>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-800 px-6">
-        <div className="flex gap-1">
-          {([
-            { key: 'establishments', label: 'Заведения' },
-            { key: 'promo', label: 'Промокоды' },
-          ] as const).map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
-                tab === t.key
-                  ? 'border-indigo-500 text-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+      {tabs.length > 0 && (
+        <div className="border-b border-gray-800 px-6">
+          <div className="flex gap-1">
+            {tabs.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
+                  activeTab === t.key
+                    ? 'border-indigo-500 text-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {tab === 'establishments' ? (
+        {!activeTab ? (
+          <div className="bg-gray-900 rounded-xl border border-gray-800 p-12 text-center text-gray-500">
+            Нет доступа ни к одному разделу. Попросите владельца выдать страницы.
+          </div>
+        ) : activeTab === 'establishments' ? (
           <EstablishmentsTab
             initialData={initialEstablishments}
             initialError={establishmentsError}
           />
-        ) : (
+        ) : activeTab === 'promo' ? (
           <PromoTab />
+        ) : (
+          <StaffTab />
         )}
       </main>
     </div>

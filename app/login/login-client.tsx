@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 export default function LoginClient() {
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,13 +16,14 @@ export default function LoginClient() {
     const res = await fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ email, password }),
     })
+    const data = await res.json().catch(() => ({}))
 
     if (res.ok) {
       window.location.href = '/'
     } else {
-      setError('Неверный пароль')
+      setError(typeof data.error === 'string' ? data.error : 'Неверный логин или пароль')
       setLoading(false)
     }
   }
@@ -35,13 +37,24 @@ export default function LoginClient() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
+          <label className="block text-sm text-gray-400 mb-2">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@email.com"
+            autoComplete="username"
+            autoFocus
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition mb-4"
+          />
+
           <label className="block text-sm text-gray-400 mb-2">Пароль</label>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="••••••••"
-            autoFocus
+            autoComplete="current-password"
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition mb-4"
           />
 
@@ -51,7 +64,7 @@ export default function LoginClient() {
 
           <button
             type="submit"
-            disabled={loading || !password}
+            disabled={loading || !email.trim() || !password}
             className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition"
           >
             {loading ? 'Проверка...' : 'Войти'}
