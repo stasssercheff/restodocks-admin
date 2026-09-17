@@ -2,6 +2,7 @@ import { createServiceClient, readEnv } from './supabase-server'
 import { ALL_ADMIN_PAGE_KEYS, sanitizePages, type AdminPageKey } from './admin-pages'
 import { hashPassword } from './password'
 import { randomUUID } from 'node:crypto'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 
 export const ADMIN_USERS_TABLE = 'admin_panel_users'
 
@@ -58,19 +59,28 @@ export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
+const DEV_STORE_PATH = '/tmp/restodocks-admin-users.json'
+
 function isDevMemoryStore() {
   return readEnv('ADMIN_USERS_DEV_STORE') === 'memory' && process.env.NODE_ENV !== 'production'
 }
 
 function memoryRows(): AdminUserRow[] {
-  const g = globalThis as unknown as { __restodocksAdminUsers?: AdminUserRow[] }
-  if (!g.__restodocksAdminUsers) g.__restodocksAdminUsers = []
-  return g.__restodocksAdminUsers
+  try {
+    if (!existsSync(DEV_STORE_PATH)) return []
+    const parsed = JSON.parse(readFileSync(DEV_STORE_PATH, 'utf8'))
+    return Array.isArray(parsed) ? parsed as AdminUserRow[] : []
+  } catch {
+    return []
+  }
+}
+
+function saveMemoryRows(rows: AdminUserRow[]) {
+  writeFileSync(DEV_STORE_PATH, JSON.stringify(rows, null, 2))
 }
 
 function rowFromMemory(idOrEmail: { id?: string; email?: string }): AdminUserRow | undefined {
-  const rows = memoryRows()
-  return rows.find(row =>
+  return memoryRows().find(row =>
     (idOrEmail.id && row.id === idOrEmail.id)
     || (idOrEmail.email && row.email === idOrEmail.email),
   )
@@ -172,7 +182,8 @@ export async function createStaffUser(input: {
   }
 
   if (isDevMemoryStore()) {
-    if (memoryRows().some(row => row.email === email)) {
+    const rows = memoryRows()
+    if (rows.some(item => item.email === email)) {
       return { error: 'Пользователь с таким email уже есть', status: 409 }
     }
     const row: AdminUserRow = {
@@ -185,7 +196,8 @@ export async function createStaffUser(input: {
       is_active: true,
       created_at: new Date().toISOString(),
     }
-    memoryRows().push(row)
+    rows.push(row)
+    saveMemoryRows(rows)
     return { user: mapRow(row) }
   }
 
@@ -241,12 +253,14 @@ export async function updateStaffUser(input: {
   }
 
   if (isDevMemoryStore()) {
-    const row = rowFromMemory({ id: input.id })
+    const rows = memoryRows()
+    const row = rows.find(item => item.id === input.id)
     if (!row) return { error: 'Пользователь не найден', status: 404 }
     if (patch.pages !== undefined) row.pages = patch.pages as string[]
     if (typeof patch.is_active === 'boolean') row.is_active = patch.is_active
     if (patch.display_name !== undefined) row.display_name = patch.display_name as string | null
     if (typeof patch.password_hash === 'string') row.password_hash = patch.password_hash
+    saveMemoryRows(rows)
     return { user: mapRow(row) }
   }
 
@@ -278,6 +292,7 @@ export async function deleteStaffUser(id: string): Promise<{ ok: true } | { erro
     const index = rows.findIndex(row => row.id === id)
     if (index < 0) return { error: 'Пользователь не найден', status: 404 }
     rows.splice(index, 1)
+    saveMemoryRows(rows)
     return { ok: true }
   }
 

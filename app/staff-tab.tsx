@@ -30,6 +30,7 @@ export default function StaffTab() {
   const [displayName, setDisplayName] = useState('')
   const [pages, setPages] = useState<AdminPageKey[]>([])
   const [creating, setCreating] = useState(false)
+  const [createdAccount, setCreatedAccount] = useState<{ email: string; password: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -62,6 +63,9 @@ export default function StaffTab() {
     if (!email.trim() || !password) return
     setCreating(true)
     setError(null)
+    setCreatedAccount(null)
+    const issuedPassword = password
+    const issuedEmail = email.trim()
     const res = await fetch('/api/admin-users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -82,6 +86,7 @@ export default function StaffTab() {
     setPassword('')
     setDisplayName('')
     setPages([])
+    setCreatedAccount({ email: issuedEmail, password: issuedPassword })
     await load()
   }
 
@@ -98,11 +103,12 @@ export default function StaffTab() {
     if (!res.ok) {
       setError(typeof json.error === 'string' ? json.error : 'Не удалось сохранить')
       await load()
-      return
+      return false
     }
     if (json.user) {
       setUsers(current => current.map(user => user.id === id ? json.user : user))
     }
+    return true
   }
 
   async function togglePage(user: StaffUser, key: AdminPageKey) {
@@ -120,8 +126,9 @@ export default function StaffTab() {
       alert('Пароль должен быть не короче 8 символов')
       return
     }
-    await patchUser(user.id, { password: next.trim() })
-    alert(`Пароль для ${user.email} обновлён`)
+    if (await patchUser(user.id, { password: next.trim() })) {
+      setCreatedAccount({ email: user.email, password: next.trim() })
+    }
   }
 
   async function removeUser(user: StaffUser) {
@@ -218,6 +225,21 @@ export default function StaffTab() {
           {creating ? '...' : '+ Создать учётку'}
         </button>
       </div>
+
+      {createdAccount && (
+        <div className="mb-4 rounded-lg border border-emerald-900/60 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
+          Учётка <span className="font-medium text-white">{createdAccount.email}</span> создана.
+          Пароль: <span className="font-mono text-white">{createdAccount.password}</span>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(createdAccount.password)}
+            className="ml-3 text-xs px-2 py-1 rounded border border-emerald-800 text-emerald-300 hover:text-white hover:border-emerald-500 transition"
+          >
+            Скопировать
+          </button>
+          <span className="block text-xs text-emerald-500/80 mt-1">Передай его сотруднику — повторно пароль не показывается.</span>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">
