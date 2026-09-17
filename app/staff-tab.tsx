@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ADMIN_PAGES, type AdminPageKey } from '@/lib/admin-pages'
+import { useI18n } from '@/lib/i18n'
 
 type StaffUser = {
   id: string
@@ -19,6 +20,7 @@ function generatePassword(length = 12): string {
 }
 
 export default function StaffTab() {
+  const { t } = useI18n()
   const [users, setUsers] = useState<StaffUser[]>([])
   const [ownerEmail, setOwnerEmail] = useState('')
   const [loading, setLoading] = useState(true)
@@ -40,18 +42,18 @@ export default function StaffTab() {
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
         setUsers([])
-        setError(typeof json.error === 'string' ? json.error : 'Не удалось загрузить админов')
+        setError(typeof json.error === 'string' ? json.error : t.admins.loadError)
         return
       }
       setOwnerEmail(typeof json.owner?.email === 'string' ? json.owner.email : '')
       setUsers(Array.isArray(json.users) ? json.users : [])
     } catch {
       setUsers([])
-      setError('Не удалось загрузить админов')
+      setError(t.admins.loadError)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t.admins.loadError])
 
   useEffect(() => { load() }, [load])
 
@@ -152,9 +154,9 @@ export default function StaffTab() {
     <>
       <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-6 space-y-4">
         <div>
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Новый админ панели</h2>
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t.admins.newTitle}</h2>
           <p className="text-xs text-gray-600 mt-1">
-            Это доступ в эту админку, не сотрудники заведений в Restodocks. Отметь, какие вкладки ему показывать.
+            {t.admins.newHint}
           </p>
         </div>
 
@@ -184,12 +186,12 @@ export default function StaffTab() {
                 onClick={() => setPassword(generatePassword())}
                 className="text-xs px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition"
               >
-                Сгенерировать
+                {t.admins.generate}
               </button>
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Имя (необязательно)</label>
+            <label className="text-xs text-gray-500">{t.admins.name}</label>
             <input
               type="text"
               value={displayName}
@@ -201,7 +203,7 @@ export default function StaffTab() {
         </div>
 
         <div>
-          <div className="text-xs text-gray-500 mb-2">Доступ к разделам</div>
+          <div className="text-xs text-gray-500 mb-2">{t.admins.access}</div>
           <div className="flex flex-wrap gap-4">
             {ADMIN_PAGES.map(page => (
               <label key={page.key} className="flex items-center gap-2 cursor-pointer select-none text-sm">
@@ -211,7 +213,7 @@ export default function StaffTab() {
                   onChange={() => toggleNewPage(page.key)}
                   className="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500"
                 />
-                <span>{page.label}</span>
+                <span>{t.tabs[page.key]}</span>
               </label>
             ))}
           </div>
@@ -222,22 +224,22 @@ export default function StaffTab() {
           disabled={creating || !email.trim() || password.length < 8}
           className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 rounded-lg font-medium transition"
         >
-          {creating ? '...' : '+ Создать учётку'}
+          {creating ? '...' : t.admins.create}
         </button>
       </div>
 
       {createdAccount && (
         <div className="mb-4 rounded-lg border border-emerald-900/60 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
-          Учётка <span className="font-medium text-white">{createdAccount.email}</span> создана.
-          Пароль: <span className="font-mono text-white">{createdAccount.password}</span>
+          {t.admins.created} <span className="font-medium text-white">{createdAccount.email}</span>
+          {' '}{t.admins.password} <span className="font-mono text-white">{createdAccount.password}</span>
           <button
             type="button"
             onClick={() => navigator.clipboard.writeText(createdAccount.password)}
             className="ml-3 text-xs px-2 py-1 rounded border border-emerald-800 text-emerald-300 hover:text-white hover:border-emerald-500 transition"
           >
-            Скопировать
+            {t.admins.copyPass}
           </button>
-          <span className="block text-xs text-emerald-500/80 mt-1">Передай его админу — повторно пароль не показывается.</span>
+          <span className="block text-xs text-emerald-500/80 mt-1">{t.admins.passOnce}</span>
         </div>
       )}
 
@@ -254,9 +256,9 @@ export default function StaffTab() {
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-                <th className="px-4 py-3 text-left">Админ</th>
+                <th className="px-4 py-3 text-left">{t.admins.colAdmin}</th>
                 {ADMIN_PAGES.map(page => (
-                  <th key={page.key} className="px-4 py-3 text-center">{page.label}</th>
+                  <th key={page.key} className="px-4 py-3 text-center">{t.tabs[page.key]}</th>
                 ))}
                 <th className="px-4 py-3 text-right">Действия</th>
               </tr>
@@ -265,17 +267,17 @@ export default function StaffTab() {
               <tr className="border-b border-gray-800/50 bg-gray-800/20">
                 <td className="px-4 py-3">
                   <div className="font-medium text-white">{ownerEmail || 'Владелец'}</div>
-                  <div className="text-xs text-indigo-300 mt-0.5">полный доступ</div>
+                  <div className="text-xs text-indigo-300 mt-0.5">{t.admins.fullAccess}</div>
                 </td>
                 {ADMIN_PAGES.map(page => (
                   <td key={page.key} className="px-4 py-3 text-center text-gray-500">✓</td>
                 ))}
-                <td className="px-4 py-3 text-right text-xs text-gray-600">владелец</td>
+                <td className="px-4 py-3 text-right text-xs text-gray-600">{t.admins.owner}</td>
               </tr>
               {users.length === 0 ? (
                 <tr>
                   <td colSpan={ADMIN_PAGES.length + 2} className="px-4 py-8 text-center text-gray-500">
-                    Других админов пока нет — создай учётку выше
+                    {t.admins.empty}
                   </td>
                 </tr>
               ) : users.map(user => (

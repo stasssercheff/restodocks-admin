@@ -1,7 +1,9 @@
 /** Разделы админки. Новый экран = новая запись; чекбоксы доступа подхватят её сами. */
 export const ADMIN_PAGES = [
-  { key: 'establishments', label: 'Заведения' },
-  { key: 'promo', label: 'Промокоды' },
+  { key: 'establishments' },
+  { key: 'promo' },
+  { key: 'demo' },
+  { key: 'vitrine' },
 ] as const
 
 export type AdminPageKey = (typeof ADMIN_PAGES)[number]['key']

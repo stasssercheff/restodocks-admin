@@ -6,6 +6,9 @@ import type { PromoCode, PromoGrantMode } from '@/lib/supabase'
 import type { EstablishmentRow } from '@/lib/establishments'
 import { ADMIN_PAGES, canAccessPage, type AdminPageKey, type PublicAdminUser } from '@/lib/admin-pages'
 import StaffTab from './staff-tab'
+import DemoTab from './demo-tab'
+import VitrineTab from './vitrine-tab'
+import { LanguageSwitcher, useI18n } from '@/lib/i18n'
 
 type TabKey = AdminPageKey | 'staff'
 
@@ -38,11 +41,11 @@ function isValidNow(startsAt: string | null, expiresAt: string | null) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-function visibleTabs(user: PublicAdminUser): { key: TabKey; label: string }[] {
+function visibleTabs(user: PublicAdminUser, labels: Record<AdminPageKey | 'staff', string>): { key: TabKey; label: string }[] {
   const pages: { key: TabKey; label: string }[] = ADMIN_PAGES
     .filter(page => canAccessPage(user, page.key))
-    .map(page => ({ key: page.key, label: page.label }))
-  if (user.isOwner) pages.push({ key: 'staff', label: 'Админы' })
+    .map(page => ({ key: page.key, label: labels[page.key] }))
+  if (user.isOwner) pages.push({ key: 'staff', label: labels.staff })
   return pages
 }
 
@@ -55,7 +58,14 @@ export default function AdminClient({
   initialEstablishments?: Establishment[]
   establishmentsError?: string | null
 }) {
-  const tabs = visibleTabs(user)
+  const { t } = useI18n()
+  const tabs = visibleTabs(user, {
+    establishments: t.tabs.establishments,
+    promo: t.tabs.promo,
+    demo: t.tabs.demo,
+    vitrine: t.tabs.vitrine,
+    staff: t.tabs.admins,
+  })
   const [tab, setTab] = useState<TabKey>(tabs[0]?.key ?? 'establishments')
   const activeTab = tabs.some(item => item.key === tab) ? tab : tabs[0]?.key
 
@@ -72,9 +82,10 @@ export default function AdminClient({
           <span className="text-gray-500 ml-2 text-sm">/ Admin</span>
         </div>
         <div className="flex items-center gap-4">
+          <LanguageSwitcher />
           <span className="text-sm text-gray-500">{user.email}</span>
           <button onClick={logout} className="text-sm text-gray-500 hover:text-white transition">
-            Выйти
+            {t.header.logout}
           </button>
         </div>
       </header>
@@ -82,17 +93,17 @@ export default function AdminClient({
       {tabs.length > 0 && (
         <div className="border-b border-gray-800 px-6">
           <div className="flex gap-1">
-            {tabs.map(t => (
+            {tabs.map(item => (
               <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
+                key={item.key}
+                onClick={() => setTab(item.key)}
                 className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
-                  activeTab === t.key
+                  activeTab === item.key
                     ? 'border-indigo-500 text-white'
                     : 'border-transparent text-gray-500 hover:text-gray-300'
                 }`}
               >
-                {t.label}
+                {item.label}
               </button>
             ))}
           </div>
@@ -102,7 +113,7 @@ export default function AdminClient({
       <main className="max-w-6xl mx-auto px-4 py-8">
         {!activeTab ? (
           <div className="bg-gray-900 rounded-xl border border-gray-800 p-12 text-center text-gray-500">
-            Нет доступа ни к одному разделу. Попросите владельца выдать страницы.
+            {t.noAccess}
           </div>
         ) : activeTab === 'establishments' ? (
           <EstablishmentsTab
@@ -111,6 +122,10 @@ export default function AdminClient({
           />
         ) : activeTab === 'promo' ? (
           <PromoTab />
+        ) : activeTab === 'demo' ? (
+          <DemoTab />
+        ) : activeTab === 'vitrine' ? (
+          <VitrineTab />
         ) : (
           <StaffTab />
         )}
@@ -129,6 +144,7 @@ function EstablishmentsTab({
   initialError: string | null
 }) {
   const router = useRouter()
+  const { t } = useI18n()
   const [data, setData] = useState<Establishment[]>(Array.isArray(initialData) ? initialData : [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(initialError)
@@ -146,17 +162,17 @@ function EstablishmentsTab({
       const json = await res.json()
       if (!res.ok) {
         setData([])
-        setError(typeof json.error === 'string' ? json.error : 'Не удалось загрузить заведения')
+        setError(typeof json.error === 'string' ? json.error : t.establishments.loadError)
         return
       }
       setData(Array.isArray(json) ? json : [])
     } catch {
       setData([])
-      setError('Не удалось загрузить заведения')
+      setError(t.establishments.loadError)
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, [router, t.establishments.loadError])
 
   // If SSR had no data (or env missing at first paint), retry once from the client.
   useEffect(() => {
@@ -178,9 +194,9 @@ function EstablishmentsTab({
     <>
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-8">
-        <StatCard label="Заведений" value={total} />
-        <StatCard label="Сотрудников" value={totalEmployees} />
-        <StatCard label="Подписок" value="—" dimmed />
+        <StatCard label={t.establishments.count} value={total} />
+        <StatCard label={t.establishments.employees} value={totalEmployees} />
+        <StatCard label={t.establishments.subscriptions} value="—" dimmed />
       </div>
 
       {/* Search */}
@@ -189,11 +205,11 @@ function EstablishmentsTab({
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Поиск по названию, владельцу, email..."
+          placeholder={t.establishments.search}
           className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1"
         />
         <button onClick={load} className="text-gray-500 hover:text-white transition px-3 py-2 rounded-lg border border-gray-800 text-sm">
-          ↻ Обновить
+          {t.common.refresh}
         </button>
       </div>
 
@@ -206,22 +222,22 @@ function EstablishmentsTab({
       {/* Table */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-gray-500">Загрузка...</div>
+          <div className="p-12 text-center text-gray-500">{t.common.loading}</div>
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-gray-500">
-            {error ? 'Нет данных' : 'Заведений нет'}
+            {error ? t.common.noData : t.establishments.empty}
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-                <th className="px-4 py-3 text-left">Заведение</th>
-                <th className="px-4 py-3 text-left">Владелец</th>
-                <th className="px-4 py-3 text-left">Email</th>
-                <th className="px-4 py-3 text-center">Сотрудников</th>
-                <th className="px-4 py-3 text-left">Страна</th>
-                <th className="px-4 py-3 text-left">Дата регистрации</th>
-                <th className="px-4 py-3 text-left">Подписка</th>
+                <th className="px-4 py-3 text-left">{t.establishments.colPlace}</th>
+                <th className="px-4 py-3 text-left">{t.establishments.colOwner}</th>
+                <th className="px-4 py-3 text-left">{t.establishments.colEmail}</th>
+                <th className="px-4 py-3 text-center">{t.establishments.colEmployees}</th>
+                <th className="px-4 py-3 text-left">{t.establishments.colCountry}</th>
+                <th className="px-4 py-3 text-left">{t.establishments.colRegistered}</th>
+                <th className="px-4 py-3 text-left">{t.establishments.colSub}</th>
               </tr>
             </thead>
             <tbody>
@@ -242,7 +258,7 @@ function EstablishmentsTab({
                   <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-500">
-                      — (скоро)
+                      {t.establishments.soon}
                     </span>
                   </td>
                 </tr>
@@ -266,6 +282,7 @@ function grantLabel(row: PromoCode) {
 }
 
 function PromoTab() {
+  const { t } = useI18n()
   const [codes, setCodes] = useState<PromoCode[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -468,16 +485,16 @@ function PromoTab() {
     <>
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3 mb-8">
-        <StatCard label="Всего" value={total} />
-        <StatCard label="Свободно" value={freeCount} />
-        <StatCard label="Использовано" value={usedCount} />
-        <StatCard label="Истекло" value={expiredCount} />
+        <StatCard label={t.promo.total} value={total} />
+        <StatCard label={t.promo.free} value={freeCount} />
+        <StatCard label={t.promo.used} value={usedCount} />
+        <StatCard label={t.promo.expired} value={expiredCount} />
       </div>
 
       {/* Add form */}
       <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-6 space-y-5">
         <div>
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Новый промокод</h2>
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t.promo.newTitle}</h2>
           <p className="text-xs text-gray-600 mt-1">
             Ultra до конца года → включи «как по подписке», поставь дату окончания. Дни вводить не нужно.
           </p>
@@ -595,7 +612,7 @@ function PromoTab() {
               disabled={saving || !canCreate}
               className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 rounded-lg font-medium transition"
             >
-              {saving ? '...' : '+ Создать'}
+              {saving ? '...' : t.promo.create}
             </button>
           </div>
         </div>
@@ -609,7 +626,7 @@ function PromoTab() {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Поиск..."
+          placeholder={t.common.search}
           className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-48"
         />
         <div className="flex gap-2">
@@ -619,7 +636,7 @@ function PromoTab() {
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-sm transition ${filter === f ? 'bg-indigo-600 text-white' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'}`}
             >
-              {{ all: 'Все', free: 'Свободные', used: 'Исп.', expired: 'Истекшие' }[f]}
+              {{ all: t.promo.all, free: t.promo.freeFilter, used: t.promo.usedFilter, expired: t.promo.expiredFilter }[f]}
             </button>
           ))}
         </div>
@@ -630,7 +647,7 @@ function PromoTab() {
         {loading ? (
           <div className="p-12 text-center text-gray-500">Загрузка...</div>
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">Промокодов нет</div>
+          <div className="p-12 text-center text-gray-500">{t.promo.empty}</div>
         ) : (
           <table className="w-full text-sm min-w-[900px]">
             <thead>

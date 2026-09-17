@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { LanguageSwitcher, useI18n } from '@/lib/i18n'
 
 export default function LoginClient() {
+  const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -23,7 +25,7 @@ export default function LoginClient() {
     if (res.ok) {
       window.location.href = '/'
     } else {
-      setError(typeof data.error === 'string' ? data.error : 'Неверный логин или пароль')
+      setError(typeof data.error === 'string' ? data.error : t.login.invalid)
       setLoading(false)
     }
   }
@@ -31,13 +33,16 @@ export default function LoginClient() {
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
+        <div className="flex justify-end mb-4">
+          <LanguageSwitcher />
+        </div>
         <div className="text-center mb-8">
           <div className="text-3xl font-bold text-white mb-1">Restodocks</div>
-          <div className="text-gray-400 text-sm">Platform Admin</div>
+          <div className="text-gray-400 text-sm">{t.login.subtitle}</div>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-gray-900 rounded-2xl p-6 border border-gray-800">
-          <label className="block text-sm text-gray-400 mb-2">Email</label>
+          <label className="block text-sm text-gray-400 mb-2">{t.login.email}</label>
           <input
             type="email"
             value={email}
@@ -48,7 +53,7 @@ export default function LoginClient() {
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition mb-4"
           />
 
-          <label className="block text-sm text-gray-400 mb-2">Пароль</label>
+          <label className="block text-sm text-gray-400 mb-2">{t.login.password}</label>
           <input
             type="password"
             value={password}
@@ -67,7 +72,7 @@ export default function LoginClient() {
             disabled={loading || !email.trim() || !password}
             className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition"
           >
-            {loading ? 'Проверка...' : 'Войти'}
+            {loading ? t.login.checking : t.login.submit}
           </button>
         </form>
       </div>
