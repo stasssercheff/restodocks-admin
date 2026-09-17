@@ -3,7 +3,7 @@ import { requireAdminRequest } from '@/lib/admin-auth'
 import { listDemoSandboxes } from '@/lib/demo'
 
 export async function GET(req: NextRequest) {
-  const auth = await requireAdminRequest(req, 'demo')
+  const auth = await requireAdminRequest(req, 'demo_sandboxes')
   if ('response' in auth) return auth.response
 
   const result = await listDemoSandboxes()
