@@ -20,14 +20,14 @@ Copy `.env.example` → `.env.local` and fill Supabase + `ADMIN_EMAIL` / `ADMIN_
 
 ## Admin accounts
 
-Login is email + password. The owner is the `ADMIN_EMAIL` + `ADMIN_PASSWORD` pair (Cloudflare Worker secrets). Staff accounts live in Supabase table `admin_panel_users`.
+Login is email + password for everyone. Owner login is `stassser@gmail.com` + `ADMIN_PASSWORD` (or `ADMIN_EMAIL` if that secret is set). Staff accounts live in Supabase table `admin_panel_users`.
 
 1. In the Supabase SQL editor run `supabase/migrations/20260917_admin_panel_users.sql`.
 2. Log in as owner.
 3. Open **Сотрудники**, create an email/password, and tick which tabs that person can see (Заведения, Промокоды). Future admin pages are added to `ADMIN_PAGES` in `lib/admin-pages.ts` and automatically appear as checkboxes.
 4. That person logs in and only sees granted tabs. APIs for other tabs return 403.
 
-If `ADMIN_EMAIL` is not set yet, the current `ADMIN_PASSWORD` still logs in as owner with whatever email you type — set `ADMIN_EMAIL` in Worker secrets when you can.
+Owner email defaults to `stassser@gmail.com`; `ADMIN_PASSWORD` stays the same as now.
 
 ## Deploy (Cloudflare Workers)
 

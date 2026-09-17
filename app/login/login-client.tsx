@@ -42,7 +42,7 @@ export default function LoginClient() {
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="you@email.com"
+            placeholder="stassser@gmail.com"
             autoComplete="username"
             autoFocus
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition mb-4"

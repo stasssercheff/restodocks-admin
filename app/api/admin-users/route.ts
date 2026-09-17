@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminRequest, ownerEmailForDisplay } from '@/lib/admin-auth'
+import { requireAdminRequest, ownerEmailForDisplay, ownerLoginEmail } from '@/lib/admin-auth'
 import {
   createStaffUser,
   deleteStaffUser,
@@ -7,12 +7,6 @@ import {
   normalizeEmail,
   updateStaffUser,
 } from '@/lib/admin-users'
-import { readEnv } from '@/lib/supabase-server'
-
-function reservedOwnerEmail(): string | undefined {
-  const email = readEnv('ADMIN_EMAIL')
-  return email ? normalizeEmail(email) : undefined
-}
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'staff')
@@ -36,8 +30,8 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const email = typeof body.email === 'string' ? normalizeEmail(body.email) : ''
-  const ownerEmail = reservedOwnerEmail()
-  if (ownerEmail && email === ownerEmail) {
+  const ownerEmail = ownerLoginEmail()
+  if (email === ownerEmail) {
     return NextResponse.json({ error: 'Этот email занят владельцем' }, { status: 409 })
   }
   if (email && email === normalizeEmail(auth.user.email)) {

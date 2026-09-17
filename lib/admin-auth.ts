@@ -8,6 +8,7 @@ import { readEnv } from '@/lib/supabase-server'
 
 export const ADMIN_SESSION_COOKIE = 'admin_session'
 export const ENV_OWNER_UID = 'env-owner'
+export const DEFAULT_OWNER_EMAIL = 'stassser@gmail.com'
 
 export type AdminUser = {
   id: string
@@ -35,9 +36,8 @@ export function publicAdminUser(user: AdminUser) {
   }
 }
 
-function envOwnerEmail(): string | undefined {
-  const email = readEnv('ADMIN_EMAIL')
-  return email ? normalizeEmail(email) : undefined
+export function ownerLoginEmail(): string {
+  return normalizeEmail(readEnv('ADMIN_EMAIL') || DEFAULT_OWNER_EMAIL)
 }
 
 function envOwnerPassword(): string | undefined {
@@ -45,7 +45,7 @@ function envOwnerPassword(): string | undefined {
 }
 
 export function ownerEmailForDisplay(sessionEmail?: string): string {
-  return envOwnerEmail() || sessionEmail || 'владелец'
+  return ownerLoginEmail() || sessionEmail || DEFAULT_OWNER_EMAIL
 }
 
 function ownerUser(email: string): AdminUser {
@@ -73,9 +73,7 @@ function fromRecord(record: AdminUserRecord): AdminUser {
 function isEnvOwnerCredentials(email: string, password: string): boolean {
   const adminPassword = envOwnerPassword()
   if (!adminPassword || !safeStringEqual(password, adminPassword)) return false
-  const configuredEmail = envOwnerEmail()
-  if (!configuredEmail) return true
-  return normalizeEmail(email) === configuredEmail
+  return normalizeEmail(email) === ownerLoginEmail()
 }
 
 export async function authenticateAdmin(emailRaw: string, password: string): Promise<
