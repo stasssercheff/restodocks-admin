@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
     password: typeof body.password === 'string' ? body.password : '',
     displayName: typeof body.displayName === 'string' ? body.displayName : null,
     pages: body.pages,
+    promoCodes: body.promoCodes,
+    referralDepth: body.referralDepth,
   })
   if ('error' in result) {
     return NextResponse.json({ error: result.error }, { status: result.status ?? 500 })
@@ -64,6 +66,8 @@ export async function PATCH(req: NextRequest) {
     isActive: typeof body.isActive === 'boolean' ? body.isActive : undefined,
     password: typeof body.password === 'string' && body.password ? body.password : undefined,
     displayName: typeof body.displayName === 'string' ? body.displayName : undefined,
+    promoCodes: body.promoCodes,
+    referralDepth: body.referralDepth,
   })
   if ('error' in result) {
     return NextResponse.json({ error: result.error }, { status: result.status ?? 500 })

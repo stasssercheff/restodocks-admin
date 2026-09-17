@@ -1,8 +1,10 @@
-import { createServiceClient, readEnv } from './supabase-server'
-import { ALL_ADMIN_PAGE_KEYS, sanitizePages, type AdminPageKey } from './admin-pages'
-import { hashPassword } from './password'
 import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { createServiceClient, readEnv } from './supabase-server'
+import { ALL_ADMIN_PAGE_KEYS, sanitizePages, type AdminPageKey } from './admin-pages'
+import { readAdminConfigJson, writeAdminConfigJson } from './admin-kv'
+import { sanitizeDataScope, sanitizePromoCodes, sanitizeReferralDepth, type DataScope } from './admin-scope'
+import { hashPassword } from './password'
 
 export const ADMIN_USERS_TABLE = 'admin_panel_users'
 
@@ -14,6 +16,8 @@ export type AdminUserRecord = {
   pages: AdminPageKey[]
   isActive: boolean
   createdAt: string
+  promoCodes: string[]
+  referralDepth: number
 }
 
 type AdminUserRow = {
@@ -25,10 +29,19 @@ type AdminUserRow = {
   pages: string[] | null
   is_active: boolean
   created_at: string
+  promo_codes?: string[] | null
+  referral_depth?: number | null
 }
 
 const TABLE_MISSING_HINT =
   'Таблица admin_panel_users ещё не создана в Supabase. Выполни supabase/migrations/20260917_admin_panel_users.sql'
+
+const DEFAULT_STAFF_PAGES: AdminPageKey[] = ['establishments']
+
+function staffPages(input: unknown): AdminPageKey[] {
+  const pages = sanitizePages(input)
+  return pages.length > 0 ? pages : [...DEFAULT_STAFF_PAGES]
+}
 
 function mapRow(row: AdminUserRow): AdminUserRecord {
   return {
@@ -39,6 +52,8 @@ function mapRow(row: AdminUserRow): AdminUserRecord {
     pages: row.is_owner ? [...ALL_ADMIN_PAGE_KEYS] : sanitizePages(row.pages),
     isActive: row.is_active !== false,
     createdAt: row.created_at,
+    promoCodes: sanitizePromoCodes(row.promo_codes),
+    referralDepth: sanitizeReferralDepth(row.referral_depth),
   }
 }
 
@@ -50,6 +65,14 @@ function tableMissing(message: string | undefined): boolean {
     || text.includes('could not find')
   )
 }
+
+function scopeColumnsMissing(message: string | undefined): boolean {
+  const text = (message ?? '').toLowerCase()
+  return text.includes('promo_codes') || text.includes('referral_depth')
+}
+
+const USER_COLUMNS = 'id, email, password_hash, display_name, is_owner, pages, is_active, created_at, promo_codes, referral_depth'
+const USER_COLUMNS_LEGACY = 'id, email, password_hash, display_name, is_owner, pages, is_active, created_at'
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
@@ -92,8 +115,35 @@ function getClient() {
   return { client }
 }
 
-function found(row: AdminUserRow) {
-  return { user: mapRow(row), passwordHash: row.password_hash }
+function scopeKey(id: string) {
+  return `admin_user_scope:${id}`
+}
+
+function omitScopeColumns<T extends Record<string, unknown>>(row: T) {
+  const next = { ...row }
+  delete next.promo_codes
+  delete next.referral_depth
+  return next
+}
+
+async function saveScopeOverlay(id: string, scope: DataScope) {
+  try {
+    await writeAdminConfigJson(scopeKey(id), scope)
+  } catch {
+    // KV is optional; SQL columns are the source of truth when present.
+  }
+}
+
+async function mergeScope(record: AdminUserRecord): Promise<AdminUserRecord> {
+  if (record.isOwner || record.promoCodes.length > 0) return record
+  const overlay = await readAdminConfigJson<DataScope>(scopeKey(record.id))
+  if (!overlay) return record
+  const sanitized = sanitizeDataScope(overlay)
+  return { ...record, promoCodes: sanitized.promoCodes, referralDepth: sanitized.referralDepth }
+}
+
+async function found(row: AdminUserRow) {
+  return { user: await mergeScope(mapRow(row)), passwordHash: row.password_hash }
 }
 
 export async function findUserByEmail(email: string): Promise<
@@ -106,18 +156,25 @@ export async function findUserByEmail(email: string): Promise<
   }
   const svc = getClient()
   if ('error' in svc) return svc
-  const { data, error } = await svc.client
+  let query = await svc.client
     .from(ADMIN_USERS_TABLE)
-    .select('id, email, password_hash, display_name, is_owner, pages, is_active, created_at')
+    .select(USER_COLUMNS)
     .eq('email', normalized)
     .maybeSingle()
-
-  if (error) {
-    if (tableMissing(error.message)) return { error: TABLE_MISSING_HINT }
-    return { error: error.message }
+  if (query.error && scopeColumnsMissing(query.error.message)) {
+    query = await svc.client
+      .from(ADMIN_USERS_TABLE)
+      .select(USER_COLUMNS_LEGACY)
+      .eq('email', normalized)
+      .maybeSingle() as typeof query
   }
-  if (!data) return null
-  return found(data as AdminUserRow)
+
+  if (query.error) {
+    if (tableMissing(query.error.message)) return { error: TABLE_MISSING_HINT }
+    return { error: query.error.message }
+  }
+  if (!query.data) return null
+  return found(query.data as AdminUserRow)
 }
 
 export async function findUserById(id: string): Promise<
@@ -129,18 +186,25 @@ export async function findUserById(id: string): Promise<
   }
   const svc = getClient()
   if ('error' in svc) return svc
-  const { data, error } = await svc.client
+  let query = await svc.client
     .from(ADMIN_USERS_TABLE)
-    .select('id, email, password_hash, display_name, is_owner, pages, is_active, created_at')
+    .select(USER_COLUMNS)
     .eq('id', id)
     .maybeSingle()
-
-  if (error) {
-    if (tableMissing(error.message)) return { error: TABLE_MISSING_HINT }
-    return { error: error.message }
+  if (query.error && scopeColumnsMissing(query.error.message)) {
+    query = await svc.client
+      .from(ADMIN_USERS_TABLE)
+      .select(USER_COLUMNS_LEGACY)
+      .eq('id', id)
+      .maybeSingle() as typeof query
   }
-  if (!data) return null
-  return found(data as AdminUserRow)
+
+  if (query.error) {
+    if (tableMissing(query.error.message)) return { error: TABLE_MISSING_HINT }
+    return { error: query.error.message }
+  }
+  if (!query.data) return null
+  return found(query.data as AdminUserRow)
 }
 
 export async function listStaffUsers(): Promise<
@@ -148,24 +212,33 @@ export async function listStaffUsers(): Promise<
 > {
   if (isDevMemoryStore()) {
     return {
-      users: memoryRows().filter(row => !row.is_owner).map(mapRow),
+      users: await Promise.all(memoryRows().filter(row => !row.is_owner).map(row => mergeScope(mapRow(row)))),
     }
   }
   const svc = getClient()
   if ('error' in svc) return svc
-  const { data, error } = await svc.client
+  let query = await svc.client
     .from(ADMIN_USERS_TABLE)
-    .select('id, email, password_hash, display_name, is_owner, pages, is_active, created_at')
+    .select(USER_COLUMNS)
     .order('created_at', { ascending: true })
-
-  if (error) {
-    if (tableMissing(error.message)) return { error: TABLE_MISSING_HINT }
-    return { error: error.message }
+  if (query.error && scopeColumnsMissing(query.error.message)) {
+    query = await svc.client
+      .from(ADMIN_USERS_TABLE)
+      .select(USER_COLUMNS_LEGACY)
+      .order('created_at', { ascending: true }) as typeof query
   }
 
-  const users = ((data ?? []) as AdminUserRow[])
-    .filter(row => !row.is_owner)
-    .map(mapRow)
+  if (query.error) {
+    if (tableMissing(query.error.message)) return { error: TABLE_MISSING_HINT }
+    return { error: query.error.message }
+  }
+  const data = query.data
+
+  const users = await Promise.all(
+    ((data ?? []) as AdminUserRow[])
+      .filter(row => !row.is_owner)
+      .map(row => mergeScope(mapRow(row))),
+  )
   return { users }
 }
 
@@ -174,11 +247,19 @@ export async function createStaffUser(input: {
   password: string
   displayName?: string | null
   pages: unknown
+  promoCodes?: unknown
+  referralDepth?: unknown
 }): Promise<{ user: AdminUserRecord } | { error: string; status?: number }> {
   const email = normalizeEmail(input.email)
   if (!isValidEmail(email)) return { error: 'Укажи корректный email', status: 400 }
   if (!input.password || input.password.length < 8) {
     return { error: 'Пароль должен быть не короче 8 символов', status: 400 }
+  }
+
+  const pages = staffPages(input.pages)
+  const scope: DataScope = {
+    promoCodes: sanitizePromoCodes(input.promoCodes),
+    referralDepth: sanitizeReferralDepth(input.referralDepth),
   }
 
   if (isDevMemoryStore()) {
@@ -192,9 +273,11 @@ export async function createStaffUser(input: {
       password_hash: await hashPassword(input.password),
       display_name: input.displayName?.trim() || null,
       is_owner: false,
-      pages: sanitizePages(input.pages),
+      pages,
       is_active: true,
       created_at: new Date().toISOString(),
+      promo_codes: scope.promoCodes,
+      referral_depth: scope.referralDepth,
     }
     rows.push(row)
     saveMemoryRows(rows)
@@ -205,28 +288,39 @@ export async function createStaffUser(input: {
   if ('error' in svc) return svc
 
   const passwordHash = await hashPassword(input.password)
-  const { data, error } = await svc.client
+  const payload = {
+    email,
+    password_hash: passwordHash,
+    display_name: input.displayName?.trim() || null,
+    is_owner: false,
+    pages,
+    is_active: true,
+    promo_codes: scope.promoCodes,
+    referral_depth: scope.referralDepth,
+  }
+  let inserted = await svc.client
     .from(ADMIN_USERS_TABLE)
-    .insert({
-      email,
-      password_hash: passwordHash,
-      display_name: input.displayName?.trim() || null,
-      is_owner: false,
-      pages: sanitizePages(input.pages),
-      is_active: true,
-    })
-    .select('id, email, password_hash, display_name, is_owner, pages, is_active, created_at')
+    .insert(payload)
+    .select(USER_COLUMNS)
     .single()
-
-  if (error) {
-    if (tableMissing(error.message)) return { error: TABLE_MISSING_HINT, status: 500 }
-    if (error.code === '23505' || error.message.toLowerCase().includes('duplicate')) {
-      return { error: 'Пользователь с таким email уже есть', status: 409 }
-    }
-    return { error: error.message, status: 500 }
+  if (inserted.error && scopeColumnsMissing(inserted.error.message)) {
+    inserted = await svc.client
+      .from(ADMIN_USERS_TABLE)
+      .insert(omitScopeColumns(payload))
+      .select(USER_COLUMNS_LEGACY)
+      .single() as typeof inserted
   }
 
-  return { user: mapRow(data as AdminUserRow) }
+  if (inserted.error) {
+    if (tableMissing(inserted.error.message)) return { error: TABLE_MISSING_HINT, status: 500 }
+    if (inserted.error.code === '23505' || inserted.error.message.toLowerCase().includes('duplicate')) {
+      return { error: 'Пользователь с таким email уже есть', status: 409 }
+    }
+    return { error: inserted.error.message, status: 500 }
+  }
+  const row = inserted.data as AdminUserRow
+  await saveScopeOverlay(row.id, scope)
+  return { user: await mergeScope({ ...mapRow(row), ...scope }) }
 }
 
 export async function updateStaffUser(input: {
@@ -235,16 +329,29 @@ export async function updateStaffUser(input: {
   isActive?: boolean
   password?: string
   displayName?: string | null
+  promoCodes?: unknown
+  referralDepth?: unknown
 }): Promise<{ user: AdminUserRecord } | { error: string; status?: number }> {
   const existing = await findUserById(input.id)
   if (!existing) return { error: 'Пользователь не найден', status: 404 }
   if ('error' in existing) return existing
   if (existing.user.isOwner) return { error: 'Нельзя менять владельца через этот список', status: 400 }
 
+  const nextScope: DataScope = {
+    promoCodes: input.promoCodes !== undefined
+      ? sanitizePromoCodes(input.promoCodes)
+      : existing.user.promoCodes,
+    referralDepth: input.referralDepth !== undefined
+      ? sanitizeReferralDepth(input.referralDepth)
+      : existing.user.referralDepth,
+  }
+
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (input.pages !== undefined) patch.pages = sanitizePages(input.pages)
   if (typeof input.isActive === 'boolean') patch.is_active = input.isActive
   if (input.displayName !== undefined) patch.display_name = input.displayName?.trim() || null
+  if (input.promoCodes !== undefined) patch.promo_codes = nextScope.promoCodes
+  if (input.referralDepth !== undefined) patch.referral_depth = nextScope.referralDepth
   if (typeof input.password === 'string') {
     if (input.password.length < 8) {
       return { error: 'Пароль должен быть не короче 8 символов', status: 400 }
@@ -260,6 +367,8 @@ export async function updateStaffUser(input: {
     if (typeof patch.is_active === 'boolean') row.is_active = patch.is_active
     if (patch.display_name !== undefined) row.display_name = patch.display_name as string | null
     if (typeof patch.password_hash === 'string') row.password_hash = patch.password_hash
+    if (patch.promo_codes !== undefined) row.promo_codes = patch.promo_codes as string[]
+    if (typeof patch.referral_depth === 'number') row.referral_depth = patch.referral_depth
     saveMemoryRows(rows)
     return { user: mapRow(row) }
   }
@@ -267,18 +376,27 @@ export async function updateStaffUser(input: {
   const svc = getClient()
   if ('error' in svc) return svc
 
-  const { data, error } = await svc.client
+  let updated = await svc.client
     .from(ADMIN_USERS_TABLE)
     .update(patch)
     .eq('id', input.id)
-    .select('id, email, password_hash, display_name, is_owner, pages, is_active, created_at')
+    .select(USER_COLUMNS)
     .single()
-
-  if (error) {
-    if (tableMissing(error.message)) return { error: TABLE_MISSING_HINT, status: 500 }
-    return { error: error.message, status: 500 }
+  if (updated.error && scopeColumnsMissing(updated.error.message)) {
+    updated = await svc.client
+      .from(ADMIN_USERS_TABLE)
+      .update(omitScopeColumns(patch))
+      .eq('id', input.id)
+      .select(USER_COLUMNS_LEGACY)
+      .single() as typeof updated
   }
-  return { user: mapRow(data as AdminUserRow) }
+
+  if (updated.error) {
+    if (tableMissing(updated.error.message)) return { error: TABLE_MISSING_HINT, status: 500 }
+    return { error: updated.error.message, status: 500 }
+  }
+  await saveScopeOverlay(input.id, nextScope)
+  return { user: await mergeScope({ ...mapRow(updated.data as AdminUserRow), ...nextScope }) }
 }
 
 export async function deleteStaffUser(id: string): Promise<{ ok: true } | { error: string; status?: number }> {
@@ -302,6 +420,11 @@ export async function deleteStaffUser(id: string): Promise<{ ok: true } | { erro
   if (error) {
     if (tableMissing(error.message)) return { error: TABLE_MISSING_HINT, status: 500 }
     return { error: error.message, status: 500 }
+  }
+  try {
+    await writeAdminConfigJson(scopeKey(id), { promoCodes: [], referralDepth: 1 })
+  } catch {
+    // overlay cleanup is best-effort
   }
   return { ok: true }
 }

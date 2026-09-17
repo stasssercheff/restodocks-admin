@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { ALL_ADMIN_PAGE_KEYS, canAccessPage, type AdminPageKey } from '@/lib/admin-pages'
+import { type DataScope } from '@/lib/admin-scope'
 import { createSessionToken, verifySessionToken, type SessionPayload } from '@/lib/admin-session'
 import { findUserByEmail, findUserById, normalizeEmail, type AdminUserRecord } from '@/lib/admin-users'
 import { safeStringEqual, verifyPassword } from '@/lib/password'
@@ -17,6 +18,8 @@ export type AdminUser = {
   isOwner: boolean
   pages: AdminPageKey[]
   isActive: boolean
+  promoCodes: string[]
+  referralDepth: number
 }
 
 export const sessionCookieOptions = {
@@ -33,6 +36,16 @@ export function publicAdminUser(user: AdminUser) {
     displayName: user.displayName,
     isOwner: user.isOwner,
     pages: user.isOwner ? [...ALL_ADMIN_PAGE_KEYS] : user.pages,
+    promoCodes: user.isOwner ? [] : user.promoCodes,
+    referralDepth: user.referralDepth,
+  }
+}
+
+export function dataScopeForUser(user: { isOwner: boolean; promoCodes?: string[]; referralDepth?: number } | null | undefined): DataScope | 'all' {
+  if (!user || user.isOwner) return 'all'
+  return {
+    promoCodes: user.promoCodes ?? [],
+    referralDepth: user.referralDepth ?? 1,
   }
 }
 
@@ -56,6 +69,8 @@ function ownerUser(email: string): AdminUser {
     isOwner: true,
     pages: [...ALL_ADMIN_PAGE_KEYS],
     isActive: true,
+    promoCodes: [],
+    referralDepth: 5,
   }
 }
 
@@ -67,6 +82,8 @@ function fromRecord(record: AdminUserRecord): AdminUser {
     isOwner: record.isOwner,
     pages: record.isOwner ? [...ALL_ADMIN_PAGE_KEYS] : record.pages,
     isActive: record.isActive,
+    promoCodes: record.promoCodes,
+    referralDepth: record.referralDepth,
   }
 }
 

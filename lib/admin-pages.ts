@@ -37,6 +37,8 @@ export type PublicAdminUser = {
   displayName: string | null
   isOwner: boolean
   pages: AdminPageKey[]
+  promoCodes: string[]
+  referralDepth: number
 }
 
 export function canAccessPage(

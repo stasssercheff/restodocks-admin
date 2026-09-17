@@ -1,4 +1,5 @@
 import { createServiceClient, fetchAllRows } from '@/lib/supabase-server'
+import { buildReferralLevels, type DataScope, summarizeScopedRows, type ScopeStats } from '@/lib/admin-scope'
 
 export type SubscriptionSummary = {
   statusLabel: string
@@ -34,6 +35,8 @@ export type EstablishmentRow = {
   subscription_group: string
   subscription_filter_key: string
   last_activity_at: string | null
+  referred_by_establishment_id: string | null
+  referral_level: number | null
 }
 
 type EstablishmentRecord = {
@@ -52,6 +55,7 @@ type EstablishmentRecord = {
   pro_paid_until: string | null
   pro_trial_ends_at: string | null
   is_demo: boolean | null
+  referred_by_establishment_id?: string | null
 }
 
 type EmployeeRecord = {
@@ -230,23 +234,39 @@ function buildSubscription(args: {
   }
 }
 
-export async function listEstablishments(): Promise<
-  { data: EstablishmentRow[] } | { error: string }
+export async function listEstablishments(scope: DataScope | 'all' = 'all'): Promise<
+  { data: EstablishmentRow[]; stats: ScopeStats | null } | { error: string }
 > {
   try {
     const supabase = createServiceClient()
     if ('error' in supabase) return supabase
 
-    const establishmentsRes = await fetchAllRows<EstablishmentRecord>((from, to) =>
+    const EST_COLUMNS =
+      'id, name, address, created_at, default_currency, owner_id, parent_establishment_id, registration_ip, registration_country, registration_city, registration_client, subscription_type, pro_paid_until, pro_trial_ends_at, is_demo, referred_by_establishment_id'
+    const EST_COLUMNS_LEGACY =
+      'id, name, address, created_at, default_currency, owner_id, parent_establishment_id, registration_ip, registration_country, registration_city, registration_client, subscription_type, pro_paid_until, pro_trial_ends_at, is_demo'
+    let establishmentsRes = await fetchAllRows<EstablishmentRecord>((from, to) =>
       supabase
         .from('establishments')
-        .select('id, name, address, created_at, default_currency, owner_id, parent_establishment_id, registration_ip, registration_country, registration_city, registration_client, subscription_type, pro_paid_until, pro_trial_ends_at, is_demo')
+        .select(EST_COLUMNS)
         .order('created_at', { ascending: false })
         .range(from, to),
     )
+    if ('error' in establishmentsRes && (establishmentsRes.error ?? '').toLowerCase().includes('referred_by_establishment_id')) {
+      establishmentsRes = await fetchAllRows<EstablishmentRecord>((from, to) =>
+        supabase
+          .from('establishments')
+          .select(EST_COLUMNS_LEGACY)
+          .order('created_at', { ascending: false })
+          .range(from, to),
+      )
+    }
     if ('error' in establishmentsRes) return establishmentsRes
-    const establishments = establishmentsRes.data
-    if (establishments.length === 0) return { data: [] }
+    const establishments = establishmentsRes.data.map(item => ({
+      ...item,
+      referred_by_establishment_id: item.referred_by_establishment_id ?? null,
+    }))
+    if (establishments.length === 0) return { data: [], stats: null }
 
     const ids = establishments.map(item => item.id)
     const ownerIds = [...new Set(establishments.map(item => item.owner_id).filter(Boolean))] as string[]
@@ -281,12 +301,12 @@ export async function listEstablishments(): Promise<
     if ('error' in employeesRes) return employeesRes
     if ('error' in redemptionsRes) return redemptionsRes
 
-    const promoIds = [...new Set(redemptionsRes.data.map(item => item.promo_code_id))]
-    const promosRes = promoIds.length
+    const redeemedPromoIds = [...new Set(redemptionsRes.data.map(item => item.promo_code_id))]
+    const promosRes = redeemedPromoIds.length
       ? await supabase
           .from('promo_codes')
           .select('id, code, grants_subscription_type, grants_employee_slot_packs, grants_branch_slot_packs, grants_additive_only, activation_duration_days, expires_at, grant_until, grant_days')
-          .in('id', promoIds)
+          .in('id', redeemedPromoIds)
       : { data: [] as PromoCodeRow[], error: null }
     if (promosRes.error) return { error: promosRes.error.message }
 
@@ -382,10 +402,56 @@ export async function listEstablishments(): Promise<
         subscription_group: sub.group,
         subscription_filter_key: sub.filterKey,
         last_activity_at: lastActivity,
+        referred_by_establishment_id: est.referred_by_establishment_id,
+        referral_level: null,
       } satisfies EstablishmentRow
     })
 
-    return { data }
+    if (scope === 'all') return { data, stats: null }
+
+    if (scope.promoCodes.length === 0) {
+      return {
+        data: [],
+        stats: summarizeScopedRows([], scope),
+      }
+    }
+
+    const promoRes = await supabase
+      .from('promo_codes')
+      .select('id, code, used_by_establishment_id')
+    if (promoRes.error) return { error: promoRes.error.message }
+    const wanted = new Set(scope.promoCodes)
+    const matching = (promoRes.data ?? []).filter(row => wanted.has(String(row.code ?? '').toUpperCase()))
+    const scopedPromoIds = matching.map(row => row.id as number)
+    const seed = new Set<string>()
+    for (const row of matching) {
+      if (row.used_by_establishment_id) seed.add(row.used_by_establishment_id as string)
+    }
+    if (scopedPromoIds.length > 0) {
+      const redemptions = await fetchAllRows<{ establishment_id: string }>((from, to) =>
+        supabase
+          .from('promo_code_redemptions')
+          .select('establishment_id')
+          .in('promo_code_id', scopedPromoIds)
+          .range(from, to),
+      )
+      if ('error' in redemptions) return redemptions
+      for (const row of redemptions.data) seed.add(row.establishment_id)
+    }
+
+    const levels = buildReferralLevels(
+      establishments.map(item => ({
+        id: item.id,
+        referred_by_establishment_id: item.referred_by_establishment_id,
+        parent_establishment_id: item.parent_establishment_id,
+      })),
+      seed,
+      scope.referralDepth,
+    )
+    const scoped = data
+      .filter(row => levels.has(row.id))
+      .map(row => ({ ...row, referral_level: levels.get(row.id) ?? 1 }))
+    return { data: scoped, stats: summarizeScopedRows(scoped, scope) }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Не удалось загрузить заведения'
     return { error: message }

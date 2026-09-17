@@ -10,6 +10,8 @@ type StaffUser = {
   displayName: string | null
   pages: AdminPageKey[]
   isActive: boolean
+  promoCodes: string[]
+  referralDepth: number
 }
 
 function generatePassword(length = 12): string {
@@ -30,7 +32,9 @@ export default function StaffTab() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [pages, setPages] = useState<AdminPageKey[]>([])
+  const [pages, setPages] = useState<AdminPageKey[]>(['establishments'])
+  const [promoCodes, setPromoCodes] = useState('')
+  const [referralDepth, setReferralDepth] = useState(1)
   const [creating, setCreating] = useState(false)
   const [createdAccount, setCreatedAccount] = useState<{ email: string; password: string } | null>(null)
 
@@ -76,6 +80,8 @@ export default function StaffTab() {
         password,
         displayName: displayName.trim() || null,
         pages,
+        promoCodes,
+        referralDepth,
       }),
     })
     const json = await res.json().catch(() => ({}))
@@ -87,7 +93,9 @@ export default function StaffTab() {
     setEmail('')
     setPassword('')
     setDisplayName('')
-    setPages([])
+    setPages(['establishments'])
+    setPromoCodes('')
+    setReferralDepth(1)
     setCreatedAccount({ email: issuedEmail, password: issuedPassword })
     await load()
   }
@@ -219,6 +227,38 @@ export default function StaffTab() {
           </div>
         </div>
 
+        <div>
+          <div className="text-xs text-gray-500 mb-2">{t.admins.dataScope}</div>
+          <p className="text-xs text-gray-600 mb-3 max-w-3xl">{t.admins.referralHint}</p>
+          <div className="flex gap-3 flex-wrap items-end">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500">{t.admins.promoCodes}</label>
+              <input
+                type="text"
+                value={promoCodes}
+                onChange={e => setPromoCodes(e.target.value.toUpperCase())}
+                placeholder="666, FERNI2026"
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-64 font-mono"
+              />
+              <span className="text-[11px] text-gray-600">{t.admins.promoCodesHint}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500">{t.admins.referralDepth}</label>
+              <select
+                value={referralDepth}
+                onChange={e => setReferralDepth(parseInt(e.target.value, 10))}
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value={1}>{t.admins.depth1}</option>
+                <option value={2}>{t.admins.depth2}</option>
+                <option value={3}>{t.admins.depth3}</option>
+                <option value={4}>{t.admins.depth4}</option>
+                <option value={5}>{t.admins.depth5}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <button
           onClick={createUser}
           disabled={creating || !email.trim() || password.length < 8}
@@ -286,6 +326,33 @@ export default function StaffTab() {
                     <div className="font-medium text-white">{user.displayName || user.email}</div>
                     {user.displayName && <div className="text-xs text-gray-500">{user.email}</div>}
                     {!user.isActive && <div className="text-xs text-red-400 mt-0.5">отключена</div>}
+                    <div className="mt-2 flex flex-col gap-2 max-w-sm">
+                      <input
+                        type="text"
+                        defaultValue={(user.promoCodes ?? []).join(', ')}
+                        key={`${user.id}-codes-${(user.promoCodes ?? []).join(',')}`}
+                        placeholder="666"
+                        onBlur={e => {
+                          const next = e.target.value
+                          const current = (user.promoCodes ?? []).join(', ')
+                          if (next.trim().toUpperCase() === current.toUpperCase()) return
+                          void patchUser(user.id, { promoCodes: next })
+                        }}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs font-mono text-white"
+                      />
+                      <select
+                        value={user.referralDepth ?? 1}
+                        disabled={savingId === user.id}
+                        onChange={e => void patchUser(user.id, { referralDepth: parseInt(e.target.value, 10) })}
+                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
+                      >
+                        <option value={1}>{t.admins.depth1}</option>
+                        <option value={2}>{t.admins.depth2}</option>
+                        <option value={3}>{t.admins.depth3}</option>
+                        <option value={4}>{t.admins.depth4}</option>
+                        <option value={5}>{t.admins.depth5}</option>
+                      </select>
+                    </div>
                   </td>
                   {ADMIN_PAGES.map(page => (
                     <td key={page.key} className="px-4 py-3 text-center">

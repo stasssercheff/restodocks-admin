@@ -117,13 +117,19 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const enriched = await withRedemptions(svc.client, (data ?? []) as PromoRow[])
+  let rows = (data ?? []) as PromoRow[]
+  if (!auth.user.isOwner) {
+    const allowed = new Set((auth.user.promoCodes ?? []).map(code => code.toUpperCase()))
+    rows = rows.filter(row => allowed.has(String(row.code ?? '').toUpperCase()))
+  }
+  const enriched = await withRedemptions(svc.client, rows)
   return NextResponse.json(enriched)
 }
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'promo')
   if ('response' in auth) return auth.response
+  if (!auth.user.isOwner) return NextResponse.json({ error: 'Только владелец может менять промокоды' }, { status: 403 })
 
   const body = await req.json()
   const insert: Record<string, unknown> = {
@@ -169,6 +175,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'promo')
   if ('response' in auth) return auth.response
+  if (!auth.user.isOwner) return NextResponse.json({ error: 'Только владелец может менять промокоды' }, { status: 403 })
 
   const body = await req.json()
   const { id, ...updates } = body
@@ -201,6 +208,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'promo')
   if ('response' in auth) return auth.response
+  if (!auth.user.isOwner) return NextResponse.json({ error: 'Только владелец может менять промокоды' }, { status: 403 })
 
   const { id } = await req.json()
   const svc = getServiceClient()

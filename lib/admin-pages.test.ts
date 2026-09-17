@@ -39,3 +39,12 @@ test('owner can access every page; staff only granted ones', () => {
   assert.equal(canAccessPage(staff, 'establishments'), false)
   assert.equal(canAccessPage(null, 'promo'), false)
 })
+
+test('new staff with no ticks still has the narrowest default: establishments only', () => {
+  const staff = { isOwner: false, pages: sanitizePages([]) }
+  assert.deepEqual(staff.pages, [])
+  const granted = staff.pages.length ? staff.pages : ['establishments']
+  assert.deepEqual(granted, ['establishments'])
+  assert.equal(canAccessPage({ isOwner: false, pages: granted }, 'establishments'), true)
+  assert.equal(canAccessPage({ isOwner: false, pages: granted }, 'reviews'), false)
+})

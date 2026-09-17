@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminRequest } from '@/lib/admin-auth'
+import { dataScopeForUser, requireAdminRequest } from '@/lib/admin-auth'
 import { createServiceClient } from '@/lib/supabase-server'
+import { listEstablishments } from '@/lib/establishments'
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'reviews')
@@ -15,7 +16,14 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const rows = data ?? []
+  let rows = data ?? []
+  const scope = dataScopeForUser(auth.user)
+  if (scope !== 'all') {
+    const scoped = await listEstablishments(scope)
+    if ('error' in scoped) return NextResponse.json({ error: scoped.error }, { status: 500 })
+    const allowed = new Set(scoped.data.map(row => row.id))
+    rows = rows.filter(row => row.establishment_id && allowed.has(row.establishment_id))
+  }
   return NextResponse.json({
     summary: {
       total: rows.length,
@@ -29,6 +37,9 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'reviews')
   if ('response' in auth) return auth.response
+  if (!auth.user.isOwner) {
+    return NextResponse.json({ error: 'Только владелец может менять отзывы' }, { status: 403 })
+  }
 
   const body = await req.json().catch(() => ({}))
   const id = typeof body.id === 'string' ? body.id : ''

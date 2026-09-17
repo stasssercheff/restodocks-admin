@@ -8,11 +8,33 @@ import { jsx, jsxs } from 'react/jsx-runtime'
 import * as s from 'react'
 import { useRouter } from 'next/navigation'
 import StaffTab from './staff-tab'
+import PartnerScopeBanner from './partner-scope-banner'
 import { LanguageSwitcher } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
 
 const r = { jsx, jsxs }
 const l = { useRouter }
+
+const ADMIN_TAB_ORDER = [
+  'reviews', 'ads_agent', 'establishments', 'promo', 'popups', 'ai_usage',
+  'demo_sandboxes', 'marketing_visits', 'broadcast', 'support', 'security', 'health',
+]
+
+function firstAllowedTab(user) {
+  if (!user) return 'reviews'
+  if (user.isOwner) return 'reviews'
+  const found = ADMIN_TAB_ORDER.find(key => canAccessPage(user, key))
+  return found || 'establishments'
+}
+
+function ReferralLevelBadge({ level }) {
+  if (!level) return null
+  return (0, r.jsx)('span', {
+    className: 'ml-1 inline-flex align-middle rounded border border-indigo-800/70 bg-indigo-950/50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-200',
+    title: `Реферальный уровень ${level}: 1 — промокод, 2+ — по реферальной ссылке`,
+    children: `ур. ${level}`,
+  })
+}
 
 function isAllowedPromoGrantType(value) {
   const v = String(value ?? '').toLowerCase().trim()
@@ -1773,6 +1795,8 @@ async function er(e) {
                 "Статус подписки": null !== (a = null == x ? void 0 : x.statusLabel) && void 0 !== a ? a : "",
                 Оплата: null !== (r = null == x ? void 0 : x.paymentLabel) && void 0 !== r ? r : "",
                 Промокод: null !== (s = null == x ? void 0 : x.promoCode) && void 0 !== s ? s : "",
+                "Уровень реферала": e.referral_level ?? "",
+                "С подпиской": e.effective_pro ? "да" : "нет",
                 "Детали подписки": null !== (l = null == x ? void 0 : x.detail) && void 0 !== l ? l : "",
                 Регистрация: e.created_at ? new Date(e.created_at).toLocaleString("ru-RU", {
                     day: "2-digit",
@@ -1913,7 +1937,7 @@ function ep({
     user
 }) {
     let e = (0, l.useRouter)(),
-        [t, a] = (0, s.useState)("reviews"),
+        [t, a] = (0, s.useState)(() => firstAllowedTab(user)),
         [n, i] = (0, s.useState)(!1);
     async function o() {
         await fetch("/api/auth", {
@@ -2003,14 +2027,20 @@ function ep({
             })
         }), (0, r.jsxs)("main", {
             className: "max-w-[min(1600px,calc(100vw-1.5rem))] mx-auto px-3 py-4 sm:px-6 sm:py-8",
-            children: ["establishments" === t && (0, r.jsx)(ey, {}), "ads_agent" === t && (0, r.jsx)(Q, {}), "promo" === t && (0, r.jsx)(ej, {}), "popups" === t && (0, r.jsx)(V, {}), "ai_usage" === t && (0, r.jsx)(e_, {}), "demo_sandboxes" === t && (0, r.jsx)(eS, {}), "marketing_visits" === t && (0, r.jsx)(eL, {}), "reviews" === t && (0, r.jsx)(B, {}), "broadcast" === t && (0, r.jsx)(eT, {}), "support" === t && (0, r.jsx)(eg, {
+                children: ["establishments" === t && canAccessPage(user, "establishments") && (0, r.jsxs)(s.Fragment, {
+                children: [(0, r.jsx)(PartnerScopeBanner, {
+                    user: user
+                }), (0, r.jsx)(ey, {
+                    user: user
+                })]
+            }), "ads_agent" === t && canAccessPage(user, "ads_agent") && (0, r.jsx)(Q, {}), "promo" === t && canAccessPage(user, "promo") && (0, r.jsx)(ej, {}), "popups" === t && canAccessPage(user, "popups") && (0, r.jsx)(V, {}), "ai_usage" === t && canAccessPage(user, "ai_usage") && (0, r.jsx)(e_, {}), "demo_sandboxes" === t && canAccessPage(user, "demo_sandboxes") && (0, r.jsx)(eS, {}), "marketing_visits" === t && canAccessPage(user, "marketing_visits") && (0, r.jsx)(eL, {}), "reviews" === t && canAccessPage(user, "reviews") && (0, r.jsx)(B, {}), "broadcast" === t && canAccessPage(user, "broadcast") && (0, r.jsx)(eT, {}), "support" === t && canAccessPage(user, "support") && (0, r.jsx)(eg, {
                 onSupportShellActiveChange: e => {
                     i(e);
                     try {
                         e ? sessionStorage.setItem(eu, "1") : sessionStorage.removeItem(eu)
                     } catch (e) {}
                 }
-            }), "security" === t && (0, r.jsx)(eN, {}), "health" === t && (0, r.jsx)(ef, {}), "staff" === t && (0, r.jsx)(StaffTab, {})]
+            }), "security" === t && canAccessPage(user, "security") && (0, r.jsx)(eN, {}), "health" === t && canAccessPage(user, "health") && (0, r.jsx)(ef, {}), "staff" === t && user?.isOwner && (0, r.jsx)(StaffTab, {})]
         })]
     })
 }
@@ -2181,6 +2211,10 @@ function eg(e) {
 let eh = "УДАЛИТЬ";
 
 function ey() {
+    let {
+        user
+    } = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : {};
+    let canMutate = !!(null == user ? void 0 : user.isOwner);
     function e(e) {
         switch (e.establishment_type) {
             case "branch":
@@ -2256,7 +2290,7 @@ function ey() {
             let i = d.toLowerCase(),
                 o = e.subscription_summary,
                 c = o ? [o.statusLabel, o.paymentLabel, o.promoCode, o.detail].filter(Boolean).join(" ").toLowerCase() : "";
-            return !!((e.id.toLowerCase().includes(i) || e.name.toLowerCase().includes(i) || e.owner_email.toLowerCase().includes(i) || e.owner_name.toLowerCase().includes(i) || (null !== (t = e.registration_ip) && void 0 !== t ? t : "").toLowerCase().includes(i) || (null !== (a = e.registration_country) && void 0 !== a ? a : "").toLowerCase().includes(i) || (null !== (r = e.registration_city) && void 0 !== r ? r : "").toLowerCase().includes(i) || (null !== (s = e.registration_client) && void 0 !== s ? s : "").toLowerCase().includes(i) || H(e).toLowerCase().includes(i) || (null !== (l = e.created_at) && void 0 !== l ? l : "").toLowerCase().includes(i) || ec(e.created_at).toLowerCase().includes(i) || c.includes(i)) && ("all" === x || e.establishment_type === x) && h(e.subscription_filter_key, u) && y(e.subscription_filter_key, v)) && (n = e.employee_count, "all" === N || ("0" === N ? 0 === n : "1" === N ? 1 === n : "2-5" === N ? !!(n >= 2) && !!(n <= 5) : !!(n >= 6)))
+            return !!((e.id.toLowerCase().includes(i) || e.name.toLowerCase().includes(i) || e.owner_email.toLowerCase().includes(i) || e.owner_name.toLowerCase().includes(i) || (null !== (t = e.registration_ip) && void 0 !== t ? t : "").toLowerCase().includes(i) || (null !== (a = e.registration_country) && void 0 !== a ? a : "").toLowerCase().includes(i) || (null !== (r = e.registration_city) && void 0 !== r ? r : "").toLowerCase().includes(i) || (null !== (s = e.registration_client) && void 0 !== s ? s : "").toLowerCase().includes(i) || H(e).toLowerCase().includes(i) || (null !== (l = e.created_at) && void 0 !== l ? l : "").toLowerCase().includes(i) || ec(e.created_at).toLowerCase().includes(i) || c.includes(i) || (e.referral_level ? "ур. ".concat(e.referral_level).includes(i) || String(e.referral_level) === i : false)) && ("all" === x || e.establishment_type === x) && h(e.subscription_filter_key, u) && y(e.subscription_filter_key, v)) && (n = e.employee_count, "all" === N || ("0" === N ? 0 === n : "1" === N ? 1 === n : "2-5" === N ? !!(n >= 2) && !!(n <= 5) : !!(n >= 6)))
         }),
         R = (0, s.useMemo)(() => new Set(D.map(e => e.id)), [D]),
         U = (0, s.useMemo)(() => ea(l).filter(e => R.has(e.id)), [l, R]);
@@ -2533,13 +2567,13 @@ function ey() {
                 onChange: e => c(e.target.value),
                 placeholder: "Поиск (название, email, ID)...",
                 className: "bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-0 text-sm"
-            }), (0, r.jsx)("button", {
+            }), canMutate ? (0, r.jsx)("button", {
                 onClick: K,
                 disabled: S,
                 className: "text-gray-500 hover:text-white transition px-3 py-2 rounded-lg border border-gray-800 text-sm shrink-0 disabled:opacity-50",
                 title: "Догнать registration_ip из last_login (владелец по owner_id, любой сотрудник) и город/страну по IP",
                 children: S ? "…" : "\uD83C\uDF10 IP и гео регистрации"
-            }), (0, r.jsx)("button", {
+            }) : null, (0, r.jsx)("button", {
                 onClick: E,
                 className: "text-gray-500 hover:text-white transition px-3 py-2 rounded-lg border border-gray-800 text-sm shrink-0",
                 children: "↻"
@@ -2716,11 +2750,13 @@ function ey() {
                                             children: (0, r.jsx)(el, {
                                                 id: l.id
                                             })
-                                        }), l.parent_establishment_name ? (0, r.jsxs)("div", {
+                                            }), l.parent_establishment_name ? (0, r.jsxs)("div", {
                                             className: "text-[10px] text-gray-500 font-normal mt-0.5 truncate",
                                             title: null !== (c = l.parent_establishment_id) && void 0 !== c ? c : "",
                                             children: ["головное: ", l.parent_establishment_name]
-                                        }) : null]
+                                        }) : null, (0, r.jsx)(ReferralLevelBadge, {
+                                            level: l.referral_level
+                                        })]
                                     }), (0, r.jsx)("td", {
                                         className: "px-2 py-2 text-[10px] min-w-0",
                                         children: (0, r.jsx)("span", {
@@ -2773,7 +2809,7 @@ function ey() {
                                             title: F(l),
                                             children: F(l)
                                         })]
-                                    }), (0, r.jsx)("td", {
+                                    }), canMutate ? (0, r.jsx)("td", {
                                         className: "px-1 py-2 text-right sticky right-0 z-10 bg-gray-900 group-hover:bg-gray-800 border-l border-gray-800",
                                         children: (0, r.jsx)("button", {
                                             type: "button",
@@ -2783,6 +2819,8 @@ function ey() {
                                             title: "Удалить заведение",
                                             children: k === l.id ? "…" : "\uD83D\uDDD1"
                                         })
+                                    }) : (0, r.jsx)("td", {
+                                        className: "px-1 py-2 sticky right-0 z-10 bg-gray-900 border-l border-gray-800"
                                     })]
                                 }, l.id)]
                             }, l.id)
@@ -2809,19 +2847,21 @@ function ey() {
                                     children: [l.indentLevel ? (0, r.jsx)("span", {
                                         className: "text-gray-500 font-normal mr-1",
                                         children: "↳"
-                                    }) : null, l.name]
+                                    }) : null, l.name, (0, r.jsx)(ReferralLevelBadge, {
+                                        level: l.referral_level
+                                    })]
                                 }), (0, r.jsxs)("span", {
                                     className: "flex items-center gap-2 shrink-0",
                                     children: [(0, r.jsxs)("span", {
                                         className: "bg-gray-800 px-2 py-0.5 rounded text-xs font-mono text-gray-400",
                                         children: [l.employee_count, " чел."]
-                                    }), (0, r.jsx)("button", {
+                                    }), canMutate ? (0, r.jsx)("button", {
                                         onClick: () => V(l),
                                         disabled: k === l.id,
                                         className: "text-red-400 hover:text-red-300 text-sm disabled:opacity-50",
                                         title: "Удалить заведение",
                                         children: k === l.id ? "..." : "\uD83D\uDDD1"
-                                    })]
+                                    }) : null]
                                 })]
                             }), (0, r.jsx)("div", {
                                 className: "mb-1",
