@@ -4,7 +4,7 @@
 // Recovered from production worker 0f158d78 (2026-09-16) — original full admin UI.
 // @ts-nocheck
 
-import { jsx, jsxs } from 'react/jsx-runtime'
+import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
 import * as s from 'react'
 import { useRouter } from 'next/navigation'
 import StaffTab from './staff-tab'
@@ -12,7 +12,7 @@ import PartnerScopeBanner from './partner-scope-banner'
 import { LanguageSwitcher } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
 
-const r = { jsx, jsxs }
+const r = { jsx, jsxs, Fragment }
 const l = { useRouter }
 
 const ADMIN_TAB_ORDER = [
