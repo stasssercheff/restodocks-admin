@@ -42,7 +42,7 @@ function visibleTabs(user: PublicAdminUser): { key: TabKey; label: string }[] {
   const pages: { key: TabKey; label: string }[] = ADMIN_PAGES
     .filter(page => canAccessPage(user, page.key))
     .map(page => ({ key: page.key, label: page.label }))
-  if (user.isOwner) pages.push({ key: 'staff', label: 'Сотрудники' })
+  if (user.isOwner) pages.push({ key: 'staff', label: 'Админы' })
   return pages
 }
 

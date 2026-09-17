@@ -24,7 +24,7 @@ Login is email + password for everyone. Owner login is `stassser@gmail.com` + `A
 
 1. In the Supabase SQL editor run `supabase/migrations/20260917_admin_panel_users.sql`.
 2. Log in as owner.
-3. Open **Сотрудники**, create an email/password, and tick which tabs that person can see (Заведения, Промокоды). Future admin pages are added to `ADMIN_PAGES` in `lib/admin-pages.ts` and automatically appear as checkboxes.
+3. Open **Админы**, create an email/password for a panel admin/partner, and tick which tabs they can see. This does not change restaurant employees in Restodocks.
 4. That person logs in and only sees granted tabs. APIs for other tabs return 403.
 
 Owner email defaults to `stassser@gmail.com`; `ADMIN_PASSWORD` stays the same as now.

@@ -40,14 +40,14 @@ export default function StaffTab() {
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
         setUsers([])
-        setError(typeof json.error === 'string' ? json.error : 'Не удалось загрузить сотрудников')
+        setError(typeof json.error === 'string' ? json.error : 'Не удалось загрузить админов')
         return
       }
       setOwnerEmail(typeof json.owner?.email === 'string' ? json.owner.email : '')
       setUsers(Array.isArray(json.users) ? json.users : [])
     } catch {
       setUsers([])
-      setError('Не удалось загрузить сотрудников')
+      setError('Не удалось загрузить админов')
     } finally {
       setLoading(false)
     }
@@ -152,9 +152,9 @@ export default function StaffTab() {
     <>
       <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-6 space-y-4">
         <div>
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Новая учётка</h2>
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Новый админ панели</h2>
           <p className="text-xs text-gray-600 mt-1">
-            Создай логин сотруднику и отметь, какие разделы ему показывать. Почту подтверждать не нужно.
+            Это доступ в эту админку, не сотрудники заведений в Restodocks. Отметь, какие вкладки ему показывать.
           </p>
         </div>
 
@@ -237,7 +237,7 @@ export default function StaffTab() {
           >
             Скопировать
           </button>
-          <span className="block text-xs text-emerald-500/80 mt-1">Передай его сотруднику — повторно пароль не показывается.</span>
+          <span className="block text-xs text-emerald-500/80 mt-1">Передай его админу — повторно пароль не показывается.</span>
         </div>
       )}
 
@@ -254,7 +254,7 @@ export default function StaffTab() {
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-                <th className="px-4 py-3 text-left">Сотрудник</th>
+                <th className="px-4 py-3 text-left">Админ</th>
                 {ADMIN_PAGES.map(page => (
                   <th key={page.key} className="px-4 py-3 text-center">{page.label}</th>
                 ))}
@@ -275,7 +275,7 @@ export default function StaffTab() {
               {users.length === 0 ? (
                 <tr>
                   <td colSpan={ADMIN_PAGES.length + 2} className="px-4 py-8 text-center text-gray-500">
-                    Сотрудников пока нет — создай учётку выше
+                    Других админов пока нет — создай учётку выше
                   </td>
                 </tr>
               ) : users.map(user => (
