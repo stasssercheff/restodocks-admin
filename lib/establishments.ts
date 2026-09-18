@@ -449,7 +449,7 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
       scope.referralDepth,
     )
     const scoped = data
-      .filter(row => levels.has(row.id))
+      .filter(row => levels.has(row.id) && !row.is_demo)
       .map(row => ({ ...row, referral_level: levels.get(row.id) ?? 1 }))
     return { data: scoped, stats: summarizeScopedRows(scoped, scope) }
   } catch (err) {

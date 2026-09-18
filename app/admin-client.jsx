@@ -1923,6 +1923,23 @@ function ec(e) {
     }) : "—"
 }
 
+/** YYYY-MM-DD local day bounds for created_at filter. */
+function matchesCreatedAt(iso, from, to) {
+    if (!from && !to) return true
+    if (!iso) return false
+    let t = new Date(iso).getTime()
+    if (Number.isNaN(t)) return false
+    if (from) {
+        let start = new Date(from + "T00:00:00").getTime()
+        if (t < start) return false
+    }
+    if (to) {
+        let end = new Date(to + "T23:59:59.999").getTime()
+        if (t > end) return false
+    }
+    return true
+}
+
 function ex(e) {
     return !!e && new Date(e) < new Date
 }
@@ -2266,7 +2283,7 @@ function ey() {
             }) : null]
         })
     }
-    let [l, n] = (0, s.useState)([]), [i, o] = (0, s.useState)(!0), [d, c] = (0, s.useState)(""), [x, m] = (0, s.useState)("all"), [u, b] = (0, s.useState)("all"), [v, j] = (0, s.useState)("all"), [N, f] = (0, s.useState)("all"), [_, w] = (0, s.useState)(null), [k, C] = (0, s.useState)(null), [S, L] = (0, s.useState)(!1), [T, P] = (0, s.useState)(!1), E = (0, s.useCallback)(async () => {
+    let [l, n] = (0, s.useState)([]), [i, o] = (0, s.useState)(!0), [d, c] = (0, s.useState)(""), [x, m] = (0, s.useState)("all"), [u, b] = (0, s.useState)("all"), [v, j] = (0, s.useState)("all"), [N, f] = (0, s.useState)("all"), [demoFilter, setDemoFilter] = (0, s.useState)("hide"), [dateFrom, setDateFrom] = (0, s.useState)(""), [dateTo, setDateTo] = (0, s.useState)(""), [_, w] = (0, s.useState)(null), [k, C] = (0, s.useState)(null), [S, L] = (0, s.useState)(!1), [T, P] = (0, s.useState)(!1), E = (0, s.useCallback)(async () => {
         o(!0), w(null);
         let e = await fetch("/api/establishments"),
             t = await e.json();
@@ -2275,17 +2292,23 @@ function ey() {
     (0, s.useEffect)(() => {
         E()
     }, [E]);
-    let I = (0, s.useMemo)(() => {
+    let baseRows = (0, s.useMemo)(() => l.filter(e => {
+            if ("hide" === demoFilter && e.is_demo) return !1;
+            if ("only" === demoFilter && !e.is_demo) return !1;
+            return matchesCreatedAt(e.created_at, dateFrom, dateTo)
+        }), [l, demoFilter, dateFrom, dateTo]),
+        hiddenDemoCount = l.filter(e => e.is_demo).length,
+        I = (0, s.useMemo)(() => {
             let e = new Map;
-            for (let t of p) e.set(t.value, "all" === t.value ? l.length : l.filter(e => h(e.subscription_filter_key, t.value)).length);
+            for (let t of p) e.set(t.value, "all" === t.value ? baseRows.length : baseRows.filter(e => h(e.subscription_filter_key, t.value)).length);
             return e
-        }, [l]),
+        }, [baseRows]),
         A = (0, s.useMemo)(() => {
             let e = new Map;
-            for (let t of g) e.set(t.value, "all" === t.value ? l.length : l.filter(e => y(e.subscription_filter_key, t.value)).length);
+            for (let t of g) e.set(t.value, "all" === t.value ? baseRows.length : baseRows.filter(e => y(e.subscription_filter_key, t.value)).length);
             return e
-        }, [l]),
-        D = l.filter(e => {
+        }, [baseRows]),
+        D = baseRows.filter(e => {
             var t, a, r, s, l, n;
             let i = d.toLowerCase(),
                 o = e.subscription_summary,
@@ -2293,12 +2316,12 @@ function ey() {
             return !!((e.id.toLowerCase().includes(i) || e.name.toLowerCase().includes(i) || e.owner_email.toLowerCase().includes(i) || e.owner_name.toLowerCase().includes(i) || (null !== (t = e.registration_ip) && void 0 !== t ? t : "").toLowerCase().includes(i) || (null !== (a = e.registration_country) && void 0 !== a ? a : "").toLowerCase().includes(i) || (null !== (r = e.registration_city) && void 0 !== r ? r : "").toLowerCase().includes(i) || (null !== (s = e.registration_client) && void 0 !== s ? s : "").toLowerCase().includes(i) || H(e).toLowerCase().includes(i) || (null !== (l = e.created_at) && void 0 !== l ? l : "").toLowerCase().includes(i) || ec(e.created_at).toLowerCase().includes(i) || c.includes(i) || (e.referral_level ? "ур. ".concat(e.referral_level).includes(i) || String(e.referral_level) === i : false)) && ("all" === x || e.establishment_type === x) && h(e.subscription_filter_key, u) && y(e.subscription_filter_key, v)) && (n = e.employee_count, "all" === N || ("0" === N ? 0 === n : "1" === N ? 1 === n : "2-5" === N ? !!(n >= 2) && !!(n <= 5) : !!(n >= 6)))
         }),
         R = (0, s.useMemo)(() => new Set(D.map(e => e.id)), [D]),
-        U = (0, s.useMemo)(() => ea(l).filter(e => R.has(e.id)), [l, R]);
+        U = (0, s.useMemo)(() => ea(baseRows).filter(e => R.has(e.id)), [baseRows, R]);
     async function O() {
-        if (0 !== l.length) {
+        if (0 !== U.length) {
             P(!0), w(null);
             try {
-                await er(l)
+                await er(U)
             } catch (t) {
                 let e = t instanceof Error ? t.message : "Ошибка выгрузки";
                 w(e), alert("Не удалось выгрузить Excel.\n\n".concat(e))
@@ -2338,10 +2361,10 @@ function ey() {
                 return "—"
         }
     }
-    let W = l.length,
-        J = l.reduce((e, t) => e + t.employee_count, 0),
-        z = l.filter(e => "paid_iap" === e.subscription_group).length,
-        G = l.filter(e => {
+    let W = baseRows.length,
+        J = baseRows.reduce((e, t) => e + t.employee_count, 0),
+        z = baseRows.filter(e => "paid_iap" === e.subscription_group).length,
+        G = baseRows.filter(e => {
             var t;
             return "promo" === e.subscription_group || (null !== (t = e.subscription_filter_key) && void 0 !== t ? t : "").startsWith("promo_addon|")
         }).length;
@@ -2408,7 +2431,7 @@ function ey() {
         }), (0, r.jsxs)("div", {
             className: "grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 sm:gap-3 sm:mb-8",
             children: [(0, r.jsx)(eP, {
-                label: "Заведений",
+                label: dateFrom || dateTo ? "Заведений за период" : "Заведений",
                 value: W
             }), (0, r.jsx)(eP, {
                 label: "Людей (влад.+сотр.)",
@@ -2420,7 +2443,22 @@ function ey() {
                 label: "С промокодом",
                 value: G
             })]
-        }), (0, r.jsxs)("div", {
+        }), "hide" === demoFilter && hiddenDemoCount > 0 ? (0, r.jsxs)("div", {
+            className: "mb-4 px-4 py-3 rounded-xl border border-gray-800 bg-gray-900/60 text-sm text-gray-400",
+            children: ["Системные демо-кухни (", hiddenDemoCount, ") скрыты — это не удаления, они в БД с флагом ", (0, r.jsx)("code", {
+                className: "text-gray-500 text-xs",
+                children: "is_demo"
+            }), ". Показать: фильтр «Демо» ниже."]
+        }) : null, (dateFrom || dateTo) ? (0, r.jsxs)("div", {
+            className: "mb-4 px-4 py-3 rounded-xl border border-sky-900/50 bg-sky-950/30 text-sm text-sky-100",
+            children: ["Новых заведений за период", dateFrom ? " с ".concat(dateFrom) : "", dateTo ? " по ".concat(dateTo) : "", ": ", (0, r.jsx)("span", {
+                className: "font-semibold text-white",
+                children: W
+            }), D.length !== W ? (0, r.jsxs)("span", {
+                className: "text-sky-300/80",
+                children: [" · в таблице с учётом поиска/типа: ", D.length]
+            }) : null]
+        }) : null, (0, r.jsxs)("div", {
             className: "mb-4 p-4 bg-gray-900/80 border border-gray-800 rounded-xl text-gray-400 text-sm leading-relaxed",
             children: [(0, r.jsx)("p", {
                 className: "font-medium text-gray-300 mb-1",
@@ -2550,15 +2588,67 @@ function ey() {
                     children: "Выгрузка в Excel"
                 }), (0, r.jsxs)("p", {
                     className: "text-xs text-gray-500 mt-0.5",
-                    children: ["Все ", l.length, " заведений из базы (фильтры поиска не применяются). Формат .xlsx."]
+                    children: ["В файл попадут ", U.length, " строк из текущего фильтра (даты, демо, поиск). Формат .xlsx."]
                 })]
             }), (0, r.jsx)("button", {
                 type: "button",
                 onClick: O,
-                disabled: T || i || 0 === l.length,
+                disabled: T || i || 0 === U.length,
                 className: "shrink-0 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed",
                 children: T ? "Формируем файл…" : "Скачать Excel (.xlsx)"
             })]
+        }), (0, r.jsxs)("div", {
+            className: "mb-3 flex flex-wrap gap-2 items-end",
+            children: [(0, r.jsxs)("div", {
+                className: "flex flex-col gap-1",
+                children: [(0, r.jsx)("label", {
+                    className: "text-[11px] text-gray-500 uppercase tracking-wide",
+                    children: "Создано с"
+                }), (0, r.jsx)("input", {
+                    type: "date",
+                    value: dateFrom,
+                    onChange: e => setDateFrom(e.target.value),
+                    className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm"
+                })]
+            }), (0, r.jsxs)("div", {
+                className: "flex flex-col gap-1",
+                children: [(0, r.jsx)("label", {
+                    className: "text-[11px] text-gray-500 uppercase tracking-wide",
+                    children: "по"
+                }), (0, r.jsx)("input", {
+                    type: "date",
+                    value: dateTo,
+                    onChange: e => setDateTo(e.target.value),
+                    className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm"
+                })]
+            }), (0, r.jsxs)("div", {
+                className: "flex flex-col gap-1",
+                children: [(0, r.jsx)("label", {
+                    className: "text-[11px] text-gray-500 uppercase tracking-wide",
+                    children: "Демо"
+                }), (0, r.jsxs)("select", {
+                    value: demoFilter,
+                    onChange: e => setDemoFilter(e.target.value),
+                    className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm",
+                    children: [(0, r.jsxs)("option", {
+                        value: "hide",
+                        children: ["Скрыть системные (", hiddenDemoCount, ")"]
+                    }), (0, r.jsx)("option", {
+                        value: "only",
+                        children: "Только системные демо"
+                    }), (0, r.jsxs)("option", {
+                        value: "all",
+                        children: ["Все (", l.length, ")"]
+                    })]
+                })]
+            }), dateFrom || dateTo || "hide" !== demoFilter ? (0, r.jsx)("button", {
+                type: "button",
+                onClick: () => {
+                    setDateFrom(""), setDateTo(""), setDemoFilter("hide")
+                },
+                className: "text-xs px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500",
+                children: "Сбросить даты/демо"
+            }) : null]
         }), (0, r.jsxs)("div", {
             className: "flex gap-2 mb-4 flex-wrap",
             children: [(0, r.jsx)("input", {
@@ -2750,7 +2840,16 @@ function ey() {
                                             children: (0, r.jsx)(el, {
                                                 id: l.id
                                             })
-                                            }), l.parent_establishment_name ? (0, r.jsxs)("div", {
+                                            }), l.is_demo ? (0, r.jsx)("div", {
+                                            className: "mt-1",
+                                            style: {
+                                                paddingLeft: l.indentLevel ? "".concat(.75 * Math.min(l.indentLevel, 3), "rem") : void 0
+                                            },
+                                            children: (0, r.jsx)("span", {
+                                                className: "inline-flex rounded border border-amber-800/60 bg-amber-950/40 px-1.5 py-0.5 text-[10px] text-amber-200",
+                                                children: "системное демо"
+                                            })
+                                        }) : null, l.parent_establishment_name ? (0, r.jsxs)("div", {
                                             className: "text-[10px] text-gray-500 font-normal mt-0.5 truncate",
                                             title: null !== (c = l.parent_establishment_id) && void 0 !== c ? c : "",
                                             children: ["головное: ", l.parent_establishment_name]
