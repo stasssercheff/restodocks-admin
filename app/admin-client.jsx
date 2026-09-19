@@ -11,9 +11,36 @@ import StaffTab from './staff-tab'
 import PartnerScopeBanner from './partner-scope-banner'
 import { LanguageSwitcher } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
+import { matchesCreatedAt, normalizeDateInput } from '@/lib/created-at-filter'
 
 const r = { jsx, jsxs, Fragment }
 const l = { useRouter }
+
+const EST_FILTER_KEY = 'rd_admin_est_filters'
+
+function loadEstFilters() {
+  try {
+    const raw = sessionStorage.getItem(EST_FILTER_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return {
+      demoFilter: parsed.demoFilter === 'only' || parsed.demoFilter === 'all' ? parsed.demoFilter : 'hide',
+      draftFrom: normalizeDateInput(parsed.draftFrom ?? parsed.dateFrom ?? ''),
+      draftTo: normalizeDateInput(parsed.draftTo ?? parsed.dateTo ?? ''),
+      appliedFrom: normalizeDateInput(parsed.appliedFrom ?? ''),
+      appliedTo: normalizeDateInput(parsed.appliedTo ?? ''),
+    }
+  } catch {
+    return null
+  }
+}
+
+function saveEstFilters(next) {
+  try {
+    sessionStorage.setItem(EST_FILTER_KEY, JSON.stringify(next))
+  } catch {}
+}
 
 const ADMIN_TAB_ORDER = [
   'reviews', 'ads_agent', 'establishments', 'promo', 'popups', 'ai_usage',
@@ -1923,23 +1950,6 @@ function ec(e) {
     }) : "—"
 }
 
-/** YYYY-MM-DD local day bounds for created_at filter. */
-function matchesCreatedAt(iso, from, to) {
-    if (!from && !to) return true
-    if (!iso) return false
-    let t = new Date(iso).getTime()
-    if (Number.isNaN(t)) return false
-    if (from) {
-        let start = new Date(from + "T00:00:00").getTime()
-        if (t < start) return false
-    }
-    if (to) {
-        let end = new Date(to + "T23:59:59.999").getTime()
-        if (t > end) return false
-    }
-    return true
-}
-
 function ex(e) {
     return !!e && new Date(e) < new Date
 }
@@ -2044,12 +2054,17 @@ function ep({
             })
         }), (0, r.jsxs)("main", {
             className: "max-w-[min(1600px,calc(100vw-1.5rem))] mx-auto px-3 py-4 sm:px-6 sm:py-8",
-                children: ["establishments" === t && canAccessPage(user, "establishments") && (0, r.jsxs)(s.Fragment, {
-                children: [(0, r.jsx)(PartnerScopeBanner, {
-                    user: user
-                }), (0, r.jsx)(ey, {
-                    user: user
-                })]
+                children: [(0, r.jsx)("div", {
+                style: {
+                    display: "establishments" === t && canAccessPage(user, "establishments") ? "block" : "none"
+                },
+                children: canAccessPage(user, "establishments") ? (0, r.jsxs)(s.Fragment, {
+                    children: [(0, r.jsx)(PartnerScopeBanner, {
+                        user: user
+                    }), (0, r.jsx)(ey, {
+                        user: user
+                    })]
+                }) : null
             }), "ads_agent" === t && canAccessPage(user, "ads_agent") && (0, r.jsx)(Q, {}), "promo" === t && canAccessPage(user, "promo") && (0, r.jsx)(ej, {}), "popups" === t && canAccessPage(user, "popups") && (0, r.jsx)(V, {}), "ai_usage" === t && canAccessPage(user, "ai_usage") && (0, r.jsx)(e_, {}), "demo_sandboxes" === t && canAccessPage(user, "demo_sandboxes") && (0, r.jsx)(eS, {}), "marketing_visits" === t && canAccessPage(user, "marketing_visits") && (0, r.jsx)(eL, {}), "reviews" === t && canAccessPage(user, "reviews") && (0, r.jsx)(B, {}), "broadcast" === t && canAccessPage(user, "broadcast") && (0, r.jsx)(eT, {}), "support" === t && canAccessPage(user, "support") && (0, r.jsx)(eg, {
                 onSupportShellActiveChange: e => {
                     i(e);
@@ -2283,7 +2298,7 @@ function ey() {
             }) : null]
         })
     }
-    let [l, n] = (0, s.useState)([]), [i, o] = (0, s.useState)(!0), [d, c] = (0, s.useState)(""), [x, m] = (0, s.useState)("all"), [u, b] = (0, s.useState)("all"), [v, j] = (0, s.useState)("all"), [N, f] = (0, s.useState)("all"), [demoFilter, setDemoFilter] = (0, s.useState)("hide"), [dateFrom, setDateFrom] = (0, s.useState)(""), [dateTo, setDateTo] = (0, s.useState)(""), [_, w] = (0, s.useState)(null), [k, C] = (0, s.useState)(null), [S, L] = (0, s.useState)(!1), [T, P] = (0, s.useState)(!1), E = (0, s.useCallback)(async () => {
+    let [l, n] = (0, s.useState)([]), [i, o] = (0, s.useState)(!0), [d, c] = (0, s.useState)(""), [x, m] = (0, s.useState)("all"), [u, b] = (0, s.useState)("all"), [v, j] = (0, s.useState)("all"), [N, f] = (0, s.useState)("all"), [demoFilter, setDemoFilter] = (0, s.useState)(() => loadEstFilters()?.demoFilter || "hide"), [dateFrom, setDateFrom] = (0, s.useState)(() => loadEstFilters()?.draftFrom || ""), [dateTo, setDateTo] = (0, s.useState)(() => loadEstFilters()?.draftTo || ""), [appliedFrom, setAppliedFrom] = (0, s.useState)(() => loadEstFilters()?.appliedFrom || ""), [appliedTo, setAppliedTo] = (0, s.useState)(() => loadEstFilters()?.appliedTo || ""), [_, w] = (0, s.useState)(null), [k, C] = (0, s.useState)(null), [S, L] = (0, s.useState)(!1), [T, P] = (0, s.useState)(!1), E = (0, s.useCallback)(async () => {
         o(!0), w(null);
         let e = await fetch("/api/establishments"),
             t = await e.json();
@@ -2292,11 +2307,22 @@ function ey() {
     (0, s.useEffect)(() => {
         E()
     }, [E]);
-    let baseRows = (0, s.useMemo)(() => l.filter(e => {
+    (0, s.useEffect)(() => {
+        saveEstFilters({
+            demoFilter,
+            draftFrom: dateFrom,
+            draftTo: dateTo,
+            appliedFrom,
+            appliedTo,
+        })
+    }, [demoFilter, dateFrom, dateTo, appliedFrom, appliedTo]);
+    let dateFilterActive = !!(appliedFrom || appliedTo),
+        datesDirty = dateFrom !== appliedFrom || dateTo !== appliedTo,
+        baseRows = (0, s.useMemo)(() => l.filter(e => {
             if ("hide" === demoFilter && e.is_demo) return !1;
             if ("only" === demoFilter && !e.is_demo) return !1;
-            return matchesCreatedAt(e.created_at, dateFrom, dateTo)
-        }), [l, demoFilter, dateFrom, dateTo]),
+            return matchesCreatedAt(e.created_at, appliedFrom, appliedTo)
+        }), [l, demoFilter, appliedFrom, appliedTo]),
         hiddenDemoCount = l.filter(e => e.is_demo).length,
         I = (0, s.useMemo)(() => {
             let e = new Map;
@@ -2317,6 +2343,21 @@ function ey() {
         }),
         R = (0, s.useMemo)(() => new Set(D.map(e => e.id)), [D]),
         U = (0, s.useMemo)(() => ea(baseRows).filter(e => R.has(e.id)), [baseRows, R]);
+    function applyDateFilter() {
+        let from = normalizeDateInput(dateFrom)
+        let to = normalizeDateInput(dateTo)
+        setDateFrom(from)
+        setDateTo(to)
+        setAppliedFrom(from)
+        setAppliedTo(to)
+    }
+    function clearDateDemoFilters() {
+        setDateFrom("")
+        setDateTo("")
+        setAppliedFrom("")
+        setAppliedTo("")
+        setDemoFilter("hide")
+    }
     async function O() {
         if (0 !== U.length) {
             P(!0), w(null);
@@ -2431,7 +2472,7 @@ function ey() {
         }), (0, r.jsxs)("div", {
             className: "grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 sm:gap-3 sm:mb-8",
             children: [(0, r.jsx)(eP, {
-                label: dateFrom || dateTo ? "Заведений за период" : "Заведений",
+                label: dateFilterActive ? "Заведений за период" : "Заведений",
                 value: W
             }), (0, r.jsx)(eP, {
                 label: "Людей (влад.+сотр.)",
@@ -2449,15 +2490,18 @@ function ey() {
                 className: "text-gray-500 text-xs",
                 children: "is_demo"
             }), ". Показать: фильтр «Демо» ниже."]
-        }) : null, (dateFrom || dateTo) ? (0, r.jsxs)("div", {
+        }) : null, dateFilterActive ? (0, r.jsxs)("div", {
             className: "mb-4 px-4 py-3 rounded-xl border border-sky-900/50 bg-sky-950/30 text-sm text-sky-100",
-            children: ["Новых заведений за период", dateFrom ? " с ".concat(dateFrom) : "", dateTo ? " по ".concat(dateTo) : "", ": ", (0, r.jsx)("span", {
+            children: ["Фильтр дат применён", appliedFrom ? " с ".concat(appliedFrom) : "", appliedTo ? " по ".concat(appliedTo) : "", ": ", (0, r.jsx)("span", {
                 className: "font-semibold text-white",
                 children: W
-            }), D.length !== W ? (0, r.jsxs)("span", {
+            }), " заведений", D.length !== W ? (0, r.jsxs)("span", {
                 className: "text-sky-300/80",
                 children: [" · в таблице с учётом поиска/типа: ", D.length]
             }) : null]
+        }) : null, datesDirty ? (0, r.jsx)("div", {
+            className: "mb-4 px-4 py-3 rounded-xl border border-amber-900/50 bg-amber-950/30 text-sm text-amber-100",
+            children: "Даты изменены, но ещё не применены — нажми «Применить»."
         }) : null, (0, r.jsxs)("div", {
             className: "mb-4 p-4 bg-gray-900/80 border border-gray-800 rounded-xl text-gray-400 text-sm leading-relaxed",
             children: [(0, r.jsx)("p", {
@@ -2597,8 +2641,12 @@ function ey() {
                 className: "shrink-0 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed",
                 children: T ? "Формируем файл…" : "Скачать Excel (.xlsx)"
             })]
-        }), (0, r.jsxs)("div", {
+        }), (0, r.jsxs)("form", {
             className: "mb-3 flex flex-wrap gap-2 items-end",
+            onSubmit: e => {
+                e.preventDefault()
+                applyDateFilter()
+            },
             children: [(0, r.jsxs)("div", {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
@@ -2641,13 +2689,15 @@ function ey() {
                         children: ["Все (", l.length, ")"]
                     })]
                 })]
-            }), dateFrom || dateTo || "hide" !== demoFilter ? (0, r.jsx)("button", {
+            }), (0, r.jsx)("button", {
+                type: "submit",
+                className: "text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium ".concat(datesDirty ? "ring-2 ring-amber-400/70" : ""),
+                children: "Применить"
+            }), dateFilterActive || "hide" !== demoFilter || datesDirty ? (0, r.jsx)("button", {
                 type: "button",
-                onClick: () => {
-                    setDateFrom(""), setDateTo(""), setDemoFilter("hide")
-                },
+                onClick: clearDateDemoFilters,
                 className: "text-xs px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500",
-                children: "Сбросить даты/демо"
+                children: "Сбросить"
             }) : null]
         }), (0, r.jsxs)("div", {
             className: "flex gap-2 mb-4 flex-wrap",
