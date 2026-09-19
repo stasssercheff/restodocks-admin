@@ -16,7 +16,18 @@ npm install
 npm run dev
 ```
 
-Copy `.env.example` → `.env.local` and fill Supabase + admin password.
+Copy `.env.example` → `.env.local` and fill Supabase + `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+
+## Admin accounts
+
+Login is email + password for everyone. Owner login is `stassser@gmail.com` + `ADMIN_PASSWORD` (or `ADMIN_EMAIL` if that secret is set). Staff accounts live in Supabase table `admin_panel_users`.
+
+1. In the Supabase SQL editor run `supabase/migrations/20260917_admin_panel_users.sql`.
+2. Log in as owner.
+3. Open **Админы**, create an email/password for a panel admin/partner, and tick which tabs they can see. This does not change restaurant employees in Restodocks.
+4. That person logs in and only sees granted tabs. APIs for other tabs return 403.
+
+Owner email defaults to `stassser@gmail.com`; `ADMIN_PASSWORD` stays the same as now.
 
 ## Deploy (Cloudflare Workers)
 
@@ -36,6 +47,7 @@ Required GitHub / CI secrets (Settings → Secrets and variables → Actions):
 Worker runtime secrets (Cloudflare dashboard → Workers & Pages → `restodocks-admin` → Settings → Variables and Secrets):
 
 - `ADMIN_PASSWORD`
+- `ADMIN_EMAIL` — owner login
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_URL` (или `NEXT_PUBLIC_SUPABASE_URL`) — URL проекта Supabase, вида `https://xxxx.supabase.co`
 - optionally `NEXT_PUBLIC_SUPABASE_ANON_KEY`

@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
-import { isAuthenticatedAdmin } from '@/lib/admin-auth'
+import { getAdminUser, type AdminUser } from '@/lib/admin-auth'
 
-export async function requireAuth() {
-  if (!(await isAuthenticatedAdmin())) {
-    redirect('/login')
-  }
+export async function requireAuth(): Promise<AdminUser> {
+  const user = await getAdminUser()
+  if (!user) redirect('/login')
+  return user
 }

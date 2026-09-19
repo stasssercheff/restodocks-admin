@@ -1,25 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ADMIN_SESSION_COOKIE, ADMIN_SESSION_VALUE } from '@/lib/admin-auth'
+import {
+  ADMIN_SESSION_COOKIE,
+  authenticateAdmin,
+  getAdminUserFromRequest,
+  issueSessionCookie,
+  publicAdminUser,
+  sessionCookieOptions,
+} from '@/lib/admin-auth'
 
-const cookieOptions = {
-  httpOnly: true,
-  secure: true,
-  sameSite: 'lax' as const,
-  path: '/',
+export async function GET(req: NextRequest) {
+  const user = await getAdminUserFromRequest(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  return NextResponse.json({ user: publicAdminUser(user) })
 }
 
 export async function POST(req: NextRequest) {
-  const { password } = await req.json()
-  const adminPassword = process.env.ADMIN_PASSWORD
-
-  if (!adminPassword || password !== adminPassword) {
-    return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
+  let body: { email?: unknown; password?: unknown }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Некорректный запрос' }, { status: 400 })
   }
 
-  const res = NextResponse.json({ ok: true })
-  res.cookies.set(ADMIN_SESSION_COOKIE, ADMIN_SESSION_VALUE, {
-    ...cookieOptions,
-    maxAge: 60 * 60 * 24, // 24 hours
+  const email = typeof body.email === 'string' ? body.email : ''
+  const password = typeof body.password === 'string' ? body.password : ''
+  const result = await authenticateAdmin(email, password)
+  if ('error' in result) {
+    return NextResponse.json({ error: result.error }, { status: result.status })
+  }
+
+  const session = issueSessionCookie(result.user)
+  if ('error' in session) {
+    return NextResponse.json({ error: session.error }, { status: 500 })
+  }
+
+  const res = NextResponse.json({ ok: true, user: publicAdminUser(result.user) })
+  res.cookies.set(ADMIN_SESSION_COOKIE, session.token, {
+    ...sessionCookieOptions,
+    maxAge: session.maxAge,
   })
   return res
 }
@@ -27,7 +45,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   const res = NextResponse.json({ ok: true })
   res.cookies.set(ADMIN_SESSION_COOKIE, '', {
-    ...cookieOptions,
+    ...sessionCookieOptions,
     maxAge: 0,
   })
   return res

@@ -31,5 +31,25 @@ export function getSupabaseServiceConfig():
 export function createServiceClient(): SupabaseClient | { error: string } {
   const config = getSupabaseServiceConfig()
   if ('error' in config) return config
-  return createClient(config.url, config.key)
+  return createClient(config.url, config.key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+export async function fetchAllRows<T>(
+  run: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  pageSize = 1000,
+  hardCap = 20000,
+): Promise<{ data: T[] } | { error: string }> {
+  const out: T[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await run(from, from + pageSize - 1)
+    if (error) return { error: error.message }
+    const chunk = data ?? []
+    out.push(...chunk)
+    if (chunk.length < pageSize || out.length >= hardCap) break
+    from += pageSize
+  }
+  return { data: out }
 }
