@@ -255,6 +255,9 @@ let j = {
         "/home": "Главная (приложение)"
     },
     N = [{
+        value: "all",
+        label: "Все хосты"
+    }, {
         value: "prod",
         label: "Только прод (.com / .ru)"
     }, {
@@ -263,9 +266,6 @@ let j = {
     }, {
         value: "beta",
         label: "Только бета (pages.dev)"
-    }, {
-        value: "all",
-        label: "Все хосты"
     }],
     f = new Set(["restodocks.com", "www.restodocks.com", "restodocks.ru", "www.restodocks.ru"]);
 

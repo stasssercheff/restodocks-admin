@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRequest } from '@/lib/admin-auth'
+import { isMarketingHostMode, matchesMarketingHost } from '@/lib/marketing-host'
 import { createServiceClient, fetchAllRows } from '@/lib/supabase-server'
 import { addDaysYmd, parseYmd, todayYmd, zonedDateTime } from '@/lib/query-range'
 
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   if ('error' in supabase) return NextResponse.json({ error: supabase.error }, { status: 500 })
 
+  const hostIsMode = isMarketingHostMode(host)
   const fetched = await fetchAllRows<VisitRow>((from, to) => {
     let query = supabase
       .from('marketing_visits')
@@ -67,15 +69,17 @@ export async function GET(req: NextRequest) {
       .lte('created_at', toIso)
       .order('created_at', { ascending: false })
     if (path) query = query.eq('path', path)
-    if (host && host !== 'all') query = query.eq('client_host', host)
+    // Presets (prod / not_beta / beta) are modes, not literal hostnames.
+    if (host && !hostIsMode) query = query.eq('client_host', host)
     if (excludeBots) query = query.neq('visitor_kind', 'bot')
     return query.range(from, to)
-  }, 1000, Math.max(limit, excludeIps.length ? limit * 2 : limit))
+  }, 1000, Math.max(limit, excludeIps.length || hostIsMode ? limit * 3 : limit))
   if ('error' in fetched) return NextResponse.json({ error: fetched.error }, { status: 500 })
   const excluded = new Set(excludeIps)
-  const rows = excluded.size
-    ? fetched.data.filter(row => !row.ip || !excluded.has(row.ip)).slice(0, limit)
-    : fetched.data.slice(0, limit)
+  const rows = fetched.data
+    .filter(row => matchesMarketingHost(row.client_host, host))
+    .filter(row => !excluded.size || !row.ip || !excluded.has(row.ip))
+    .slice(0, limit)
   const uniqueSessions = new Set(rows.map(row => row.session_id).filter(Boolean)).size
 
   return NextResponse.json({
