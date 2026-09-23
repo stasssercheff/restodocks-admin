@@ -550,14 +550,23 @@ export function useI18n() {
 export function LanguageSwitcher({ className = '' }: { className?: string }) {
   const { locale, setLocale } = useI18n()
   return (
-    <div className={`flex text-xs rounded-lg border border-gray-800 overflow-hidden ${className}`}>
+    <div
+      className={`flex text-xs rounded-lg border border-gray-800 overflow-hidden ${className}`}
+      role="group"
+      aria-label="Language"
+    >
       {(['ru', 'en'] as const).map(item => (
         <button
           key={item}
           type="button"
-          onClick={() => setLocale(item)}
-          className={`px-2.5 py-1.5 uppercase tracking-wide transition ${
-            locale === item ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-white'
+          aria-pressed={locale === item}
+          onClick={e => {
+            e.preventDefault()
+            e.stopPropagation()
+            setLocale(item)
+          }}
+          className={`min-w-[2.5rem] px-3 py-2 uppercase tracking-wide transition ${
+            locale === item ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-white hover:bg-gray-900'
           }`}
         >
           {item}
