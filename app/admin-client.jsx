@@ -9,10 +9,16 @@ import * as s from 'react'
 import { useRouter } from 'next/navigation'
 import StaffTab from './staff-tab'
 import PartnerScopeBanner from './partner-scope-banner'
+import SettingsTab from './settings-tab'
 import { LanguageSwitcher, useI18n } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
 import { matchesCreatedAt, normalizeDateInput } from '@/lib/created-at-filter'
 import { normalizeExcludeIp, parseExcludeIps, rowIpIsExcluded } from '@/lib/exclude-ips'
+import {
+  firstVisibleNavTab,
+  loadAdminUiPrefs,
+  visibleNavTabs,
+} from '@/lib/admin-ui-prefs'
 
 const r = { jsx, jsxs, Fragment }
 const l = { useRouter }
@@ -1968,18 +1974,37 @@ function ep({
         {
             t: i18n
         } = useI18n(),
-        [t, a] = (0, s.useState)(() => firstAllowedTab(user)),
+        [uiPrefs, setUiPrefs] = (0, s.useState)(() => loadAdminUiPrefs()),
+        [t, a] = (0, s.useState)(() => firstVisibleNavTab(user, loadAdminUiPrefs())),
         [n, i] = (0, s.useState)(!1);
+    (0, s.useEffect)(() => {
+        try {
+            "1" === sessionStorage.getItem(eu) && i(!0)
+        } catch (e) {}
+    }, []);
+    (0, s.useEffect)(() => {
+        let loaded = loadAdminUiPrefs();
+        setUiPrefs(loaded);
+        let keys = visibleNavTabs(user, loaded);
+        if (!keys.includes(t)) a(keys[0] || "settings")
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user]);
+    (0, s.useEffect)(() => {
+        let keys = visibleNavTabs(user, uiPrefs);
+        if (!keys.includes(t)) a(keys[0] || "settings")
+    }, [uiPrefs, user, t]);
     async function o() {
         await fetch("/api/auth", {
             method: "DELETE"
         }), e.push("/login")
     }
-    return (0, s.useEffect)(() => {
-        try {
-            "1" === sessionStorage.getItem(eu) && i(!0)
-        } catch (e) {}
-    }, []), (0, r.jsxs)("div", {
+    let tabLabel = key => {
+            if ("settings" === key) return i18n.settings.title;
+            if ("staff" === key) return i18n.tabs.admins;
+            return i18n.tabs[key] || key
+        },
+        navKeys = visibleNavTabs(user, uiPrefs);
+    return (0, r.jsxs)("div", {
         className: "min-h-screen bg-gray-950 text-white",
         children: [(0, r.jsxs)("header", {
             className: "px-4 py-3 flex items-center justify-between sticky top-0 z-10 border-b transition-colors ".concat(n ? "border-purple-500/70 bg-purple-950/95 shadow-[0_0_24px_rgba(147,51,234,0.25)]" : "border-amber-900/40 bg-gray-950"),
@@ -2011,50 +2036,11 @@ function ep({
             "aria-label": i18n.tabsAria,
             children: (0, r.jsx)("div", {
                 className: "flex gap-1 px-4 w-max min-w-full flex-nowrap",
-                children: [{
-                    key: "reviews",
-                    label: i18n.tabs.reviews
-                }, {
-                    key: "ads_agent",
-                    label: i18n.tabs.ads_agent
-                }, {
-                    key: "establishments",
-                    label: i18n.tabs.establishments
-                }, {
-                    key: "promo",
-                    label: i18n.tabs.promo
-                }, {
-                    key: "popups",
-                    label: i18n.tabs.popups
-                }, {
-                    key: "ai_usage",
-                    label: i18n.tabs.ai_usage
-                }, {
-                    key: "demo_sandboxes",
-                    label: i18n.tabs.demo_sandboxes
-                }, {
-                    key: "marketing_visits",
-                    label: i18n.tabs.marketing_visits
-                }, {
-                    key: "broadcast",
-                    label: i18n.tabs.broadcast
-                }, {
-                    key: "support",
-                    label: i18n.tabs.support
-                }, {
-                    key: "security",
-                    label: i18n.tabs.security
-                }, {
-                    key: "health",
-                    label: i18n.tabs.health
-                }, ...(user?.isOwner ? [{
-                    key: "staff",
-                    label: i18n.tabs.admins
-                }] : [])].filter(item => item.key === "staff" || canAccessPage(user, item.key)).map(e => (0, r.jsx)("button", {
-                    onClick: () => a(e.key),
-                    className: "shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ".concat(t === e.key ? "border-indigo-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"),
-                    children: e.label
-                }, e.key))
+                children: navKeys.map(key => (0, r.jsx)("button", {
+                    onClick: () => a(key),
+                    className: "shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ".concat(t === key ? "border-indigo-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"),
+                    children: tabLabel(key)
+                }, key))
             })
         }), (0, r.jsxs)("main", {
             className: "max-w-[min(1600px,calc(100vw-1.5rem))] mx-auto px-3 py-4 sm:px-6 sm:py-8",
@@ -2076,7 +2062,10 @@ function ep({
                         e ? sessionStorage.setItem(eu, "1") : sessionStorage.removeItem(eu)
                     } catch (e) {}
                 }
-            }), "security" === t && canAccessPage(user, "security") && (0, r.jsx)(eN, {}), "health" === t && canAccessPage(user, "health") && (0, r.jsx)(ef, {}), "staff" === t && user?.isOwner && (0, r.jsx)(StaffTab, {})]
+            }), "security" === t && canAccessPage(user, "security") && (0, r.jsx)(eN, {}), "health" === t && canAccessPage(user, "health") && (0, r.jsx)(ef, {}), "staff" === t && user?.isOwner && (0, r.jsx)(StaffTab, {}), "settings" === t && (0, r.jsx)(SettingsTab, {
+                user: user,
+                onPrefsChange: setUiPrefs
+            })]
         })]
     })
 }
