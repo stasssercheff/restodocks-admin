@@ -9,9 +9,10 @@ import * as s from 'react'
 import { useRouter } from 'next/navigation'
 import StaffTab from './staff-tab'
 import PartnerScopeBanner from './partner-scope-banner'
-import { LanguageSwitcher } from '@/lib/i18n'
+import { LanguageSwitcher, useI18n } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
 import { matchesCreatedAt, normalizeDateInput } from '@/lib/created-at-filter'
+import { normalizeExcludeIp, parseExcludeIps, rowIpIsExcluded } from '@/lib/exclude-ips'
 
 const r = { jsx, jsxs, Fragment }
 const l = { useRouter }
@@ -354,7 +355,7 @@ function E(e) {
     let a = (null != e ? e : "").trim().toLowerCase();
     return a ? null !== (t = L[a]) && void 0 !== t ? t : a : "—"
 }
-let I = {
+let visitTimeOpts = {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -366,7 +367,7 @@ let I = {
 function A(e, t) {
     try {
         return new Date(e).toLocaleString("ru-RU", {
-            ...I,
+            ...visitTimeOpts,
             timeZone: t
         })
     } catch (e) {
@@ -1964,6 +1965,9 @@ function ep({
     user
 }) {
     let e = (0, l.useRouter)(),
+        {
+            t: i18n
+        } = useI18n(),
         [t, a] = (0, s.useState)(() => firstAllowedTab(user)),
         [n, i] = (0, s.useState)(!1);
     async function o() {
@@ -1986,10 +1990,10 @@ function ep({
                     children: "Restodocks"
                 }), (0, r.jsx)("span", {
                     className: "text-gray-500 text-sm hidden sm:inline",
-                    children: "/ Admin"
+                    children: "/ ".concat(i18n.header.admin)
                 }), n ? (0, r.jsx)("span", {
                     className: "text-xs font-medium text-purple-200/95 hidden sm:inline",
-                    children: "— сеанс техподдержки открыт"
+                    children: i18n.header.supportSession
                 }) : null]
             }), (0, r.jsxs)("div", {
                 className: "flex items-center gap-3",
@@ -1999,53 +2003,53 @@ function ep({
                 }) : null, (0, r.jsx)("button", {
                     onClick: o,
                     className: "text-sm text-gray-500 hover:text-white transition",
-                    children: "Выйти"
+                    children: i18n.header.logout
                 })]
             })]
         }), (0, r.jsx)("nav", {
             className: "border-b border-gray-800 overflow-x-auto overscroll-x-contain touch-pan-x",
-            "aria-label": "Вкладки админки",
+            "aria-label": i18n.tabsAria,
             children: (0, r.jsx)("div", {
                 className: "flex gap-1 px-4 w-max min-w-full flex-nowrap",
                 children: [{
                     key: "reviews",
-                    label: "Отзывы"
+                    label: i18n.tabs.reviews
                 }, {
                     key: "ads_agent",
-                    label: "Ads Agent"
+                    label: i18n.tabs.ads_agent
                 }, {
                     key: "establishments",
-                    label: "Заведения"
+                    label: i18n.tabs.establishments
                 }, {
                     key: "promo",
-                    label: "Промокоды"
+                    label: i18n.tabs.promo
                 }, {
                     key: "popups",
-                    label: "Попапы"
+                    label: i18n.tabs.popups
                 }, {
                     key: "ai_usage",
-                    label: "AI Usage"
+                    label: i18n.tabs.ai_usage
                 }, {
                     key: "demo_sandboxes",
-                    label: "Демо"
+                    label: i18n.tabs.demo_sandboxes
                 }, {
                     key: "marketing_visits",
-                    label: "Витрина"
+                    label: i18n.tabs.marketing_visits
                 }, {
                     key: "broadcast",
-                    label: "Рассылка"
+                    label: i18n.tabs.broadcast
                 }, {
                     key: "support",
-                    label: "Техподдержка"
+                    label: i18n.tabs.support
                 }, {
                     key: "security",
-                    label: "Безопасность"
+                    label: i18n.tabs.security
                 }, {
                     key: "health",
-                    label: "Нагрузка"
+                    label: i18n.tabs.health
                 }, ...(user?.isOwner ? [{
                     key: "staff",
-                    label: "Админы"
+                    label: i18n.tabs.admins
                 }] : [])].filter(item => item.key === "staff" || canAccessPage(user, item.key)).map(e => (0, r.jsx)("button", {
                     onClick: () => a(e.key),
                     className: "shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap ".concat(t === e.key ? "border-indigo-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"),
@@ -5368,7 +5372,53 @@ function eS() {
 
 function eL() {
     var e, t, a, l, n, i, o, d, c, x, m, u, p, g, h, y, b;
-    let [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)("all"), [F, M] = (0, s.useState)(!1), [q, H] = (0, s.useState)(!1), [W, J] = (0, s.useState)(""), [z, G] = (0, s.useState)("time_desc"), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
+    let {
+            locale: i18nLocale,
+            t: i18n
+        } = useI18n(),
+        tm = i18n.marketing,
+        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)("all"), [F, M] = (0, s.useState)(!1), [q, H] = (0, s.useState)(!1), [W, J] = (0, s.useState)(""), [excludeOverride, setExcludeOverride] = (0, s.useState)(null), [z, G] = (0, s.useState)("time_desc"), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
+    const hostOptions = (0, s.useMemo)(() => [{
+            value: "all",
+            label: tm.hostsAll
+        }, {
+            value: "prod",
+            label: tm.hostsProd
+        }, {
+            value: "not_beta",
+            label: tm.hostsNotBeta
+        }, {
+            value: "beta",
+            label: tm.hostsBeta
+        }], [tm.hostsAll, tm.hostsBeta, tm.hostsNotBeta, tm.hostsProd]),
+        eventStats = (0, s.useMemo)(() => [{
+            id: "locale_chosen",
+            label: tm.events.locale_chosen,
+            legacyTypes: []
+        }, {
+            id: "registration_nav_start_using",
+            label: tm.events.registration_nav_start_using,
+            legacyTypes: ["cta_start"]
+        }, {
+            id: "registration_nav_try_ultra",
+            label: tm.events.registration_nav_try_ultra,
+            legacyTypes: ["cta_start_try_ultra"]
+        }, {
+            id: "registration",
+            label: tm.events.registration,
+            legacyTypes: []
+        }], [tm.events]),
+        labelEvent = (0, s.useCallback)(e => {
+            let a = (null != e ? e : "").trim().toLowerCase();
+            if (!a) return "—";
+            return tm.events[a] || a
+        }, [tm.events]),
+        labelVisitor = (0, s.useCallback)(e => {
+            let a = (null != e ? e : "").trim().toLowerCase();
+            if (!a) return "—";
+            return tm.visitors[a] || a
+        }, [tm.visitors]),
+        localeTag = "en" === i18nLocale ? "en-GB" : "ru-RU";
     (0, s.useEffect)(() => {
         try {
             let e = localStorage.getItem(ew);
@@ -5380,15 +5430,35 @@ function eL() {
         } catch (e) {}
     }, [W]);
     let er = (0, s.useCallback)(e => {
-            let t = e.trim();
-            t && (J(e => {
-                let a = e.split(",").map(e => e.trim()).filter(Boolean);
-                return a.includes(t) ? e : [...a, t].join(", ")
-            }), H(!0))
-        }, []),
+            let t = normalizeExcludeIp(e);
+            if (!t) return;
+            // Keep the full saved list in the text field, but when turning the filter
+            // on via a row click, exclude ONLY this IP (do not suddenly apply the backlog).
+            J(prev => {
+                let list = parseExcludeIps(prev);
+                return list.includes(t) ? list.join(", ") : [...list, t].join(", ")
+            }), setExcludeOverride(q ? null : t), H(!0), V(prev => {
+                if (!(null == prev ? void 0 : prev.recent)) return prev;
+                let recent = prev.recent.filter(row => normalizeExcludeIp(row.ip) !== t);
+                return {
+                    ...prev,
+                    recent,
+                    meta: prev.meta ? {
+                        ...prev.meta,
+                        sampleSize: recent.length,
+                        excludeIps: [t]
+                    } : prev.meta
+                }
+            })
+        }, [q]),
+        activeExcludeRaw = q ? excludeOverride || W : "",
         el = (0, s.useMemo)(() => {
             var e;
             let t = [...null !== (e = null == K ? void 0 : K.recent) && void 0 !== e ? e : []];
+            if (activeExcludeRaw.trim()) {
+                let excluded = new Set(parseExcludeIps(activeExcludeRaw));
+                t = t.filter(row => !rowIpIsExcluded(row.ip, excluded))
+            }
             return t.sort((e, t) => {
                 switch (z) {
                     case "time_asc":
@@ -5399,37 +5469,40 @@ function eL() {
                         var a, r;
                         return (null !== (a = e.client_host) && void 0 !== a ? a : "").localeCompare(null !== (r = t.client_host) && void 0 !== r ? r : "") || t.created_at.localeCompare(e.created_at);
                     case "event_asc":
-                        return E(e.event_type).localeCompare(E(t.event_type), "ru") || t.created_at.localeCompare(e.created_at);
+                        return labelEvent(e.event_type).localeCompare(labelEvent(t.event_type), i18nLocale) || t.created_at.localeCompare(e.created_at);
                     default:
                         return t.created_at.localeCompare(e.created_at)
                 }
             }), t
-        }, [null == K ? void 0 : K.recent, z]),
+        }, [null == K ? void 0 : K.recent, z, activeExcludeRaw, labelEvent, i18nLocale]),
         en = e => {
             j(ed(-e)), k(ed(0))
         },
         ei = (0, s.useCallback)(async e => {
             if (!v || !f) {
-                et("Укажите даты \xabС\xbb и \xabПо\xbb");
+                et(tm.needDates);
                 return
             }
             let t = ed(0),
                 a = f;
             a < t && (a = t, k(t));
-            let r = (null == e ? void 0 : e.silent) === !0;
+            let r = (null == e ? void 0 : e.silent) === !0,
+                clearOverride = (null == e ? void 0 : e.clearOverride) === !0;
+            clearOverride && setExcludeOverride(null);
             r ? Y(!0) : Z(!0), et(null);
             try {
-                let e = new URLSearchParams;
-                e.set("from", v), e.set("to", a), L.trim() && e.set("path", L.trim()), e.set("host", I.trim() || "all"), F && e.set("excludeBots", "1"), q && W.trim() && e.set("excludeIps", W.trim()), e.set("limit", "2000");
+                let e = new URLSearchParams,
+                    excludeRaw = clearOverride ? W : excludeOverride || W;
+                e.set("from", v), e.set("to", a), L.trim() && e.set("path", L.trim()), e.set("host", I.trim() || "all"), F && e.set("excludeBots", "1"), q && excludeRaw.trim() && e.set("excludeIps", parseExcludeIps(excludeRaw).join(",")), e.set("limit", "2000");
                 let t = await fetch("/api/marketing-visits?".concat(e.toString()), {
                         cache: "no-store"
                     }),
                     s = await t.json();
-                t.ok ? (V(s), X(new Date)) : (et("string" == typeof(null == s ? void 0 : s.error) ? s.error : "Ошибка (".concat(t.status, ")")), r || V(null))
+                t.ok ? (V(s), X(new Date)) : (et("string" == typeof(null == s ? void 0 : s.error) ? s.error : "".concat(tm.error, " (").concat(t.status, ")")), r || V(null))
             } finally {
                 r ? Y(!1) : Z(!1)
             }
-        }, [v, f, L, I, F, q, W]);
+        }, [v, f, L, I, F, q, W, excludeOverride, tm.needDates, tm.error]);
     (0, s.useEffect)(() => {
         ei()
     }, [ei]), (0, s.useEffect)(() => {
@@ -5447,35 +5520,68 @@ function eL() {
             window.clearInterval(e), document.removeEventListener("visibilitychange", t)
         }
     }, [ei]);
-    let eo = (null == K ? void 0 : null === (e = K.meta) || void 0 === e ? void 0 : e.rangeFrom) && (null == K ? void 0 : null === (t = K.meta) || void 0 === t ? void 0 : t.rangeTo) ? "".concat(es(K.meta.rangeFrom), " — ").concat(es(K.meta.rangeTo)) : (null == K ? void 0 : null === (a = K.meta) || void 0 === a ? void 0 : a.fromIso) ? "с ".concat(es(K.meta.fromIso)) : null;
+    let eo = (null == K ? void 0 : null === (e = K.meta) || void 0 === e ? void 0 : e.rangeFrom) && (null == K ? void 0 : null === (t = K.meta) || void 0 === t ? void 0 : t.rangeTo) ? "".concat(es(K.meta.rangeFrom), " — ").concat(es(K.meta.rangeTo)) : (null == K ? void 0 : null === (a = K.meta) || void 0 === a ? void 0 : a.fromIso) ? "".concat(tm.from.toLowerCase(), " ").concat(es(K.meta.fromIso)) : null,
+        formatVisitTime = (iso, tz) => {
+            if (!iso) return "—";
+            try {
+                return new Date(iso).toLocaleString(localeTag, {
+                    ...visitTimeOpts,
+                    timeZone: (null != tz ? tz : "").trim() || "UTC"
+                })
+            } catch (e) {
+                return new Date(iso).toLocaleString(localeTag)
+            }
+        },
+        formatYourTime = iso => {
+            if (!iso) return "—";
+            try {
+                return "".concat(tm.atYou, ": ").concat(new Date(iso).toLocaleString(localeTag, {
+                    ...visitTimeOpts,
+                    timeZone: ea
+                }))
+            } catch (e) {
+                return "".concat(tm.atYou, ": ").concat(new Date(iso).toLocaleString(localeTag))
+            }
+        },
+        sessionBadge = row => {
+            if (!row || !row.session_active) return null;
+            return (0, r.jsxs)("span", {
+                className: "inline-flex items-center gap-1 rounded border border-emerald-700/80 bg-emerald-950/60 px-1.5 py-0.5 text-[10px] font-medium text-emerald-200",
+                title: tm.sessionActiveTitle,
+                children: [(0, r.jsx)("span", {
+                    className: "inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse",
+                    "aria-hidden": !0
+                }), tm.sessionActive]
+            })
+        };
     return (0, r.jsxs)("div", {
         className: "space-y-6 pb-12",
         children: [(0, r.jsxs)("p", {
             className: "text-sm text-gray-400",
-            children: ["Данные в ", (0, r.jsx)("strong", {
+            children: [tm.hintBefore, " ", (0, r.jsx)("strong", {
                 className: "text-gray-300",
                 children: "Supabase"
             }), " (", (0, r.jsx)("code", {
                 className: "text-gray-500",
                 children: "marketing_visits"
-            }), "), автообновление каждые 30 сек.", (0, r.jsx)("strong", {
+            }), ")", tm.hintMid, (0, r.jsx)("strong", {
                 className: "text-gray-300",
-                children: " Анонимные визиты"
-            }), " (язык, промо, регистрация) и", " ", (0, r.jsx)("strong", {
+                children: " ".concat(tm.hintAnon)
+            }), " ", tm.hintAnonDetail, " ", (0, r.jsx)("strong", {
                 className: "text-gray-300",
-                children: "входы сотрудников"
+                children: tm.hintStaff
             }), " (", (0, r.jsx)("code", {
                 className: "text-gray-500",
                 children: "app_login"
-            }), " — пароль,", " ", (0, r.jsx)("code", {
+            }), " ", tm.hintStaffDetail, " ", (0, r.jsx)("code", {
                 className: "text-gray-500",
                 children: "app_open"
-            }), " — уже залогинен, открыл /home). \xabСкрыть мои IP\xbb работает только при ", (0, r.jsx)("strong", {
+            }), " ", tm.hintAppOpen, " ", (0, r.jsx)("strong", {
                 className: "text-gray-300",
-                children: "включённой"
-            }), " ", "галочке; IP в поле — через запятую. Колонка \xabПоследний вход\xbb по заведениям — вкладка", " ", (0, r.jsx)("strong", {
+                children: tm.hintEnabled
+            }), " ", tm.hintIps, " ", (0, r.jsx)("strong", {
                 className: "text-gray-300",
-                children: "Заведения"
+                children: tm.hintEstablishments
             }), "."]
         }), (0, r.jsxs)("div", {
             className: "bg-gray-900 rounded-xl p-4 border border-gray-800 flex flex-wrap items-end gap-3",
@@ -5485,7 +5591,7 @@ function eL() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "С"
+                        children: tm.from
                     }), (0, r.jsx)("input", {
                         type: "date",
                         value: v,
@@ -5496,7 +5602,7 @@ function eL() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "По"
+                        children: tm.to
                     }), (0, r.jsx)("input", {
                         type: "date",
                         value: f,
@@ -5508,7 +5614,7 @@ function eL() {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-500",
-                    children: "Быстрый период"
+                    children: tm.quickPeriod
                 }), (0, r.jsxs)("select", {
                     defaultValue: "",
                     onChange: e => {
@@ -5518,74 +5624,74 @@ function eL() {
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm min-w-[10rem]",
                     children: [(0, r.jsx)("option", {
                         value: "",
-                        children: "выбрать…"
+                        children: tm.quickPick
                     }), (0, r.jsx)("option", {
                         value: 7,
-                        children: "последние 7 дней"
+                        children: tm.last7
                     }), (0, r.jsx)("option", {
                         value: 14,
-                        children: "последние 14 дней"
+                        children: tm.last14
                     }), (0, r.jsx)("option", {
                         value: 30,
-                        children: "последние 30 дней"
+                        children: tm.last30
                     }), (0, r.jsx)("option", {
                         value: 90,
-                        children: "последние 90 дней"
+                        children: tm.last90
                     })]
                 })]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-500",
-                    children: "Страница входа"
+                    children: tm.landingPage
                 }), (0, r.jsxs)("select", {
                     value: L,
                     onChange: e => T(e.target.value),
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm min-w-[10rem]",
                     children: [(0, r.jsx)("option", {
                         value: "",
-                        children: "все страницы"
+                        children: tm.allPages
                     }), (0, r.jsx)("option", {
                         value: "/login",
-                        children: "Вход /login"
+                        children: tm.pathLogin
                     }), (0, r.jsx)("option", {
                         value: "/promo",
-                        children: "Промо /promo"
+                        children: tm.pathPromo
                     }), (0, r.jsx)("option", {
                         value: "/register-company",
-                        children: "Регистрация /register-company"
+                        children: tm.pathRegisterCompany
                     }), (0, r.jsx)("option", {
                         value: "/register",
-                        children: "Регистрация сотрудника"
+                        children: tm.pathRegister
                     }), (0, r.jsx)("option", {
                         value: "/owner-registration",
-                        children: "Регистрация владельца"
+                        children: tm.pathOwner
                     })]
                 })]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-500",
-                    children: "Сортировка"
+                    children: tm.sort
                 }), (0, r.jsxs)("select", {
                     value: z,
                     onChange: e => G(e.target.value),
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm min-w-[10rem]",
                     children: [(0, r.jsx)("option", {
                         value: "time_desc",
-                        children: "время ↓ новые"
+                        children: tm.sortTimeDesc
                     }), (0, r.jsx)("option", {
                         value: "time_asc",
-                        children: "время ↑ старые"
+                        children: tm.sortTimeAsc
                     }), (0, r.jsx)("option", {
                         value: "path_asc",
-                        children: "страница A→Z"
+                        children: tm.sortPath
                     }), (0, r.jsx)("option", {
                         value: "host_asc",
-                        children: "хост A→Z"
+                        children: tm.sortHost
                     }), (0, r.jsx)("option", {
                         value: "event_asc",
-                        children: "событие A→Z"
+                        children: tm.sortEvent
                     })]
                 })]
             }), (0, r.jsx)("div", {
@@ -5597,7 +5703,7 @@ function eL() {
                         checked: F,
                         onChange: e => M(e.target.checked),
                         className: "rounded border-gray-600"
-                    }), "Скрыть ботов"]
+                    }), tm.hideBots]
                 })
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col gap-1 min-w-[12rem]",
@@ -5606,48 +5712,54 @@ function eL() {
                     children: [(0, r.jsx)("input", {
                         type: "checkbox",
                         checked: q,
-                        onChange: e => H(e.target.checked),
+                        onChange: e => {
+                            setExcludeOverride(null), H(e.target.checked)
+                        },
                         className: "rounded border-gray-600"
-                    }), "Скрыть мои IP"]
+                    }), tm.hideMyIps]
                 }), (0, r.jsx)("input", {
                     type: "text",
                     value: W,
-                    onChange: e => J(e.target.value),
+                    onChange: e => {
+                        setExcludeOverride(null), J(e.target.value)
+                    },
                     placeholder: "1.2.3.4, 5.6.7.8",
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono",
-                    title: "Через запятую. Клик \xabскрыть\xbb в таблице добавит IP сюда."
+                    title: tm.hideIpTitle
                 })]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-500",
-                    children: "Сайт (хост)"
+                    children: tm.host
                 }), (0, r.jsx)("select", {
                     value: I,
                     onChange: e => A(e.target.value),
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm min-w-[11rem]",
-                    children: N.map(e => (0, r.jsx)("option", {
+                    children: hostOptions.map(e => (0, r.jsx)("option", {
                         value: e.value,
                         children: e.label
                     }, e.value))
                 })]
             }), (0, r.jsx)("button", {
                 type: "button",
-                onClick: () => void ei(),
+                onClick: () => void ei({
+                    clearOverride: !0
+                }),
                 disabled: B,
                 className: "bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium",
-                children: B ? "Обновление…" : $ ? "Обновление…" : "Обновить"
+                children: B || $ ? tm.refreshing : tm.refresh
             }), (null == K ? void 0 : K.meta) ? (0, r.jsxs)("div", {
                 className: "text-xs text-gray-500 ml-auto text-right",
                 children: [(0, r.jsxs)("div", {
-                    children: ["Записей: ", K.meta.sampleSize]
+                    children: [tm.records, ": ", K.meta.sampleSize]
                 }), eo ? (0, r.jsx)("div", {
                     className: "mt-0.5",
                     children: eo
                 }) : null, Q ? (0, r.jsxs)("div", {
                     className: "mt-0.5",
-                    title: "Автообновление каждые 30 сек",
-                    children: ["Обновлено: ", Q.toLocaleTimeString("ru-RU"), $ ? " …" : null]
+                    title: tm.hintMid,
+                    children: [tm.updated, ": ", Q.toLocaleTimeString(localeTag), $ ? " …" : null]
                 }) : null]
             }) : null]
         }), ee ? (0, r.jsx)("div", {
@@ -5656,13 +5768,13 @@ function eL() {
         }) : null, K ? (0, r.jsxs)(r.Fragment, {
             children: [(0, r.jsx)("div", {
                 className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3",
-                children: S.map(e => {
+                children: eventStats.map(e => {
                     var t;
                     return (0, r.jsx)(eP, {
                         label: e.label,
                         value: function(e, t) {
                             var a, r;
-                            let s = S.find(e => e.id === t);
+                            let s = eventStats.find(e => e.id === t);
                             if (!s) return 0;
                             let l = new Map(e.map(e => [e.event_type, e.count])),
                                 n = null !== (a = l.get(s.id)) && void 0 !== a ? a : 0;
@@ -5675,7 +5787,7 @@ function eL() {
                 className: "flex flex-wrap gap-2 text-xs",
                 children: (null !== (u = K.byVisitorKind) && void 0 !== u ? u : []).map(e => (0, r.jsxs)("span", {
                     className: "rounded-lg border px-2 py-1 ".concat("human" === e.visitor_kind ? "bg-emerald-950/50 border-emerald-800 text-emerald-200" : "bot" === e.visitor_kind ? "bg-rose-950/40 border-rose-800 text-rose-200" : "bg-gray-800 border-gray-700 text-gray-300"),
-                    children: [P(e.visitor_kind), ":", " ", (0, r.jsx)("strong", {
+                    children: [labelVisitor(e.visitor_kind), ":", " ", (0, r.jsx)("strong", {
                         className: "text-white",
                         children: e.count
                     })]
@@ -5684,12 +5796,12 @@ function eL() {
         }) : null, (0, r.jsxs)("section", {
             children: [(0, r.jsx)("h2", {
                 className: "text-base font-semibold text-white mb-2",
-                children: "Последние визиты"
+                children: tm.recentTitle
             }), (0, r.jsx)("div", {
                 className: "md:hidden space-y-2",
                 children: 0 === el.length ? (0, r.jsx)("div", {
                     className: "bg-gray-900 rounded-xl border border-gray-800 px-4 py-6 text-center text-gray-500 text-sm",
-                    children: B ? "Загрузка…" : "Нет записей за период"
+                    children: B ? tm.loading : tm.empty
                 }) : el.map(e => {
                     var t;
                     return (0, r.jsxs)("div", {
@@ -5700,14 +5812,14 @@ function eL() {
                                 className: "min-w-0",
                                 children: [(0, r.jsx)("div", {
                                     className: "text-gray-300 font-mono text-[11px]",
-                                    children: R(e.created_at, e.timezone)
+                                    children: formatVisitTime(e.created_at, e.timezone)
                                 }), (0, r.jsx)("div", {
                                     className: "text-[10px] text-gray-500 mt-0.5",
-                                    children: U(e.created_at, ea)
-                                })]
+                                    children: formatYourTime(e.created_at)
+                                }), sessionBadge(e)]
                             }), (0, r.jsx)("span", {
                                 className: "text-gray-100 font-medium shrink-0 text-right",
-                                children: E(e.event_type)
+                                children: labelEvent(e.event_type)
                             })]
                         }), (0, r.jsxs)("div", {
                             className: "text-gray-400 leading-snug",
@@ -5716,23 +5828,23 @@ function eL() {
                                 type: "button",
                                 onClick: () => er(e.ip.trim()),
                                 className: "block text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5",
-                                title: "Добавить IP в \xabСкрыть мои IP\xbb",
-                                children: ["скрыть ", e.ip.trim()]
+                                title: tm.hideIpTitle,
+                                children: [tm.hideIp, " ", e.ip.trim()]
                             }) : null]
                         }), (0, r.jsxs)("div", {
                             className: "grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]",
                             children: [(0, r.jsxs)("div", {
                                 children: [(0, r.jsx)("span", {
                                     className: "text-gray-600",
-                                    children: "Посетитель: "
+                                    children: "".concat(tm.visitor, ": ")
                                 }), (0, r.jsx)("span", {
                                     className: "human" === e.visitor_kind ? "text-emerald-300" : "bot" === e.visitor_kind ? "text-rose-300" : "text-amber-200",
-                                    children: P(e.visitor_kind)
+                                    children: labelVisitor(e.visitor_kind)
                                 })]
                             }), (0, r.jsxs)("div", {
                                 children: [(0, r.jsx)("span", {
                                     className: "text-gray-600",
-                                    children: "Страница: "
+                                    children: "".concat(tm.page, ": ")
                                 }), (0, r.jsx)("span", {
                                     className: "text-gray-200",
                                     children: w(e.path)
@@ -5740,14 +5852,14 @@ function eL() {
                             }), (0, r.jsxs)("div", {
                                 children: [(0, r.jsx)("span", {
                                     className: "text-gray-600",
-                                    children: "Язык: "
+                                    children: "".concat(tm.lang, ": ")
                                 }), (0, r.jsx)("span", {
                                     children: C(e.language_code)
                                 })]
                             }), (0, r.jsxs)("div", {
                                 children: [(0, r.jsx)("span", {
                                     className: "text-gray-600",
-                                    children: "Экран: "
+                                    children: "".concat(tm.screen, ": ")
                                 }), (0, r.jsx)("span", {
                                     className: "text-gray-400",
                                     children: null != e.viewport_width && null != e.viewport_height ? "".concat(e.viewport_width, "\xd7").concat(e.viewport_height) : "—"
@@ -5756,7 +5868,7 @@ function eL() {
                                 className: "col-span-2",
                                 children: [(0, r.jsx)("span", {
                                     className: "text-gray-600",
-                                    children: "Хост: "
+                                    children: "".concat(tm.hostLabel, ": ")
                                 }), (0, r.jsx)("span", {
                                     className: "text-gray-500",
                                     children: _(e.client_host)
@@ -5776,28 +5888,28 @@ function eL() {
                                 className: "border-b border-gray-800 text-gray-500 text-left",
                                 children: [(0, r.jsx)("th", {
                                     className: "px-3 py-2 whitespace-nowrap w-[9rem]",
-                                    children: "Время"
+                                    children: tm.colTime
                                 }), (0, r.jsx)("th", {
                                     className: "px-3 py-2 w-[11rem]",
-                                    children: "Место"
+                                    children: tm.colPlace
                                 }), (0, r.jsx)("th", {
                                     className: "px-3 py-2 whitespace-nowrap w-[8rem]",
-                                    children: "Событие"
+                                    children: tm.colEvent
+                                }), (0, r.jsx)("th", {
+                                    className: "px-3 py-2 whitespace-nowrap w-[7rem]",
+                                    children: tm.colVisitor
                                 }), (0, r.jsx)("th", {
                                     className: "px-3 py-2 whitespace-nowrap w-[6rem]",
-                                    children: "Посетитель"
-                                }), (0, r.jsx)("th", {
-                                    className: "px-3 py-2 whitespace-nowrap w-[6rem]",
-                                    children: "Страница"
+                                    children: tm.colPage
                                 }), (0, r.jsx)("th", {
                                     className: "px-3 py-2 whitespace-nowrap w-[5rem]",
-                                    children: "Язык"
+                                    children: tm.colLang
                                 }), (0, r.jsx)("th", {
                                     className: "px-3 py-2 whitespace-nowrap w-[5rem]",
-                                    children: "Экран"
+                                    children: tm.colScreen
                                 }), (0, r.jsx)("th", {
                                     className: "px-3 py-2 whitespace-nowrap w-[6rem]",
-                                    children: "Хост"
+                                    children: tm.colHost
                                 })]
                             })
                         }), (0, r.jsx)("tbody", {
@@ -5805,7 +5917,7 @@ function eL() {
                                 children: (0, r.jsx)("td", {
                                     colSpan: 8,
                                     className: "px-3 py-6 text-center text-gray-500",
-                                    children: B ? "Загрузка…" : "Нет записей за период"
+                                    children: B ? tm.loading : tm.empty
                                 })
                             }) : el.map(e => {
                                 var t, a;
@@ -5814,10 +5926,13 @@ function eL() {
                                     children: [(0, r.jsxs)("td", {
                                         className: "px-3 py-2 text-gray-300 whitespace-nowrap",
                                         children: [(0, r.jsx)("div", {
-                                            children: R(e.created_at, e.timezone)
+                                            children: formatVisitTime(e.created_at, e.timezone)
                                         }), (0, r.jsx)("div", {
                                             className: "text-[10px] text-gray-500 leading-snug mt-0.5",
-                                            children: U(e.created_at, ea)
+                                            children: formatYourTime(e.created_at)
+                                        }), (0, r.jsx)("div", {
+                                            className: "mt-1",
+                                            children: sessionBadge(e)
                                         })]
                                     }), (0, r.jsxs)("td", {
                                         className: "px-3 py-2 text-gray-400 min-w-[9rem] max-w-[14rem]",
@@ -5829,18 +5944,18 @@ function eL() {
                                             type: "button",
                                             onClick: () => er(e.ip.trim()),
                                             className: "text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5 whitespace-nowrap",
-                                            title: "Добавить IP в \xabСкрыть мои IP\xbb",
-                                            children: ["скрыть ", e.ip.trim()]
+                                            title: tm.hideIpTitle,
+                                            children: [tm.hideIp, " ", e.ip.trim()]
                                         }) : null]
                                     }), (0, r.jsx)("td", {
                                         className: "px-3 py-2 text-gray-100 font-medium whitespace-nowrap",
-                                        children: E(e.event_type)
+                                        children: labelEvent(e.event_type)
                                     }), (0, r.jsxs)("td", {
                                         className: "px-3 py-2 whitespace-nowrap",
                                         title: null !== (a = e.visitor_hint) && void 0 !== a ? a : void 0,
                                         children: [(0, r.jsx)("span", {
                                             className: "human" === e.visitor_kind ? "text-emerald-300" : "bot" === e.visitor_kind ? "text-rose-300" : "text-amber-200",
-                                            children: P(e.visitor_kind)
+                                            children: labelVisitor(e.visitor_kind)
                                         }), e.visitor_hint ? (0, r.jsx)("span", {
                                             className: "block text-[10px] text-gray-500",
                                             children: e.visitor_hint
@@ -5866,17 +5981,17 @@ function eL() {
             }), el.length > 0 ? (0, r.jsx)("div", {
                 className: "border-t-2 border-gray-700 px-4 py-4 text-center text-sm text-gray-300 bg-gray-950/60 rounded-b-xl border border-t-0 border-gray-800 md:rounded-t-none md:-mt-px",
                 children: (null !== (p = null == K ? void 0 : null === (n = K.meta) || void 0 === n ? void 0 : n.sampleSize) && void 0 !== p ? p : 0) >= (null !== (g = null == K ? void 0 : null === (i = K.meta) || void 0 === i ? void 0 : i.limit) && void 0 !== g ? g : 0) ? (0, r.jsxs)(r.Fragment, {
-                    children: ["Показаны первые ", null == K ? void 0 : null === (o = K.meta) || void 0 === o ? void 0 : o.limit, " записей за выбранный период.", (0, r.jsx)("span", {
+                    children: [tm.shownFirst, " ", null == K ? void 0 : null === (o = K.meta) || void 0 === o ? void 0 : o.limit, " ", tm.shownPeriod, (0, r.jsx)("span", {
                         className: "block text-gray-500 text-xs mt-1",
-                        children: "Сузьте диапазон дат или уточните фильтр \xabСтраница\xbb."
+                        children: tm.narrowHint
                     })]
                 }) : (0, r.jsxs)(r.Fragment, {
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-200",
-                        children: "— Конец списка —"
+                        children: tm.endOfList
                     }), (0, r.jsxs)("span", {
                         className: "block text-gray-500 text-xs mt-1",
-                        children: [null !== (h = null == K ? void 0 : null === (d = K.meta) || void 0 === d ? void 0 : d.sampleSize) && void 0 !== h ? h : 0, " ", (null !== (y = null == K ? void 0 : null === (c = K.meta) || void 0 === c ? void 0 : c.sampleSize) && void 0 !== y ? y : 0) === 1 ? "запись" : (null !== (b = null == K ? void 0 : null === (x = K.meta) || void 0 === x ? void 0 : x.sampleSize) && void 0 !== b ? b : 0) < 5 ? "записи" : "записей", eo ? " \xb7 ".concat(eo) : ""]
+                        children: [null !== (h = null == K ? void 0 : null === (d = K.meta) || void 0 === d ? void 0 : d.sampleSize) && void 0 !== h ? h : 0, " ", (null !== (y = null == K ? void 0 : null === (c = K.meta) || void 0 === c ? void 0 : c.sampleSize) && void 0 !== y ? y : 0) === 1 ? tm.record1 : (null !== (b = null == K ? void 0 : null === (x = K.meta) || void 0 === x ? void 0 : x.sampleSize) && void 0 !== b ? b : 0) < 5 ? tm.record2 : tm.record5, eo ? " \xb7 ".concat(eo) : ""]
                     })]
                 })
             }) : null]

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRequest } from '@/lib/admin-auth'
+import { parseExcludeIps, rowIpIsExcluded } from '@/lib/exclude-ips'
 import { isMarketingHostMode, matchesMarketingHost } from '@/lib/marketing-host'
 import { createServiceClient, fetchAllRows } from '@/lib/supabase-server'
 import { addDaysYmd, parseYmd, todayYmd, zonedDateTime } from '@/lib/query-range'
@@ -49,10 +50,7 @@ export async function GET(req: NextRequest) {
   const path = url.searchParams.get('path')?.trim() || null
   const host = url.searchParams.get('host')?.trim() || 'all'
   const excludeBots = url.searchParams.get('excludeBots') === '1'
-  const excludeIps = (url.searchParams.get('excludeIps') || '')
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean)
+  const excludeIps = parseExcludeIps(url.searchParams.get('excludeIps') || '')
   const limit = Math.min(5000, Math.max(1, parseInt(url.searchParams.get('limit') || '2000', 10) || 2000))
   const fromIso = zonedDateTime(rangeFrom, '00:00', 'UTC').toISOString()
   const toIso = zonedDateTime(rangeTo, '23:59', 'UTC', true).toISOString()
@@ -61,6 +59,7 @@ export async function GET(req: NextRequest) {
   if ('error' in supabase) return NextResponse.json({ error: supabase.error }, { status: 500 })
 
   const hostIsMode = isMarketingHostMode(host)
+  const overFetch = excludeIps.length > 0 || hostIsMode
   const fetched = await fetchAllRows<VisitRow>((from, to) => {
     let query = supabase
       .from('marketing_visits')
@@ -73,14 +72,27 @@ export async function GET(req: NextRequest) {
     if (host && !hostIsMode) query = query.eq('client_host', host)
     if (excludeBots) query = query.neq('visitor_kind', 'bot')
     return query.range(from, to)
-  }, 1000, Math.max(limit, excludeIps.length || hostIsMode ? limit * 3 : limit))
+  }, 1000, overFetch ? limit * 3 : limit)
   if ('error' in fetched) return NextResponse.json({ error: fetched.error }, { status: 500 })
   const excluded = new Set(excludeIps)
   const rows = fetched.data
     .filter(row => matchesMarketingHost(row.client_host, host))
-    .filter(row => !excluded.size || !row.ip || !excluded.has(row.ip))
+    .filter(row => !rowIpIsExcluded(row.ip, excluded))
     .slice(0, limit)
-  const uniqueSessions = new Set(rows.map(row => row.session_id).filter(Boolean)).size
+
+  const lastActivityBySession = new Map<string, string>()
+  for (const row of rows) {
+    const sid = (row.session_id ?? '').trim()
+    if (!sid) continue
+    const prev = lastActivityBySession.get(sid)
+    if (!prev || row.created_at > prev) lastActivityBySession.set(sid, row.created_at)
+  }
+  const activeWindowMs = 15 * 60 * 1000
+  const now = Date.now()
+  const activeSessionIds = [...lastActivityBySession.entries()]
+    .filter(([, at]) => now - new Date(at).getTime() <= activeWindowMs)
+    .map(([sid]) => sid)
+  const uniqueSessions = lastActivityBySession.size
 
   return NextResponse.json({
     meta: {
@@ -96,10 +108,13 @@ export async function GET(req: NextRequest) {
       rangeTo,
       sampleSize: rows.length,
       limit,
+      activeWindowMinutes: 15,
+      activeSessionCount: activeSessionIds.length,
     },
     summary: {
       visits: rows.length,
       uniqueSessions,
+      activeSessions: activeSessionIds.length,
     },
     byPath: countMap(rows, row => row.path ?? '').map(({ key, count }) => ({ path: key, count })),
     byLanguage: countMap(rows, row => row.language_code ?? '').map(({ key, count }) => ({ language_code: key, count })),
@@ -108,6 +123,12 @@ export async function GET(req: NextRequest) {
     byDay: countMap(rows, row => row.created_at.slice(0, 10))
       .sort((a, b) => a.key.localeCompare(b.key))
       .map(({ key, count }) => ({ date: key, count })),
-    recent: rows,
+    activeSessionIds,
+    recent: rows.map(row => {
+      const sid = (row.session_id ?? '').trim()
+      const last = sid ? lastActivityBySession.get(sid) : null
+      const sessionActive = !!(sid && last && now - new Date(last).getTime() <= activeWindowMs)
+      return { ...row, session_active: sessionActive }
+    }),
   })
 }
