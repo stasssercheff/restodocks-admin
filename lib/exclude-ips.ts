@@ -54,3 +54,30 @@ export function filterRowsByExcludedIps<T extends { ip?: string | null }>(
   const excluded = new Set(list)
   return rows.filter(row => !rowIpIsExcluded(row.ip, excluded))
 }
+
+/**
+ * Resolve which IPs are actively filtered.
+ * Row-click hides accumulate in `clickedIps` and NEVER dump the whole saved field.
+ * Manual checkbox with an empty click-set uses the saved field.
+ */
+export function resolveActiveExcludeIps(options: {
+  enabled: boolean
+  savedField: string
+  clickedIps?: readonly string[] | null
+}): string[] {
+  if (!options.enabled) return []
+  const clicked = parseExcludeIps((options.clickedIps ?? []).join(','))
+  if (clicked.length) return clicked
+  return parseExcludeIps(options.savedField)
+}
+
+export function addClickedHideIp(
+  current: readonly string[],
+  ip: string | null | undefined,
+): string[] {
+  const next = normalizeExcludeIp(ip)
+  if (!next) return [...current]
+  const list = parseExcludeIps(current.join(','))
+  if (list.includes(next)) return list
+  return [...list, next]
+}

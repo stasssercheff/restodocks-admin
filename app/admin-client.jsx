@@ -13,7 +13,7 @@ import SettingsTab from './settings-tab'
 import { LanguageSwitcher, useI18n } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
 import { matchesCreatedAt, normalizeDateInput } from '@/lib/created-at-filter'
-import { normalizeExcludeIp, parseExcludeIps, rowIpIsExcluded } from '@/lib/exclude-ips'
+import { addClickedHideIp, normalizeExcludeIp, parseExcludeIps, resolveActiveExcludeIps, rowIpIsExcluded } from '@/lib/exclude-ips'
 import {
   firstVisibleNavTab,
   loadAdminUiPrefs,
@@ -5366,7 +5366,7 @@ function eL() {
             t: i18n
         } = useI18n(),
         tm = i18n.marketing,
-        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)("all"), [F, M] = (0, s.useState)(!1), [q, H] = (0, s.useState)(!1), [W, J] = (0, s.useState)(""), [excludeOverride, setExcludeOverride] = (0, s.useState)(null), [z, G] = (0, s.useState)("time_desc"), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
+        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)("all"), [F, M] = (0, s.useState)(!1), [q, H] = (0, s.useState)(!1), [W, J] = (0, s.useState)(""), [clickedHideIps, setClickedHideIps] = (0, s.useState)([]), [z, G] = (0, s.useState)("time_desc"), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
     const hostOptions = (0, s.useMemo)(() => [{
             value: "all",
             label: tm.hostsAll
@@ -5421,12 +5421,12 @@ function eL() {
     let er = (0, s.useCallback)(e => {
             let t = normalizeExcludeIp(e);
             if (!t) return;
-            // Keep the full saved list in the text field, but when turning the filter
-            // on via a row click, exclude ONLY this IP (do not suddenly apply the backlog).
+            // «скрыть» always hides ONLY this IP (and others clicked the same way).
+            // Never suddenly apply the whole saved IP backlog in the text field.
             J(prev => {
                 let list = parseExcludeIps(prev);
                 return list.includes(t) ? list.join(", ") : [...list, t].join(", ")
-            }), setExcludeOverride(q ? null : t), H(!0), V(prev => {
+            }), setClickedHideIps(prev => addClickedHideIp(prev, t)), H(!0), V(prev => {
                 if (!(null == prev ? void 0 : prev.recent)) return prev;
                 let recent = prev.recent.filter(row => normalizeExcludeIp(row.ip) !== t);
                 return {
@@ -5435,17 +5435,22 @@ function eL() {
                     meta: prev.meta ? {
                         ...prev.meta,
                         sampleSize: recent.length,
-                        excludeIps: [t]
+                        excludeIps: addClickedHideIp(clickedHideIps, t)
                     } : prev.meta
                 }
             })
-        }, [q]),
-        activeExcludeRaw = q ? excludeOverride || W : "",
+        }, [clickedHideIps]),
+        activeExcludeList = resolveActiveExcludeIps({
+            enabled: q,
+            savedField: W,
+            clickedIps: clickedHideIps
+        }),
+        activeExcludeRaw = activeExcludeList.join(","),
         el = (0, s.useMemo)(() => {
             var e;
             let t = [...null !== (e = null == K ? void 0 : K.recent) && void 0 !== e ? e : []];
-            if (activeExcludeRaw.trim()) {
-                let excluded = new Set(parseExcludeIps(activeExcludeRaw));
+            if (activeExcludeList.length) {
+                let excluded = new Set(activeExcludeList);
                 t = t.filter(row => !rowIpIsExcluded(row.ip, excluded))
             }
             return t.sort((e, t) => {
@@ -5475,14 +5480,16 @@ function eL() {
             let t = ed(0),
                 a = f;
             a < t && (a = t, k(t));
-            let r = (null == e ? void 0 : e.silent) === !0,
-                clearOverride = (null == e ? void 0 : e.clearOverride) === !0;
-            clearOverride && setExcludeOverride(null);
+            let r = (null == e ? void 0 : e.silent) === !0;
             r ? Y(!0) : Z(!0), et(null);
             try {
                 let e = new URLSearchParams,
-                    excludeRaw = clearOverride ? W : excludeOverride || W;
-                e.set("from", v), e.set("to", a), L.trim() && e.set("path", L.trim()), e.set("host", I.trim() || "all"), F && e.set("excludeBots", "1"), q && excludeRaw.trim() && e.set("excludeIps", parseExcludeIps(excludeRaw).join(",")), e.set("limit", "2000");
+                    excludeList = resolveActiveExcludeIps({
+                        enabled: q,
+                        savedField: W,
+                        clickedIps: clickedHideIps
+                    });
+                e.set("from", v), e.set("to", a), L.trim() && e.set("path", L.trim()), e.set("host", I.trim() || "all"), F && e.set("excludeBots", "1"), excludeList.length && e.set("excludeIps", excludeList.join(",")), e.set("limit", "2000");
                 let t = await fetch("/api/marketing-visits?".concat(e.toString()), {
                         cache: "no-store"
                     }),
@@ -5491,7 +5498,7 @@ function eL() {
             } finally {
                 r ? Y(!1) : Z(!1)
             }
-        }, [v, f, L, I, F, q, W, excludeOverride, tm.needDates, tm.error]);
+        }, [v, f, L, I, F, q, W, clickedHideIps, tm.needDates, tm.error]);
     (0, s.useEffect)(() => {
         ei()
     }, [ei]), (0, s.useEffect)(() => {
@@ -5702,7 +5709,8 @@ function eL() {
                         type: "checkbox",
                         checked: q,
                         onChange: e => {
-                            setExcludeOverride(null), H(e.target.checked)
+                            // Manual toggle: drop row-click set so the text field is what applies.
+                            setClickedHideIps([]), H(e.target.checked)
                         },
                         className: "rounded border-gray-600"
                     }), tm.hideMyIps]
@@ -5710,7 +5718,7 @@ function eL() {
                     type: "text",
                     value: W,
                     onChange: e => {
-                        setExcludeOverride(null), J(e.target.value)
+                        setClickedHideIps([]), J(e.target.value)
                     },
                     placeholder: "1.2.3.4, 5.6.7.8",
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono",
@@ -5732,9 +5740,7 @@ function eL() {
                 })]
             }), (0, r.jsx)("button", {
                 type: "button",
-                onClick: () => void ei({
-                    clearOverride: !0
-                }),
+                onClick: () => void ei(),
                 disabled: B,
                 className: "bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium",
                 children: B || $ ? tm.refreshing : tm.refresh

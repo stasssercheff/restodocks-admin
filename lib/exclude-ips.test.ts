@@ -5,6 +5,8 @@ import {
   normalizeExcludeIp,
   parseExcludeIps,
   rowIpIsExcluded,
+  resolveActiveExcludeIps,
+  addClickedHideIp,
 } from './exclude-ips.ts'
 
 describe('normalizeExcludeIp', () => {
@@ -59,5 +61,54 @@ describe('rowIpIsExcluded / filterRowsByExcludedIps', () => {
   it('matches normalized forms only', () => {
     assert.equal(rowIpIsExcluded('89.222.24.53:8080', ['89.222.24.53']), true)
     assert.equal(rowIpIsExcluded('89.222.24.53', ['89.222.24.53:8080']), true)
+  })
+})
+
+describe('resolveActiveExcludeIps / addClickedHideIp', () => {
+  it('row-click hides only clicked IPs, not the whole saved backlog', () => {
+    const saved = '117.2.158.122, 89.222.24.53, 77.83.246.132, 123.19.137.228'
+    assert.deepEqual(
+      resolveActiveExcludeIps({
+        enabled: true,
+        savedField: saved,
+        clickedIps: ['123.19.137.228'],
+      }),
+      ['123.19.137.228'],
+    )
+    assert.deepEqual(
+      resolveActiveExcludeIps({
+        enabled: true,
+        savedField: saved,
+        clickedIps: ['123.19.137.228', '171.225.248.206'],
+      }),
+      ['123.19.137.228', '171.225.248.206'],
+    )
+  })
+
+  it('manual checkbox with no clicks applies the full saved field', () => {
+    assert.deepEqual(
+      resolveActiveExcludeIps({
+        enabled: true,
+        savedField: '1.1.1.1, 2.2.2.2',
+        clickedIps: [],
+      }),
+      ['1.1.1.1', '2.2.2.2'],
+    )
+  })
+
+  it('disabled filter returns nothing', () => {
+    assert.deepEqual(
+      resolveActiveExcludeIps({
+        enabled: false,
+        savedField: '1.1.1.1',
+        clickedIps: ['1.1.1.1'],
+      }),
+      [],
+    )
+  })
+
+  it('addClickedHideIp appends unique normalized IPs', () => {
+    assert.deepEqual(addClickedHideIp(['1.1.1.1'], ' 2.2.2.2 '), ['1.1.1.1', '2.2.2.2'])
+    assert.deepEqual(addClickedHideIp(['1.1.1.1'], '1.1.1.1'), ['1.1.1.1'])
   })
 })
