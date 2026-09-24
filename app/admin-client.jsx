@@ -19,6 +19,10 @@ import {
   loadAdminUiPrefs,
   visibleNavTabs,
 } from '@/lib/admin-ui-prefs'
+import {
+  loadMarketingVisitsPrefs,
+  saveMarketingVisitsPrefs,
+} from '@/lib/marketing-visits-prefs'
 
 const r = { jsx, jsxs, Fragment }
 const l = { useRouter }
@@ -27,17 +31,23 @@ const EST_FILTER_KEY = 'rd_admin_est_filters'
 
 function loadEstFilters() {
   try {
-    const raw = sessionStorage.getItem(EST_FILTER_KEY)
+    const raw = localStorage.getItem(EST_FILTER_KEY) || sessionStorage.getItem(EST_FILTER_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
-    return {
+    const next = {
       demoFilter: parsed.demoFilter === 'only' || parsed.demoFilter === 'all' ? parsed.demoFilter : 'hide',
       draftFrom: normalizeDateInput(parsed.draftFrom ?? parsed.dateFrom ?? ''),
       draftTo: normalizeDateInput(parsed.draftTo ?? parsed.dateTo ?? ''),
       appliedFrom: normalizeDateInput(parsed.appliedFrom ?? ''),
       appliedTo: normalizeDateInput(parsed.appliedTo ?? ''),
     }
+    // Migrate session → local so filters survive closing the tab.
+    try {
+      localStorage.setItem(EST_FILTER_KEY, JSON.stringify(next))
+      sessionStorage.removeItem(EST_FILTER_KEY)
+    } catch {}
+    return next
   } catch {
     return null
   }
@@ -45,7 +55,8 @@ function loadEstFilters() {
 
 function saveEstFilters(next) {
   try {
-    sessionStorage.setItem(EST_FILTER_KEY, JSON.stringify(next))
+    localStorage.setItem(EST_FILTER_KEY, JSON.stringify(next))
+    sessionStorage.removeItem(EST_FILTER_KEY)
   } catch {}
 }
 
@@ -5366,7 +5377,8 @@ function eL() {
             t: i18n
         } = useI18n(),
         tm = i18n.marketing,
-        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)("all"), [F, M] = (0, s.useState)(!1), [q, H] = (0, s.useState)(!1), [W, J] = (0, s.useState)(""), [clickedHideIps, setClickedHideIps] = (0, s.useState)([]), [z, G] = (0, s.useState)("time_desc"), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
+        savedVisitsPrefs = (0, s.useMemo)(() => loadMarketingVisitsPrefs(), []),
+        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)(() => savedVisitsPrefs.host || "all"), [F, M] = (0, s.useState)(() => !!savedVisitsPrefs.excludeBots), [q, H] = (0, s.useState)(() => !!savedVisitsPrefs.excludeEnabled), [W, J] = (0, s.useState)(() => savedVisitsPrefs.excludeIps || ""), [clickedHideIps, setClickedHideIps] = (0, s.useState)(() => savedVisitsPrefs.clickedHideIps || []), [z, G] = (0, s.useState)(() => savedVisitsPrefs.sort || "time_desc"), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
     const hostOptions = (0, s.useMemo)(() => [{
             value: "all",
             label: tm.hostsAll
@@ -5410,14 +5422,17 @@ function eL() {
         localeTag = "en" === i18nLocale ? "en-GB" : "ru-RU";
     (0, s.useEffect)(() => {
         try {
-            let e = localStorage.getItem(ew);
-            (null == e ? void 0 : e.trim()) && J(e.trim())
+            saveMarketingVisitsPrefs({
+                version: 1,
+                excludeIps: W,
+                excludeEnabled: q,
+                clickedHideIps,
+                excludeBots: F,
+                host: I,
+                sort: z
+            })
         } catch (e) {}
-    }, []), (0, s.useEffect)(() => {
-        try {
-            localStorage.setItem(ew, W.trim())
-        } catch (e) {}
-    }, [W]);
+    }, [W, q, clickedHideIps, F, I, z]);
     let er = (0, s.useCallback)(e => {
             let t = normalizeExcludeIp(e);
             if (!t) return;
