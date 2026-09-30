@@ -15,6 +15,7 @@ import {
   setTabVisible,
   canOpenNavTab,
   syncAdminUiPrefs,
+  touchAdminUiPrefs,
 } from '@/lib/admin-ui-prefs'
 import type { PublicAdminUser } from '@/lib/admin-pages'
 
@@ -63,12 +64,29 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
   const rows = prefs.tabs.filter(item => allowed.has(item.key))
 
   async function commit(next: AdminUiPrefs) {
-    const clean = sanitizeAdminUiPrefs(next)
+    const clean = touchAdminUiPrefs(sanitizeAdminUiPrefs(next))
     setPrefs(clean)
     saveAdminUiPrefs(clean)
     onPrefsChange(clean)
     setSyncError(null)
     const pushed = await pushAdminUiPrefsToServer(clean)
+    if (!pushed.ok) {
+      setSyncError(pushed.error)
+      return
+    }
+    setSavedFlash(true)
+    window.setTimeout(() => setSavedFlash(false), 1600)
+  }
+
+  async function forcePush() {
+    setSyncError(null)
+    setSyncing(true)
+    const clean = touchAdminUiPrefs(prefs)
+    setPrefs(clean)
+    saveAdminUiPrefs(clean)
+    onPrefsChange(clean)
+    const pushed = await pushAdminUiPrefsToServer(clean)
+    setSyncing(false)
     if (!pushed.ok) {
       setSyncError(pushed.error)
       return
@@ -98,13 +116,23 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
             <h2 className="text-base font-medium text-white">{s.tabsTitle}</h2>
             <p className="text-xs text-gray-500 mt-0.5">{s.tabsHint}</p>
           </div>
-          <button
-            type="button"
-            onClick={resetDefaults}
-            className="text-xs text-gray-400 hover:text-white border border-gray-700 rounded-lg px-3 py-1.5 transition"
-          >
-            {s.reset}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void forcePush()}
+              disabled={syncing}
+              className="text-xs text-indigo-300 hover:text-white border border-indigo-800 rounded-lg px-3 py-1.5 transition disabled:opacity-40"
+            >
+              {s.forceSync}
+            </button>
+            <button
+              type="button"
+              onClick={resetDefaults}
+              className="text-xs text-gray-400 hover:text-white border border-gray-700 rounded-lg px-3 py-1.5 transition"
+            >
+              {s.reset}
+            </button>
+          </div>
         </div>
 
         <ul className="bg-gray-900 border border-gray-800 rounded-xl divide-y divide-gray-800 overflow-hidden">

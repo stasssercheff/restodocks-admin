@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import StaffTab from './staff-tab'
 import PartnerScopeBanner from './partner-scope-banner'
 import SettingsTab from './settings-tab'
+import MarketingVisitsRecent from './marketing-visits-recent'
 import { LanguageSwitcher, useI18n } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
 import { matchesCreatedAt, normalizeDateInput } from '@/lib/created-at-filter'
@@ -17,9 +18,12 @@ import { addClickedHideIp, normalizeExcludeIp, parseExcludeIps, resolveActiveExc
 import {
   firstVisibleNavTab,
   loadAdminUiPrefs,
+  sanitizeAdminUiPrefs,
+  saveAdminUiPrefs,
   syncAdminUiPrefs,
   visibleNavTabs,
 } from '@/lib/admin-ui-prefs'
+import { groupVisitSessions } from '@/lib/marketing-visit-sessions'
 import {
   loadMarketingVisitsPrefs,
   saveMarketingVisitsPrefs,
@@ -1980,14 +1984,16 @@ function em(e) {
 let eu = "rd_admin_support_active";
 
 function ep({
-    user
+    user,
+    initialUiPrefs
 }) {
     let e = (0, l.useRouter)(),
         {
             t: i18n
         } = useI18n(),
-        [uiPrefs, setUiPrefs] = (0, s.useState)(() => loadAdminUiPrefs()),
-        [t, a] = (0, s.useState)(() => firstVisibleNavTab(user, loadAdminUiPrefs())),
+        seedPrefs = initialUiPrefs ? sanitizeAdminUiPrefs(initialUiPrefs) : null,
+        [uiPrefs, setUiPrefs] = (0, s.useState)(() => seedPrefs || loadAdminUiPrefs()),
+        [t, a] = (0, s.useState)(() => firstVisibleNavTab(user, seedPrefs || loadAdminUiPrefs())),
         [n, i] = (0, s.useState)(!1);
     (0, s.useEffect)(() => {
         try {
@@ -1995,10 +2001,17 @@ function ep({
         } catch (e) {}
     }, []);
     (0, s.useEffect)(() => {
+        // Mirror SSR prefs into localStorage immediately so offline reload keeps order.
+        if (seedPrefs) saveAdminUiPrefs(seedPrefs);
+    }, []);
+    (0, s.useEffect)(() => {
         let cancelled = !1;
         (async () => {
             // Prefer account prefs from KV so PC and mobile share the same tab layout.
-            let loaded = await syncAdminUiPrefs();
+            // Seed from SSR so we still heal/upload even if the client GET races.
+            let loaded = await syncAdminUiPrefs({
+                seed: seedPrefs
+            });
             if (cancelled) return;
             setUiPrefs(loaded);
             let keys = visibleNavTabs(user, loaded);
@@ -5387,7 +5400,7 @@ function eL() {
         } = useI18n(),
         tm = i18n.marketing,
         savedVisitsPrefs = (0, s.useMemo)(() => loadMarketingVisitsPrefs(), []),
-        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)(() => savedVisitsPrefs.host || "all"), [F, M] = (0, s.useState)(() => !!savedVisitsPrefs.excludeBots), [q, H] = (0, s.useState)(() => !!savedVisitsPrefs.excludeEnabled), [W, J] = (0, s.useState)(() => savedVisitsPrefs.excludeIps || ""), [clickedHideIps, setClickedHideIps] = (0, s.useState)(() => savedVisitsPrefs.clickedHideIps || []), [z, G] = (0, s.useState)(() => savedVisitsPrefs.sort || "time_desc"), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
+        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)(() => savedVisitsPrefs.host || "all"), [F, M] = (0, s.useState)(() => !!savedVisitsPrefs.excludeBots), [q, H] = (0, s.useState)(() => !!savedVisitsPrefs.excludeEnabled), [W, J] = (0, s.useState)(() => savedVisitsPrefs.excludeIps || ""), [clickedHideIps, setClickedHideIps] = (0, s.useState)(() => savedVisitsPrefs.clickedHideIps || []), [z, G] = (0, s.useState)(() => savedVisitsPrefs.sort || "time_desc"), [viewMode, setViewMode] = (0, s.useState)("sessions"), [expandedSessions, setExpandedSessions] = (0, s.useState)(() => new Set), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
     const hostOptions = (0, s.useMemo)(() => [{
             value: "all",
             label: tm.hostsAll
@@ -5493,6 +5506,18 @@ function eL() {
                 }
             }), t
         }, [null == K ? void 0 : K.recent, z, activeExcludeRaw, labelEvent, i18nLocale]),
+        visitSessions = (0, s.useMemo)(() => {
+            // Prefer API-grouped sessions when filters match; else regroup client-side after local hide-IP.
+            if ((null == K ? void 0 : K.sessions) && !activeExcludeList.length && "time_desc" === z) return K.sessions;
+            return groupVisitSessions(el)
+        }, [null == K ? void 0 : K.sessions, el, activeExcludeRaw, z]),
+        toggleSession = key => {
+            setExpandedSessions(prev => {
+                let next = new Set(prev);
+                return next.has(key) ? next.delete(key) : next.add(key), next
+            })
+        },
+        journeyLabel = types => (types || []).map(labelEvent).filter(Boolean).join(" → ") || "—",
         en = e => {
             j(ed(-e)), k(ed(0))
         },
@@ -5771,7 +5796,11 @@ function eL() {
             }), (null == K ? void 0 : K.meta) ? (0, r.jsxs)("div", {
                 className: "text-xs text-gray-500 ml-auto text-right",
                 children: [(0, r.jsxs)("div", {
-                    children: [tm.records, ": ", K.meta.sampleSize]
+                    title: tm.peopleTitle,
+                    children: [(0, r.jsx)("span", {
+                        className: "text-emerald-300 font-medium",
+                        children: tm.people
+                    }), ": ", visitSessions.length, " · ", tm.records, ": ", K.meta.sampleSize]
                 }), eo ? (0, r.jsx)("div", {
                     className: "mt-0.5",
                     children: eo
@@ -5812,208 +5841,28 @@ function eL() {
                     })]
                 }, e.visitor_kind))
             }) : null]
-        }) : null, (0, r.jsxs)("section", {
-            children: [(0, r.jsx)("h2", {
-                className: "text-base font-semibold text-white mb-2",
-                children: tm.recentTitle
-            }), (0, r.jsx)("div", {
-                className: "md:hidden space-y-2",
-                children: 0 === el.length ? (0, r.jsx)("div", {
-                    className: "bg-gray-900 rounded-xl border border-gray-800 px-4 py-6 text-center text-gray-500 text-sm",
-                    children: B ? tm.loading : tm.empty
-                }) : el.map(e => {
-                    var t;
-                    return (0, r.jsxs)("div", {
-                        className: "bg-gray-900 rounded-xl border border-gray-800 p-3 space-y-2 text-xs",
-                        children: [(0, r.jsxs)("div", {
-                            className: "flex items-start justify-between gap-2",
-                            children: [(0, r.jsxs)("div", {
-                                className: "min-w-0",
-                                children: [(0, r.jsx)("div", {
-                                    className: "text-gray-300 font-mono text-[11px]",
-                                    children: formatVisitTime(e.created_at, e.timezone)
-                                }), (0, r.jsx)("div", {
-                                    className: "text-[10px] text-gray-500 mt-0.5",
-                                    children: formatYourTime(e.created_at)
-                                }), sessionBadge(e)]
-                            }), (0, r.jsx)("span", {
-                                className: "text-gray-100 font-medium shrink-0 text-right",
-                                children: labelEvent(e.event_type)
-                            })]
-                        }), (0, r.jsxs)("div", {
-                            className: "text-gray-400 leading-snug",
-                            title: O(e),
-                            children: [O(e), (null === (t = e.ip) || void 0 === t ? void 0 : t.trim()) ? (0, r.jsxs)("button", {
-                                type: "button",
-                                onClick: () => er(e.ip.trim()),
-                                className: "block text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5",
-                                title: tm.hideIpTitle,
-                                children: [tm.hideIp, " ", e.ip.trim()]
-                            }) : null]
-                        }), (0, r.jsxs)("div", {
-                            className: "grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]",
-                            children: [(0, r.jsxs)("div", {
-                                children: [(0, r.jsx)("span", {
-                                    className: "text-gray-600",
-                                    children: "".concat(tm.visitor, ": ")
-                                }), (0, r.jsx)("span", {
-                                    className: "human" === e.visitor_kind ? "text-emerald-300" : "bot" === e.visitor_kind ? "text-rose-300" : "text-amber-200",
-                                    children: labelVisitor(e.visitor_kind)
-                                })]
-                            }), (0, r.jsxs)("div", {
-                                children: [(0, r.jsx)("span", {
-                                    className: "text-gray-600",
-                                    children: "".concat(tm.page, ": ")
-                                }), (0, r.jsx)("span", {
-                                    className: "text-gray-200",
-                                    children: w(e.path)
-                                })]
-                            }), (0, r.jsxs)("div", {
-                                children: [(0, r.jsx)("span", {
-                                    className: "text-gray-600",
-                                    children: "".concat(tm.lang, ": ")
-                                }), (0, r.jsx)("span", {
-                                    children: C(e.language_code)
-                                })]
-                            }), (0, r.jsxs)("div", {
-                                children: [(0, r.jsx)("span", {
-                                    className: "text-gray-600",
-                                    children: "".concat(tm.screen, ": ")
-                                }), (0, r.jsx)("span", {
-                                    className: "text-gray-400",
-                                    children: null != e.viewport_width && null != e.viewport_height ? "".concat(e.viewport_width, "\xd7").concat(e.viewport_height) : "—"
-                                })]
-                            }), (0, r.jsxs)("div", {
-                                className: "col-span-2",
-                                children: [(0, r.jsx)("span", {
-                                    className: "text-gray-600",
-                                    children: "".concat(tm.hostLabel, ": ")
-                                }), (0, r.jsx)("span", {
-                                    className: "text-gray-500",
-                                    children: _(e.client_host)
-                                })]
-                            })]
-                        })]
-                    }, e.id)
-                })
-            }), (0, r.jsx)("div", {
-                className: "hidden md:block bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
-                children: (0, r.jsx)("div", {
-                    className: "overflow-x-auto",
-                    children: (0, r.jsxs)("table", {
-                        className: "w-full min-w-[56rem] text-xs",
-                        children: [(0, r.jsx)("thead", {
-                            children: (0, r.jsxs)("tr", {
-                                className: "border-b border-gray-800 text-gray-500 text-left",
-                                children: [(0, r.jsx)("th", {
-                                    className: "px-3 py-2 whitespace-nowrap w-[9rem]",
-                                    children: tm.colTime
-                                }), (0, r.jsx)("th", {
-                                    className: "px-3 py-2 w-[11rem]",
-                                    children: tm.colPlace
-                                }), (0, r.jsx)("th", {
-                                    className: "px-3 py-2 whitespace-nowrap w-[8rem]",
-                                    children: tm.colEvent
-                                }), (0, r.jsx)("th", {
-                                    className: "px-3 py-2 whitespace-nowrap w-[7rem]",
-                                    children: tm.colVisitor
-                                }), (0, r.jsx)("th", {
-                                    className: "px-3 py-2 whitespace-nowrap w-[6rem]",
-                                    children: tm.colPage
-                                }), (0, r.jsx)("th", {
-                                    className: "px-3 py-2 whitespace-nowrap w-[5rem]",
-                                    children: tm.colLang
-                                }), (0, r.jsx)("th", {
-                                    className: "px-3 py-2 whitespace-nowrap w-[5rem]",
-                                    children: tm.colScreen
-                                }), (0, r.jsx)("th", {
-                                    className: "px-3 py-2 whitespace-nowrap w-[6rem]",
-                                    children: tm.colHost
-                                })]
-                            })
-                        }), (0, r.jsx)("tbody", {
-                            children: 0 === el.length ? (0, r.jsx)("tr", {
-                                children: (0, r.jsx)("td", {
-                                    colSpan: 8,
-                                    className: "px-3 py-6 text-center text-gray-500",
-                                    children: B ? tm.loading : tm.empty
-                                })
-                            }) : el.map(e => {
-                                var t, a;
-                                return (0, r.jsxs)("tr", {
-                                    className: "border-t border-gray-800/70 align-top",
-                                    children: [(0, r.jsxs)("td", {
-                                        className: "px-3 py-2 text-gray-300 whitespace-nowrap",
-                                        children: [(0, r.jsx)("div", {
-                                            children: formatVisitTime(e.created_at, e.timezone)
-                                        }), (0, r.jsx)("div", {
-                                            className: "text-[10px] text-gray-500 leading-snug mt-0.5",
-                                            children: formatYourTime(e.created_at)
-                                        }), (0, r.jsx)("div", {
-                                            className: "mt-1",
-                                            children: sessionBadge(e)
-                                        })]
-                                    }), (0, r.jsxs)("td", {
-                                        className: "px-3 py-2 text-gray-400 min-w-[9rem] max-w-[14rem]",
-                                        title: O(e),
-                                        children: [(0, r.jsx)("div", {
-                                            className: "break-words leading-snug",
-                                            children: O(e)
-                                        }), (null === (t = e.ip) || void 0 === t ? void 0 : t.trim()) ? (0, r.jsxs)("button", {
-                                            type: "button",
-                                            onClick: () => er(e.ip.trim()),
-                                            className: "text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5 whitespace-nowrap",
-                                            title: tm.hideIpTitle,
-                                            children: [tm.hideIp, " ", e.ip.trim()]
-                                        }) : null]
-                                    }), (0, r.jsx)("td", {
-                                        className: "px-3 py-2 text-gray-100 font-medium whitespace-nowrap",
-                                        children: labelEvent(e.event_type)
-                                    }), (0, r.jsxs)("td", {
-                                        className: "px-3 py-2 whitespace-nowrap",
-                                        title: null !== (a = e.visitor_hint) && void 0 !== a ? a : void 0,
-                                        children: [(0, r.jsx)("span", {
-                                            className: "human" === e.visitor_kind ? "text-emerald-300" : "bot" === e.visitor_kind ? "text-rose-300" : "text-amber-200",
-                                            children: labelVisitor(e.visitor_kind)
-                                        }), e.visitor_hint ? (0, r.jsx)("span", {
-                                            className: "block text-[10px] text-gray-500",
-                                            children: e.visitor_hint
-                                        }) : null]
-                                    }), (0, r.jsx)("td", {
-                                        className: "px-3 py-2 text-gray-200 whitespace-nowrap",
-                                        children: w(e.path)
-                                    }), (0, r.jsx)("td", {
-                                        className: "px-3 py-2 whitespace-nowrap",
-                                        children: C(e.language_code)
-                                    }), (0, r.jsx)("td", {
-                                        className: "px-3 py-2 text-gray-400 whitespace-nowrap",
-                                        children: null != e.viewport_width && null != e.viewport_height ? "".concat(e.viewport_width, "\xd7").concat(e.viewport_height) : "—"
-                                    }), (0, r.jsx)("td", {
-                                        className: "px-3 py-2 text-gray-500 whitespace-nowrap",
-                                        children: _(e.client_host)
-                                    })]
-                                }, e.id)
-                            })
-                        })]
-                    })
-                })
-            }), el.length > 0 ? (0, r.jsx)("div", {
-                className: "border-t-2 border-gray-700 px-4 py-4 text-center text-sm text-gray-300 bg-gray-950/60 rounded-b-xl border border-t-0 border-gray-800 md:rounded-t-none md:-mt-px",
-                children: (null !== (p = null == K ? void 0 : null === (n = K.meta) || void 0 === n ? void 0 : n.sampleSize) && void 0 !== p ? p : 0) >= (null !== (g = null == K ? void 0 : null === (i = K.meta) || void 0 === i ? void 0 : i.limit) && void 0 !== g ? g : 0) ? (0, r.jsxs)(r.Fragment, {
-                    children: [tm.shownFirst, " ", null == K ? void 0 : null === (o = K.meta) || void 0 === o ? void 0 : o.limit, " ", tm.shownPeriod, (0, r.jsx)("span", {
-                        className: "block text-gray-500 text-xs mt-1",
-                        children: tm.narrowHint
-                    })]
-                }) : (0, r.jsxs)(r.Fragment, {
-                    children: [(0, r.jsx)("span", {
-                        className: "text-gray-200",
-                        children: tm.endOfList
-                    }), (0, r.jsxs)("span", {
-                        className: "block text-gray-500 text-xs mt-1",
-                        children: [null !== (h = null == K ? void 0 : null === (d = K.meta) || void 0 === d ? void 0 : d.sampleSize) && void 0 !== h ? h : 0, " ", (null !== (y = null == K ? void 0 : null === (c = K.meta) || void 0 === c ? void 0 : c.sampleSize) && void 0 !== y ? y : 0) === 1 ? tm.record1 : (null !== (b = null == K ? void 0 : null === (x = K.meta) || void 0 === x ? void 0 : x.sampleSize) && void 0 !== b ? b : 0) < 5 ? tm.record2 : tm.record5, eo ? " \xb7 ".concat(eo) : ""]
-                    })]
-                })
-            }) : null]
+        }) : null, (0, r.jsx)(MarketingVisitsRecent, {
+            tm: tm,
+            viewMode: viewMode,
+            onViewModeChange: setViewMode,
+            loading: B,
+            events: el,
+            sessions: visitSessions,
+            expandedSessions: expandedSessions,
+            onToggleSession: toggleSession,
+            labelEvent: labelEvent,
+            labelVisitor: labelVisitor,
+            labelPath: w,
+            labelLang: C,
+            labelHost: _,
+            labelPlace: O,
+            formatVisitTime: formatVisitTime,
+            formatYourTime: formatYourTime,
+            onHideIp: er,
+            sampleSize: null !== (p = null == K ? void 0 : null === (n = K.meta) || void 0 === n ? void 0 : n.sampleSize) && void 0 !== p ? p : 0,
+            limit: null !== (g = null == K ? void 0 : null === (i = K.meta) || void 0 === i ? void 0 : i.limit) && void 0 !== g ? g : 0,
+            rangeLabel: eo,
+            journeyLabel: journeyLabel
         })]
     })
 }
@@ -6300,6 +6149,6 @@ function eP(e) {
     })
 }
 
-export default function AdminClient({ user }) {
-  return ep({ user })
+export default function AdminClient({ user, initialUiPrefs = null }) {
+  return ep({ user, initialUiPrefs })
 }

@@ -7,6 +7,7 @@ import {
   moveTabAmong,
   sanitizeAdminUiPrefs,
   setTabVisible,
+  touchAdminUiPrefs,
   visibleNavTabs,
 } from './admin-ui-prefs.ts'
 
@@ -111,3 +112,16 @@ function ALL_HIDDEN_EXCEPT_SETTINGS() {
     visible: item.key === 'settings',
   }))
 }
+
+
+test('sanitizeAdminUiPrefs keeps updatedAt and touchAdminUiPrefs stamps time', () => {
+  const prefs = sanitizeAdminUiPrefs({
+    version: 1,
+    updatedAt: 1700000000000,
+    tabs: [{ key: 'marketing_visits', visible: true }],
+  })
+  assert.equal(prefs.updatedAt, 1700000000000)
+  const touched = touchAdminUiPrefs(prefs)
+  assert.ok((touched.updatedAt ?? 0) >= 1700000000000)
+  assert.ok((touched.updatedAt ?? 0) <= Date.now())
+})
