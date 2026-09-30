@@ -102,6 +102,19 @@ export async function GET(req: NextRequest) {
   const sessions = groupVisitSessions(recent)
   const uniqueSessions = sessions.length
 
+  // «Регистрация» on the dashboard = completed signups (new establishments),
+  // not marketing_visits event_type=registration (that is only opening the form).
+  const completed = await supabase
+    .from('establishments')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', fromIso)
+    .lte('created_at', toIso)
+    .eq('is_demo', false)
+  if (completed.error) {
+    return NextResponse.json({ error: completed.error.message }, { status: 500 })
+  }
+  const completedRegistrations = typeof completed.count === 'number' ? completed.count : 0
+
   return NextResponse.json({
     meta: {
       days: Math.max(1, Math.round((new Date(rangeTo).getTime() - new Date(rangeFrom).getTime()) / 86400000) + 1),
@@ -116,6 +129,7 @@ export async function GET(req: NextRequest) {
       rangeTo,
       sampleSize: rows.length,
       uniqueSessions,
+      completedRegistrations,
       limit,
       activeWindowMinutes: 15,
       activeSessionCount: activeSessionIds.length,
@@ -124,6 +138,7 @@ export async function GET(req: NextRequest) {
       visits: rows.length,
       uniqueSessions,
       activeSessions: activeSessionIds.length,
+      completedRegistrations,
     },
     byPath: countMap(rows, row => row.path ?? '').map(({ key, count }) => ({ path: key, count })),
     byLanguage: countMap(rows, row => row.language_code ?? '').map(({ key, count }) => ({ language_code: key, count })),

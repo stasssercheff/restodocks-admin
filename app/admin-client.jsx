@@ -340,7 +340,7 @@ let S = [{
         label: "\xabПопробовать ультра\xbb",
         legacyTypes: ["cta_start_try_ultra"]
     }, {
-        id: "registration",
+        id: "registration_completed",
         label: "Регистрация",
         legacyTypes: []
     }],
@@ -348,7 +348,7 @@ let S = [{
         locale_chosen: "Выбор языка",
         registration_nav_start_using: "\xabНачать использование\xbb",
         registration_nav_try_ultra: "\xabПопробовать ультра\xbb",
-        registration: "Регистрация",
+        registration: "Открыл регистрацию",
         cta_start: "\xabНачать использование\xbb",
         cta_start_try_ultra: "\xabПопробовать ультра\xbb",
         page_view: "Просмотр страницы",
@@ -5448,10 +5448,12 @@ function eL() {
             label: tm.events.registration_nav_try_ultra,
             legacyTypes: ["cta_start_try_ultra"]
         }, {
-            id: "registration",
-            label: tm.events.registration,
+            // Completed venues — not marketing event_type=registration (form open).
+            id: "registration_completed",
+            label: tm.statRegistration,
+            title: tm.statRegistrationTitle,
             legacyTypes: []
-        }], [tm.events]),
+        }], [tm.events, tm.statRegistration, tm.statRegistrationTitle]),
         labelEvent = (0, s.useCallback)(e => {
             let a = (null != e ? e : "").trim().toLowerCase();
             if (!a) return "—";
@@ -5883,8 +5885,14 @@ function eL() {
                 className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3",
                 children: eventStats.map(e => (0, r.jsx)(eP, {
                     label: e.label,
+                    title: e.title,
                     value: function(counts, id) {
                         var a, r;
+                        // Align with Заведения: completed signup = new non-demo establishment.
+                        if ("registration_completed" === id) {
+                            var metaCount, summaryCount;
+                            return null !== (metaCount = null == K || null == K.meta ? void 0 : K.meta.completedRegistrations) && void 0 !== metaCount ? metaCount : null !== (summaryCount = null == K || null == K.summary ? void 0 : K.summary.completedRegistrations) && void 0 !== summaryCount ? summaryCount : 0
+                        }
                         let s = eventStats.find(item => item.id === id);
                         if (!s) return 0;
                         let l = new Map(counts.map(item => [item.event_type, item.count])),
@@ -6199,10 +6207,12 @@ function eP(e) {
     let {
         label: t,
         value: a,
-        dimmed: s
+        dimmed: s,
+        title: titleAttr
     } = e;
     return (0, r.jsxs)("div", {
         className: "bg-gray-900 rounded-xl p-3 sm:p-4 border border-gray-800",
+        title: titleAttr || void 0,
         children: [(0, r.jsx)("div", {
             className: "text-xl sm:text-2xl font-bold ".concat(s ? "text-gray-600" : "text-white"),
             children: a
