@@ -9,10 +9,12 @@ import {
   defaultAdminUiPrefs,
   loadAdminUiPrefs,
   moveTabAmong,
+  pushAdminUiPrefsToServer,
   saveAdminUiPrefs,
   sanitizeAdminUiPrefs,
   setTabVisible,
   canOpenNavTab,
+  syncAdminUiPrefs,
 } from '@/lib/admin-ui-prefs'
 import type { PublicAdminUser } from '@/lib/admin-pages'
 
@@ -30,12 +32,25 @@ function tabLabel(key: NavTabKey, tabs: Record<string, string>, settingsLabel: s
 export default function SettingsTab({ user, onPrefsChange }: Props) {
   const { t } = useI18n()
   const s = t.settings
-  const [prefs, setPrefs] = useState<AdminUiPrefs>(() => defaultAdminUiPrefs())
+  const [prefs, setPrefs] = useState<AdminUiPrefs>(() => loadAdminUiPrefs())
   const [savedFlash, setSavedFlash] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
-    setPrefs(loadAdminUiPrefs())
-  }, [])
+    let cancelled = false
+    ;(async () => {
+      setSyncing(true)
+      const synced = await syncAdminUiPrefs()
+      if (cancelled) return
+      setPrefs(synced)
+      onPrefsChange(synced)
+      setSyncing(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [onPrefsChange])
 
   const allowed = useMemo(() => {
     const set = new Set<NavTabKey>()
@@ -47,21 +62,27 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
 
   const rows = prefs.tabs.filter(item => allowed.has(item.key))
 
-  function commit(next: AdminUiPrefs) {
+  async function commit(next: AdminUiPrefs) {
     const clean = sanitizeAdminUiPrefs(next)
     setPrefs(clean)
     saveAdminUiPrefs(clean)
     onPrefsChange(clean)
+    setSyncError(null)
+    const pushed = await pushAdminUiPrefsToServer(clean)
+    if (!pushed.ok) {
+      setSyncError(pushed.error)
+      return
+    }
     setSavedFlash(true)
     window.setTimeout(() => setSavedFlash(false), 1600)
   }
 
   function updateTabs(updater: (tabs: TabLayoutItem[]) => TabLayoutItem[]) {
-    commit({ ...prefs, tabs: updater(prefs.tabs) })
+    void commit({ ...prefs, tabs: updater(prefs.tabs) })
   }
 
   function resetDefaults() {
-    commit(defaultAdminUiPrefs())
+    void commit(defaultAdminUiPrefs())
   }
 
   return (
@@ -135,10 +156,12 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
           })}
         </ul>
 
-        {savedFlash ? (
+        {syncError ? (
+          <p className="text-xs text-amber-300">{syncError}</p>
+        ) : savedFlash ? (
           <p className="text-xs text-emerald-400">{s.saved}</p>
         ) : (
-          <p className="text-xs text-gray-600">{s.localNote}</p>
+          <p className="text-xs text-gray-600">{syncing ? s.syncing : s.localNote}</p>
         )}
       </section>
 

@@ -94,6 +94,17 @@ test('LAYOUT_PAGE_KEYS stays aligned with ADMIN_PAGES registry', async () => {
   assert.deepEqual([...LAYOUT_PAGE_KEYS], [...ALL_ADMIN_PAGE_KEYS])
 })
 
+test('isCustomAdminUiPrefs detects reorder and hidden tabs', async () => {
+  const { defaultAdminUiPrefs, isCustomAdminUiPrefs, sanitizeAdminUiPrefs } = await import('./admin-ui-prefs.ts')
+  assert.equal(isCustomAdminUiPrefs(defaultAdminUiPrefs()), false)
+  assert.equal(isCustomAdminUiPrefs(sanitizeAdminUiPrefs({
+    tabs: [
+      { key: 'marketing_visits', visible: true },
+      { key: 'reviews', visible: false },
+    ],
+  })), true)
+})
+
 function ALL_HIDDEN_EXCEPT_SETTINGS() {
   return defaultAdminUiPrefs().tabs.map(item => ({
     ...item,

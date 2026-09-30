@@ -110,6 +110,65 @@ export function saveAdminUiPrefs(prefs: AdminUiPrefs): void {
   }
 }
 
+/** True when prefs differ from the default all-visible registry order. */
+export function isCustomAdminUiPrefs(prefs: AdminUiPrefs): boolean {
+  const defaults = defaultAdminUiPrefs()
+  const clean = sanitizeAdminUiPrefs(prefs)
+  if (clean.tabs.length !== defaults.tabs.length) return true
+  return clean.tabs.some((item, index) => {
+    const base = defaults.tabs[index]
+    return !base || item.key !== base.key || item.visible !== base.visible
+  })
+}
+
+/** Fetch account prefs from the server (Cloudflare KV). Falls back to null on error/empty. */
+export async function fetchAdminUiPrefsFromServer(): Promise<AdminUiPrefs | null> {
+  try {
+    const res = await fetch('/api/ui-prefs', { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = await res.json() as { prefs?: unknown }
+    if (!json.prefs) return null
+    return sanitizeAdminUiPrefs(json.prefs)
+  } catch {
+    return null
+  }
+}
+
+/** Persist prefs to the server so PC and mobile share the same layout. */
+export async function pushAdminUiPrefsToServer(prefs: AdminUiPrefs): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch('/api/ui-prefs', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefs: sanitizeAdminUiPrefs(prefs) }),
+    })
+    const json = await res.json().catch(() => ({})) as { error?: string }
+    if (!res.ok) {
+      return { ok: false, error: typeof json.error === 'string' ? json.error : `Ошибка (${res.status})` }
+    }
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Сеть: не удалось сохранить на сервер' }
+  }
+}
+
+/**
+ * Load prefs for the shell: prefer server (cross-device), else localStorage.
+ * If server is empty but local has a custom layout, upload local once.
+ */
+export async function syncAdminUiPrefs(): Promise<AdminUiPrefs> {
+  const local = loadAdminUiPrefs()
+  const remote = await fetchAdminUiPrefsFromServer()
+  if (remote) {
+    saveAdminUiPrefs(remote)
+    return remote
+  }
+  if (isCustomAdminUiPrefs(local)) {
+    await pushAdminUiPrefsToServer(local)
+  }
+  return local
+}
+
 export function moveTab(tabs: TabLayoutItem[], key: NavTabKey, direction: -1 | 1): TabLayoutItem[] {
   const index = tabs.findIndex(item => item.key === key)
   if (index < 0) return tabs
