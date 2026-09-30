@@ -5515,6 +5515,10 @@ function eL() {
             if (excludeDatacenter) {
                 t = t.filter(row => !looksLikeDatacenterVisit(row))
             }
+            // «не люди»: keep only visitor_kind=human (API excludeBots drops bots; this also drops uncertain)
+            if (F) {
+                t = t.filter(row => "human" === (null != row.visitor_kind ? row.visitor_kind : "").trim().toLowerCase())
+            }
             return t.sort((e, t) => {
                 switch (z) {
                     case "time_asc":
@@ -5530,7 +5534,7 @@ function eL() {
                         return t.created_at.localeCompare(e.created_at)
                 }
             }), t
-        }, [null == K ? void 0 : K.recent, z, activeExcludeRaw, excludeDatacenter, labelEvent, i18nLocale]),
+        }, [null == K ? void 0 : K.recent, z, activeExcludeRaw, excludeDatacenter, F, labelEvent, i18nLocale]),
         visitSessions = (0, s.useMemo)(() => {
             // Always regroup on the client so dedupe/merge stays in sync with filters
             // (never trust a pre-built API `sessions` snapshot that can lag the bundle).
@@ -5678,8 +5682,53 @@ function eL() {
                 children: tm.hintEstablishments
             }), "."]
         }), (0, r.jsxs)("div", {
-            className: "bg-gray-900 rounded-xl p-4 border border-gray-800 flex flex-wrap items-end gap-3",
+            className: "bg-gray-900 rounded-xl p-4 border border-gray-800 space-y-3",
             children: [(0, r.jsxs)("div", {
+                className: "w-full",
+                children: [(0, r.jsx)("div", {
+                    className: "text-xs text-gray-500 mb-2",
+                    children: tm.hideSection
+                }), (0, r.jsxs)("div", {
+                    className: "grid grid-cols-2 gap-2",
+                    children: [(0, r.jsxs)("label", {
+                        className: "flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-gray-800 bg-gray-950/50 text-sm text-gray-200 active:bg-gray-800",
+                        title: tm.hideNonPeopleTitle,
+                        children: [(0, r.jsx)("input", {
+                            type: "checkbox",
+                            checked: !!(F && excludeDatacenter),
+                            onChange: e => {
+                                let on = e.target.checked;
+                                M(on), setExcludeDatacenter(on)
+                            },
+                            className: "rounded border-gray-600 h-4 w-4"
+                        }), tm.hideNonPeople]
+                    }), (0, r.jsxs)("label", {
+                        className: "flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-gray-800 bg-gray-950/50 text-sm text-gray-200 active:bg-gray-800",
+                        children: [(0, r.jsx)("input", {
+                            type: "checkbox",
+                            checked: q,
+                            onChange: e => {
+                                setClickedHideIps([]), H(e.target.checked)
+                            },
+                            className: "rounded border-gray-600 h-4 w-4"
+                        }), tm.hideMyIps]
+                    })]
+                }), q ? (0, r.jsx)("input", {
+                    type: "text",
+                    value: W,
+                    onChange: e => {
+                        setClickedHideIps([]), J(e.target.value)
+                    },
+                    placeholder: "1.2.3.4, 5.6.7.8",
+                    className: "mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono",
+                    title: tm.hideIpTitle
+                }) : null, (0, r.jsx)("p", {
+                    className: "mt-2 text-[11px] text-gray-600",
+                    children: tm.filterSoon
+                })]
+            }), (0, r.jsxs)("div", {
+                className: "flex flex-wrap items-end gap-3",
+                children: [(0, r.jsxs)("div", {
                 className: "flex items-end gap-2",
                 children: [(0, r.jsxs)("div", {
                     className: "flex flex-col gap-1",
@@ -5788,52 +5837,6 @@ function eL() {
                         children: tm.sortEvent
                     })]
                 })]
-            }), (0, r.jsx)("div", {
-                className: "flex flex-col gap-1 min-w-[12rem]",
-                children: (0, r.jsxs)("label", {
-                    className: "text-xs text-gray-500 flex items-center gap-2",
-                    children: [(0, r.jsx)("input", {
-                        type: "checkbox",
-                        checked: F,
-                        onChange: e => M(e.target.checked),
-                        className: "rounded border-gray-600"
-                    }), tm.hideBots]
-                })
-            }), (0, r.jsx)("div", {
-                className: "flex flex-col gap-1 min-w-[12rem]",
-                children: (0, r.jsxs)("label", {
-                    className: "text-xs text-gray-500 flex items-center gap-2",
-                    title: tm.hideDatacenterTitle,
-                    children: [(0, r.jsx)("input", {
-                        type: "checkbox",
-                        checked: excludeDatacenter,
-                        onChange: e => setExcludeDatacenter(e.target.checked),
-                        className: "rounded border-gray-600"
-                    }), tm.hideDatacenter]
-                })
-            }), (0, r.jsxs)("div", {
-                className: "flex flex-col gap-1 min-w-[12rem]",
-                children: [(0, r.jsxs)("label", {
-                    className: "text-xs text-gray-500 flex items-center gap-2",
-                    children: [(0, r.jsx)("input", {
-                        type: "checkbox",
-                        checked: q,
-                        onChange: e => {
-                            // Manual toggle: drop row-click set so the text field is what applies.
-                            setClickedHideIps([]), H(e.target.checked)
-                        },
-                        className: "rounded border-gray-600"
-                    }), tm.hideMyIps]
-                }), (0, r.jsx)("input", {
-                    type: "text",
-                    value: W,
-                    onChange: e => {
-                        setClickedHideIps([]), J(e.target.value)
-                    },
-                    placeholder: "1.2.3.4, 5.6.7.8",
-                    className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono",
-                    title: tm.hideIpTitle
-                })]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
@@ -5871,6 +5874,7 @@ function eL() {
                     children: [tm.updated, ": ", Q.toLocaleTimeString(localeTag), $ ? " …" : null]
                 }) : null]
             }) : null]
+            })]
         }), ee ? (0, r.jsx)("div", {
             className: "bg-amber-950/40 border border-amber-800/60 rounded-xl p-4 text-amber-200 text-sm",
             children: ee
