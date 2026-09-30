@@ -29,6 +29,7 @@ import {
   loadMarketingVisitsPrefs,
   saveMarketingVisitsPrefs,
 } from '@/lib/marketing-visits-prefs'
+import { completedRegistrationCount } from '@/lib/registration-stat'
 
 const r = { jsx, jsxs, Fragment }
 const l = { useRouter }
@@ -5889,10 +5890,7 @@ function eL() {
                     value: function(counts, id) {
                         var a, r;
                         // Align with Заведения: completed signup = new non-demo establishment.
-                        if ("registration_completed" === id) {
-                            var metaCount, summaryCount;
-                            return null !== (metaCount = null == K || null == K.meta ? void 0 : K.meta.completedRegistrations) && void 0 !== metaCount ? metaCount : null !== (summaryCount = null == K || null == K.summary ? void 0 : K.summary.completedRegistrations) && void 0 !== summaryCount ? summaryCount : 0
-                        }
+                        if ("registration_completed" === id) return completedRegistrationCount(K);
                         let s = eventStats.find(item => item.id === id);
                         if (!s) return 0;
                         let l = new Map(counts.map(item => [item.event_type, item.count])),
