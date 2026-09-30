@@ -17,6 +17,7 @@ import { addClickedHideIp, normalizeExcludeIp, parseExcludeIps, resolveActiveExc
 import {
   firstVisibleNavTab,
   loadAdminUiPrefs,
+  syncAdminUiPrefs,
   visibleNavTabs,
 } from '@/lib/admin-ui-prefs'
 import {
@@ -1994,10 +1995,18 @@ function ep({
         } catch (e) {}
     }, []);
     (0, s.useEffect)(() => {
-        let loaded = loadAdminUiPrefs();
-        setUiPrefs(loaded);
-        let keys = visibleNavTabs(user, loaded);
-        if (!keys.includes(t)) a(keys[0] || "settings")
+        let cancelled = !1;
+        (async () => {
+            // Prefer account prefs from KV so PC and mobile share the same tab layout.
+            let loaded = await syncAdminUiPrefs();
+            if (cancelled) return;
+            setUiPrefs(loaded);
+            let keys = visibleNavTabs(user, loaded);
+            if (!keys.includes(t)) a(keys[0] || "settings")
+        })();
+        return () => {
+            cancelled = !0
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
     (0, s.useEffect)(() => {
