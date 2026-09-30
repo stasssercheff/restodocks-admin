@@ -56,6 +56,7 @@ type Tm = {
   person2: string
   person5: string
   people: string
+  peopleShort?: string
   datacenterIp: string
   datacenterIpTitle: string
   langVisitorTitle: string

@@ -5516,6 +5516,30 @@ function eL() {
             // (never trust a pre-built API `sessions` snapshot that can lag the bundle).
             return groupVisitSessions(el)
         }, [el]),
+        // Event/people stats must use the same filtered rows as the table
+        // (hidden IPs / datacenter filter must not appear in the cards).
+        filteredEventTypeCounts = (0, s.useMemo)(() => {
+            let map = new Map;
+            for (let row of el) {
+                let key = (null != row.event_type ? row.event_type : "").trim() || "(empty)";
+                map.set(key, (map.get(key) || 0) + 1)
+            }
+            return [...map.entries()].map(([event_type, count]) => ({
+                event_type,
+                count
+            }))
+        }, [el]),
+        filteredVisitorKindPeople = (0, s.useMemo)(() => {
+            let map = new Map;
+            for (let session of visitSessions) {
+                let key = (null != session.visitor_kind ? session.visitor_kind : "").trim() || "(empty)";
+                map.set(key, (map.get(key) || 0) + 1)
+            }
+            return [...map.entries()].map(([visitor_kind, count]) => ({
+                visitor_kind,
+                count
+            }))
+        }, [visitSessions]),
         toggleSession = key => {
             setExpandedSessions(prev => {
                 let next = new Set(prev);
@@ -5810,14 +5834,14 @@ function eL() {
                 disabled: B,
                 className: "bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium",
                 children: B || $ ? tm.refreshing : tm.refresh
-            }), (null == K ? void 0 : K.meta) ? (0, r.jsxs)("div", {
+            }), (null == K ? void 0 : K.meta) || el.length || visitSessions.length ? (0, r.jsxs)("div", {
                 className: "text-xs text-gray-500 ml-auto text-right",
                 children: [(0, r.jsxs)("div", {
                     title: tm.peopleTitle,
                     children: [(0, r.jsx)("span", {
                         className: "text-emerald-300 font-medium",
                         children: tm.people
-                    }), ": ", visitSessions.length, " · ", tm.records, ": ", K.meta.sampleSize]
+                    }), ": ", visitSessions.length, " · ", tm.records, ": ", el.length]
                 }), eo ? (0, r.jsx)("div", {
                     className: "mt-0.5",
                     children: eo
@@ -5830,32 +5854,30 @@ function eL() {
         }), ee ? (0, r.jsx)("div", {
             className: "bg-amber-950/40 border border-amber-800/60 rounded-xl p-4 text-amber-200 text-sm",
             children: ee
-        }) : null, K ? (0, r.jsxs)(r.Fragment, {
+        }) : null, K || el.length ? (0, r.jsxs)(r.Fragment, {
             children: [(0, r.jsx)("div", {
                 className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3",
-                children: eventStats.map(e => {
-                    var t;
-                    return (0, r.jsx)(eP, {
-                        label: e.label,
-                        value: function(e, t) {
-                            var a, r;
-                            let s = eventStats.find(e => e.id === t);
-                            if (!s) return 0;
-                            let l = new Map(e.map(e => [e.event_type, e.count])),
-                                n = null !== (a = l.get(s.id)) && void 0 !== a ? a : 0;
-                            for (let e of s.legacyTypes) n += null !== (r = l.get(e)) && void 0 !== r ? r : 0;
-                            return n
-                        }(null !== (t = K.byEventType) && void 0 !== t ? t : [], e.id)
-                    }, e.id)
-                })
-            }), (null !== (m = null === (l = K.byVisitorKind) || void 0 === l ? void 0 : l.length) && void 0 !== m ? m : 0) > 0 ? (0, r.jsx)("div", {
+                children: eventStats.map(e => (0, r.jsx)(eP, {
+                    label: e.label,
+                    value: function(counts, id) {
+                        var a, r;
+                        let s = eventStats.find(item => item.id === id);
+                        if (!s) return 0;
+                        let l = new Map(counts.map(item => [item.event_type, item.count])),
+                            n = null !== (a = l.get(s.id)) && void 0 !== a ? a : 0;
+                        for (let legacy of s.legacyTypes) n += null !== (r = l.get(legacy)) && void 0 !== r ? r : 0;
+                        return n
+                    }(filteredEventTypeCounts, e.id)
+                }, e.id))
+            }), filteredVisitorKindPeople.length > 0 ? (0, r.jsx)("div", {
                 className: "flex flex-wrap gap-2 text-xs",
-                children: (null !== (u = K.byVisitorKind) && void 0 !== u ? u : []).map(e => (0, r.jsxs)("span", {
+                children: filteredVisitorKindPeople.map(e => (0, r.jsxs)("span", {
                     className: "rounded-lg border px-2 py-1 ".concat("human" === e.visitor_kind ? "bg-emerald-950/50 border-emerald-800 text-emerald-200" : "bot" === e.visitor_kind ? "bg-rose-950/40 border-rose-800 text-rose-200" : "bg-gray-800 border-gray-700 text-gray-300"),
+                    title: tm.peopleTitle,
                     children: [labelVisitor(e.visitor_kind), ":", " ", (0, r.jsx)("strong", {
                         className: "text-white",
                         children: e.count
-                    })]
+                    }), " ", tm.peopleShort]
                 }, e.visitor_kind))
             }) : null]
         }) : null, (0, r.jsx)(MarketingVisitsRecent, {
@@ -5877,7 +5899,7 @@ function eL() {
             formatVisitTime: formatVisitTime,
             formatYourTime: formatYourTime,
             onHideIp: er,
-            sampleSize: null !== (p = null == K ? void 0 : null === (n = K.meta) || void 0 === n ? void 0 : n.sampleSize) && void 0 !== p ? p : 0,
+            sampleSize: el.length,
             limit: null !== (g = null == K ? void 0 : null === (i = K.meta) || void 0 === i ? void 0 : i.limit) && void 0 !== g ? g : 0,
             rangeLabel: eo,
             journeyLabel: journeyLabel
