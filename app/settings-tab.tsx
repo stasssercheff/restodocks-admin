@@ -103,7 +103,7 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
     return () => {
       cancelled = true
     }
-  }, [user.isOwner])
+  }, [user.isOwner, tr])
 
   const allowed = useMemo(() => {
     const set = new Set<NavTabKey>()
