@@ -1,7 +1,13 @@
 'use client'
 
 import { Fragment, type ReactNode } from 'react'
-import type { VisitEvent, VisitSession } from '@/lib/marketing-visit-sessions'
+import {
+  formatDurationMs,
+  visitPace,
+  type VisitEvent,
+  type VisitSession,
+  type VisitTimelineStep,
+} from '@/lib/marketing-visit-sessions'
 
 type Tm = {
   recentTitle: string
@@ -31,6 +37,13 @@ type Tm = {
   eventsInVisit: string
   expandVisit: string
   collapseVisit: string
+  visitDuration: string
+  afterGap: string
+  fromStart: string
+  paceQuick: string
+  paceNormal: string
+  paceSlow: string
+  startEvent: string
   endOfList: string
   shownFirst: string
   shownPeriod: string
@@ -46,6 +59,7 @@ type Tm = {
 
 type Props = {
   tm: Tm
+  locale: string
   viewMode: 'sessions' | 'events'
   onViewModeChange: (mode: 'sessions' | 'events') => void
   loading: boolean
@@ -108,8 +122,120 @@ function HideIpButton({
   )
 }
 
+function PaceBadge({
+  session,
+  tm,
+}: {
+  session: VisitSession
+  tm: Pick<Tm, 'paceQuick' | 'paceNormal' | 'paceSlow'>
+}) {
+  const pace = visitPace(session.durationMs, session.event_count)
+  if (!pace) return null
+  const label = pace === 'quick' ? tm.paceQuick : pace === 'slow' ? tm.paceSlow : tm.paceNormal
+  const cls =
+    pace === 'quick'
+      ? 'border-amber-800/70 bg-amber-950/40 text-amber-200'
+      : pace === 'slow'
+        ? 'border-sky-800/70 bg-sky-950/40 text-sky-200'
+        : 'border-gray-700 bg-gray-800/60 text-gray-300'
+  return (
+    <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] ${cls}`}>
+      {label}
+    </span>
+  )
+}
+
+function DurationMeta({
+  session,
+  tm,
+  locale,
+  formatVisitTime,
+}: {
+  session: VisitSession
+  tm: Tm
+  locale: string
+  formatVisitTime: Props['formatVisitTime']
+}) {
+  const duration = formatDurationMs(session.durationMs, locale)
+  const sameMoment = session.first_at === session.last_at || session.event_count < 2
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+      <span
+        className="inline-flex rounded border border-gray-700 bg-gray-800/70 px-1.5 py-0.5 text-[10px] text-gray-200 font-medium"
+        title={tm.visitDuration}
+      >
+        {sameMoment ? duration : `${tm.visitDuration}: ${duration}`}
+      </span>
+      <PaceBadge session={session} tm={tm} />
+      {!sameMoment ? (
+        <span className="text-[10px] text-gray-500 font-mono">
+          {formatVisitTime(session.first_at, session.timezone)}
+          {' → '}
+          {formatVisitTime(session.last_at, session.timezone)}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function TimelineList({
+  timeline,
+  tm,
+  locale,
+  labelEvent,
+  labelPath,
+  formatVisitTime,
+}: {
+  timeline: VisitTimelineStep[]
+  tm: Tm
+  locale: string
+  labelEvent: Props['labelEvent']
+  labelPath: Props['labelPath']
+  formatVisitTime: Props['formatVisitTime']
+}) {
+  return (
+    <ol className="space-y-0">
+      {timeline.map((step, index) => {
+        const ev = step.event
+        return (
+          <li key={ev.id}>
+            {step.gapFromPrevMs != null ? (
+              <div className="flex items-center gap-2 py-1 pl-2 text-[10px] text-indigo-300/90">
+                <span className="text-gray-600" aria-hidden>↓</span>
+                <span>
+                  {tm.afterGap} {formatDurationMs(step.gapFromPrevMs, locale)}
+                </span>
+                <span className="text-gray-600">
+                  · {tm.fromStart} {formatDurationMs(step.elapsedFromStartMs, locale)}
+                </span>
+              </div>
+            ) : (
+              <div className="text-[10px] text-gray-600 pl-2 pb-0.5">{tm.startEvent}</div>
+            )}
+            <div className="flex items-start justify-between gap-2 rounded-lg border border-gray-800 bg-gray-950/50 px-2.5 py-1.5 text-[11px]">
+              <div className="min-w-0">
+                <div className="text-gray-100 font-medium">{labelEvent(ev.event_type)}</div>
+                <div className="text-gray-500">{labelPath(ev.path)}</div>
+              </div>
+              <div className="text-gray-400 font-mono shrink-0 text-right">
+                <div>{formatVisitTime(ev.created_at, ev.timezone)}</div>
+                {index > 0 ? (
+                  <div className="text-[10px] text-gray-600">
+                    +{formatDurationMs(step.elapsedFromStartMs, locale)}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
 export default function MarketingVisitsRecent({
   tm,
+  locale,
   viewMode,
   onViewModeChange,
   loading,
@@ -180,6 +306,7 @@ export default function MarketingVisitsRecent({
                     </div>
                     <div className="text-[10px] text-gray-500 mt-0.5">{formatYourTime(session.last_at)}</div>
                     <SessionBadge active={session.session_active} label={tm.sessionActive} title={tm.sessionActiveTitle} />
+                    <DurationMeta session={session} tm={tm} locale={locale} formatVisitTime={formatVisitTime} />
                   </div>
                   <span className="text-[10px] text-gray-400 shrink-0">
                     {session.event_count} {tm.eventsInVisit}
@@ -220,19 +347,16 @@ export default function MarketingVisitsRecent({
                   {open ? tm.collapseVisit : tm.expandVisit}
                 </button>
                 {open ? (
-                  <ul className="border-t border-gray-800 pt-2 space-y-1.5">
-                    {[...session.events].reverse().map(ev => (
-                      <li key={ev.id} className="flex items-start justify-between gap-2 text-[11px]">
-                        <div className="min-w-0">
-                          <div className="text-gray-300">{labelEvent(ev.event_type)}</div>
-                          <div className="text-gray-500">{labelPath(ev.path)}</div>
-                        </div>
-                        <div className="text-gray-500 font-mono shrink-0">
-                          {formatVisitTime(ev.created_at, ev.timezone)}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="border-t border-gray-800 pt-2">
+                    <TimelineList
+                      timeline={session.timeline}
+                      tm={tm}
+                      locale={locale}
+                      labelEvent={labelEvent}
+                      labelPath={labelPath}
+                      formatVisitTime={formatVisitTime}
+                    />
+                  </div>
                 ) : null}
               </div>
             )
@@ -295,9 +419,9 @@ export default function MarketingVisitsRecent({
           <table className="w-full min-w-[56rem] text-xs">
             <thead>
               <tr className="border-b border-gray-800 text-gray-500 text-left">
-                <th className="px-3 py-2 whitespace-nowrap w-[9rem]">{tm.colTime}</th>
+                <th className="px-3 py-2 whitespace-nowrap w-[11rem]">{tm.colTime}</th>
                 <th className="px-3 py-2 w-[11rem]">{tm.colPlace}</th>
-                <th className="px-3 py-2 whitespace-nowrap w-[12rem]">
+                <th className="px-3 py-2 whitespace-nowrap w-[14rem]">
                   {viewMode === 'sessions' ? tm.colJourney : tm.colEvent}
                 </th>
                 <th className="px-3 py-2 whitespace-nowrap w-[7rem]">{tm.colVisitor}</th>
@@ -326,6 +450,7 @@ export default function MarketingVisitsRecent({
                           <div className="mt-1">
                             <SessionBadge active={session.session_active} label={tm.sessionActive} title={tm.sessionActiveTitle} />
                           </div>
+                          <DurationMeta session={session} tm={tm} locale={locale} formatVisitTime={formatVisitTime} />
                         </td>
                         <td className="px-3 py-2 text-gray-400 min-w-[9rem] max-w-[14rem]" title={labelPlace(session)}>
                           <div className="break-words leading-snug">{labelPlace(session)}</div>
@@ -358,23 +483,20 @@ export default function MarketingVisitsRecent({
                         <td className="px-3 py-2 whitespace-nowrap">{labelLang(session.language_code)}</td>
                         <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{labelHost(session.client_host)}</td>
                       </tr>
-                      {open
-                        ? [...session.events].reverse().map(ev => (
-                            <tr key={ev.id} className="border-t border-gray-900 bg-gray-950/50 align-top">
-                              <td className="px-3 py-1.5 pl-6 text-gray-500 whitespace-nowrap text-[11px]">
-                                {formatVisitTime(ev.created_at, ev.timezone)}
-                              </td>
-                              <td className="px-3 py-1.5 text-gray-600 text-[11px]">—</td>
-                              <td className="px-3 py-1.5 text-gray-300 text-[11px]">
-                                {labelEvent(ev.event_type)}
-                                <span className="block text-gray-500">{labelPath(ev.path)}</span>
-                              </td>
-                              <td className="px-3 py-1.5 text-gray-600 text-[11px]">—</td>
-                              <td className="px-3 py-1.5 text-gray-600 text-[11px]">{labelLang(ev.language_code)}</td>
-                              <td className="px-3 py-1.5 text-gray-600 text-[11px]">{labelHost(ev.client_host)}</td>
-                            </tr>
-                          ))
-                        : null}
+                      {open ? (
+                        <tr className="border-t border-gray-900 bg-gray-950/40">
+                          <td colSpan={6} className="px-4 py-3">
+                            <TimelineList
+                              timeline={session.timeline}
+                              tm={tm}
+                              locale={locale}
+                              labelEvent={labelEvent}
+                              labelPath={labelPath}
+                              formatVisitTime={formatVisitTime}
+                            />
+                          </td>
+                        </tr>
+                      ) : null}
                     </FragmentRows>
                   )
                 })

@@ -19,13 +19,26 @@ export type VisitEvent = {
   session_active?: boolean
 }
 
+/** One step in a visit timeline (chronological, oldest → newest). */
+export type VisitTimelineStep = {
+  event: VisitEvent
+  /** ms since previous step; null for the first event. */
+  gapFromPrevMs: number | null
+  /** ms since the first event of the visit. */
+  elapsedFromStartMs: number
+}
+
 export type VisitSession = {
   key: string
   session_id: string | null
   first_at: string
   last_at: string
+  /** last_at − first_at in ms (0 for a single event). */
+  durationMs: number
   event_count: number
   events: VisitEvent[]
+  /** Chronological steps with gaps between events. */
+  timeline: VisitTimelineStep[]
   event_types: string[]
   ip: string | null
   city: string | null
@@ -50,6 +63,53 @@ function sessionKey(row: VisitEvent): string {
   return `f:${ip}|${host}|${bucket}`
 }
 
+function buildTimeline(sortedOldestFirst: VisitEvent[]): VisitTimelineStep[] {
+  if (sortedOldestFirst.length === 0) return []
+  const start = new Date(sortedOldestFirst[0].created_at).getTime()
+  let prev = start
+  return sortedOldestFirst.map((event, index) => {
+    const at = new Date(event.created_at).getTime()
+    const step: VisitTimelineStep = {
+      event,
+      gapFromPrevMs: index === 0 ? null : Math.max(0, at - prev),
+      elapsedFromStartMs: Math.max(0, at - start),
+    }
+    prev = at
+    return step
+  })
+}
+
+/**
+ * Compact duration for UI: `12с`, `3м 20с`, `1ч 5м`.
+ * Uses short units so rows stay readable in RU and EN.
+ */
+export function formatDurationMs(ms: number | null | undefined, locale: string = 'ru'): string {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return '—'
+  const totalSec = Math.round(ms / 1000)
+  const ru = locale.toLowerCase().startsWith('ru')
+  if (totalSec < 60) return ru ? `${totalSec} с` : `${totalSec}s`
+  const hours = Math.floor(totalSec / 3600)
+  const minutes = Math.floor((totalSec % 3600) / 60)
+  const seconds = totalSec % 60
+  if (hours > 0) {
+    if (minutes === 0) return ru ? `${hours} ч` : `${hours}h`
+    return ru ? `${hours} ч ${minutes} м` : `${hours}h ${minutes}m`
+  }
+  if (seconds === 0 || minutes >= 10) return ru ? `${minutes} м` : `${minutes}m`
+  return ru ? `${minutes} м ${seconds} с` : `${minutes}m ${seconds}s`
+}
+
+/** Heuristic pace label from total visit span (only when ≥2 events). */
+export function visitPace(
+  durationMs: number,
+  eventCount: number,
+): 'quick' | 'normal' | 'slow' | null {
+  if (eventCount < 2) return null
+  if (durationMs < 45_000) return 'quick'
+  if (durationMs >= 3 * 60_000) return 'slow'
+  return 'normal'
+}
+
 /** Group flat marketing_visits rows into one card per visitor session. */
 export function groupVisitSessions(rows: VisitEvent[]): VisitSession[] {
   const map = new Map<string, VisitEvent[]>()
@@ -70,13 +130,21 @@ export function groupVisitSessions(rows: VisitEvent[]): VisitSession[] {
       const type = (event.event_type ?? '').trim()
       if (type && !types.includes(type)) types.push(type)
     }
+    const firstMs = new Date(oldest.created_at).getTime()
+    const lastMs = new Date(newest.created_at).getTime()
+    const durationMs = Number.isFinite(firstMs) && Number.isFinite(lastMs)
+      ? Math.max(0, lastMs - firstMs)
+      : 0
+    const timeline = buildTimeline(sorted)
     sessions.push({
       key,
       session_id: (newest.session_id ?? '').trim() || null,
       first_at: oldest.created_at,
       last_at: newest.created_at,
+      durationMs,
       event_count: sorted.length,
       events: [...sorted].reverse(), // newest first inside the card
+      timeline,
       event_types: types,
       ip: newest.ip,
       city: newest.city,

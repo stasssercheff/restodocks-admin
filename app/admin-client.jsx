@@ -5843,6 +5843,7 @@ function eL() {
             }) : null]
         }) : null, (0, r.jsx)(MarketingVisitsRecent, {
             tm: tm,
+            locale: i18nLocale,
             viewMode: viewMode,
             onViewModeChange: setViewMode,
             loading: B,
