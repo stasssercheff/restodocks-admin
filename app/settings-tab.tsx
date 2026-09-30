@@ -17,6 +17,12 @@ import {
   syncAdminUiPrefs,
   touchAdminUiPrefs,
 } from '@/lib/admin-ui-prefs'
+import {
+  defaultRegistrationNotifyPrefs,
+  sanitizeRegistrationNotifyPrefs,
+  type RegistrationNotifyField,
+  type RegistrationNotifyPrefs,
+} from '@/lib/registration-notify-prefs'
 import type { PublicAdminUser } from '@/lib/admin-pages'
 
 type Props = {
@@ -30,6 +36,16 @@ function tabLabel(key: NavTabKey, tabs: Record<string, string>, settingsLabel: s
   return tabs[key] ?? key
 }
 
+const NOTIFY_FIELDS: RegistrationNotifyField[] = [
+  'establishmentName',
+  'ownerName',
+  'ownerEmail',
+  'place',
+  'ip',
+  'createdAtLocal',
+  'totalEstablishments',
+]
+
 export default function SettingsTab({ user, onPrefsChange }: Props) {
   const { t } = useI18n()
   const s = t.settings
@@ -37,6 +53,14 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
   const [savedFlash, setSavedFlash] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
+
+  const [notify, setNotify] = useState<RegistrationNotifyPrefs>(() => defaultRegistrationNotifyPrefs())
+  const [notifyLoading, setNotifyLoading] = useState(false)
+  const [notifySaving, setNotifySaving] = useState(false)
+  const [notifyFlash, setNotifyFlash] = useState(false)
+  const [notifyError, setNotifyError] = useState<string | null>(null)
+  const [notifyResult, setNotifyResult] = useState<string | null>(null)
+  const [notifyChecking, setNotifyChecking] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +76,32 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
       cancelled = true
     }
   }, [onPrefsChange])
+
+  useEffect(() => {
+    if (!user.isOwner) return
+    let cancelled = false
+    ;(async () => {
+      setNotifyLoading(true)
+      try {
+        const res = await fetch('/api/registration-notify', { cache: 'no-store', credentials: 'same-origin' })
+        const json = await res.json().catch(() => ({})) as { prefs?: unknown; error?: string }
+        if (cancelled) return
+        if (!res.ok) {
+          setNotifyError(typeof json.error === 'string' ? json.error : `Ошибка (${res.status})`)
+        } else {
+          setNotify(sanitizeRegistrationNotifyPrefs(json.prefs))
+          setNotifyError(null)
+        }
+      } catch {
+        if (!cancelled) setNotifyError('Сеть: не удалось загрузить настройки писем')
+      } finally {
+        if (!cancelled) setNotifyLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user.isOwner])
 
   const allowed = useMemo(() => {
     const set = new Set<NavTabKey>()
@@ -101,6 +151,65 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
 
   function resetDefaults() {
     void commit(defaultAdminUiPrefs())
+  }
+
+  async function saveNotify() {
+    setNotifySaving(true)
+    setNotifyError(null)
+    try {
+      const res = await fetch('/api/registration-notify', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefs: notify }),
+      })
+      const json = await res.json().catch(() => ({})) as { prefs?: unknown; error?: string }
+      if (!res.ok) {
+        setNotifyError(typeof json.error === 'string' ? json.error : `Ошибка (${res.status})`)
+        return
+      }
+      setNotify(sanitizeRegistrationNotifyPrefs(json.prefs))
+      setNotifyFlash(true)
+      window.setTimeout(() => setNotifyFlash(false), 1600)
+    } catch {
+      setNotifyError('Сеть: не удалось сохранить')
+    } finally {
+      setNotifySaving(false)
+    }
+  }
+
+  async function runNotifyCheck() {
+    setNotifyChecking(true)
+    setNotifyError(null)
+    try {
+      const res = await fetch('/api/registration-notify', {
+        method: 'POST',
+        credentials: 'same-origin',
+      })
+      const json = await res.json().catch(() => ({})) as {
+        error?: string
+        enabled?: boolean
+        checked?: number
+        sent?: number
+        skipped?: number
+        errors?: string[]
+      }
+      if (!res.ok) {
+        setNotifyError(typeof json.error === 'string' ? json.error : `Ошибка (${res.status})`)
+        return
+      }
+      const parts = [
+        `проверено: ${json.checked ?? 0}`,
+        `писем: ${json.sent ?? 0}`,
+        json.skipped ? `пропущено: ${json.skipped}` : null,
+        json.errors?.length ? `ошибки: ${json.errors.join('; ')}` : null,
+      ].filter(Boolean)
+      setNotifyResult(parts.join(' · '))
+    } catch {
+      setNotifyError('Сеть: проверка не удалась')
+    } finally {
+      setNotifyChecking(false)
+    }
   }
 
   return (
@@ -193,9 +302,121 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
         )}
       </section>
 
-      <section className="border border-dashed border-gray-800 rounded-xl px-4 py-5 text-sm text-gray-500">
-        <p className="font-medium text-gray-400">{s.moreTitle}</p>
-        <p className="mt-1">{s.moreHint}</p>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-medium text-white">{s.notifyTitle}</h2>
+          <p className="text-xs text-gray-500 mt-0.5">{s.notifyHint}</p>
+        </div>
+
+        {!user.isOwner ? (
+          <p className="text-sm text-gray-500">{s.notifyOwnerOnly}</p>
+        ) : notifyLoading ? (
+          <p className="text-sm text-gray-500">{s.syncing}</p>
+        ) : (
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-4">
+            <label className="flex items-center gap-2 text-sm text-gray-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={notify.enabled}
+                onChange={e => setNotify(prev => ({ ...prev, enabled: e.target.checked }))}
+                className="rounded border-gray-600"
+              />
+              {s.notifyEnabled}
+            </label>
+
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500">{s.notifyRecipients}</label>
+              <input
+                type="text"
+                value={notify.recipients}
+                onChange={e => setNotify(prev => ({ ...prev, recipients: e.target.value }))}
+                placeholder={s.notifyRecipientsPlaceholder}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500">{s.notifyTimeZone}</label>
+              <select
+                value={notify.timeZone}
+                onChange={e => setNotify(prev => ({ ...prev, timeZone: e.target.value }))}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
+              >
+                <option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (VN)</option>
+                <option value="Europe/Moscow">Europe/Moscow</option>
+                <option value="Europe/London">Europe/London</option>
+                <option value="UTC">UTC</option>
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={notify.excludeDemo}
+                onChange={e => setNotify(prev => ({ ...prev, excludeDemo: e.target.checked }))}
+                className="rounded border-gray-600"
+              />
+              {s.notifyExcludeDemo}
+            </label>
+
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">{s.notifyFields}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {NOTIFY_FIELDS.map(key => {
+                  const label =
+                    key === 'establishmentName' ? s.notifyFieldEstablishment
+                      : key === 'ownerName' ? s.notifyFieldOwnerName
+                        : key === 'ownerEmail' ? s.notifyFieldOwnerEmail
+                          : key === 'place' ? s.notifyFieldPlace
+                            : key === 'ip' ? s.notifyFieldIp
+                              : key === 'createdAtLocal' ? s.notifyFieldTime
+                                : s.notifyFieldTotal
+                  return (
+                    <label key={key} className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={notify.fields[key]}
+                        onChange={e => setNotify(prev => ({
+                          ...prev,
+                          fields: { ...prev.fields, [key]: e.target.checked },
+                        }))}
+                        className="rounded border-gray-600"
+                      />
+                      {label}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => void saveNotify()}
+                disabled={notifySaving}
+                className="text-sm bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 px-3 py-1.5 rounded-lg"
+              >
+                {notifySaving ? s.syncing : s.notifySave}
+              </button>
+              <button
+                type="button"
+                onClick={() => void runNotifyCheck()}
+                disabled={notifyChecking || !notify.enabled}
+                className="text-sm border border-gray-700 text-gray-300 hover:text-white disabled:opacity-40 px-3 py-1.5 rounded-lg"
+              >
+                {notifyChecking ? s.notifyChecking : s.notifyCheck}
+              </button>
+              {notifyFlash ? <span className="text-xs text-emerald-400">{s.notifySaved}</span> : null}
+            </div>
+
+            {notifyError ? <p className="text-xs text-amber-300">{notifyError}</p> : null}
+            {notifyResult ? (
+              <p className="text-xs text-gray-500">
+                {s.notifyLastResult}: {notifyResult}
+              </p>
+            ) : null}
+          </div>
+        )}
       </section>
     </div>
   )
