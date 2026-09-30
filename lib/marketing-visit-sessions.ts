@@ -58,8 +58,9 @@ export const DUP_EVENT_WINDOW_MS = 2_000
 /**
  * Sessions with the same IP whose time ranges are this close are one person
  * (new session_id on refresh / double mount), not two visitors.
+ * Preview/beta often double-fires locale_chosen with a fresh session_id.
  */
-export const MERGE_SAME_IP_WINDOW_MS = 5_000
+export const MERGE_SAME_IP_WINDOW_MS = 30_000
 
 function sessionKey(row: VisitEvent): string {
   const sid = (row.session_id ?? '').trim()

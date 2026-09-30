@@ -5507,10 +5507,10 @@ function eL() {
             }), t
         }, [null == K ? void 0 : K.recent, z, activeExcludeRaw, labelEvent, i18nLocale]),
         visitSessions = (0, s.useMemo)(() => {
-            // Prefer API-grouped sessions when filters match; else regroup client-side after local hide-IP.
-            if ((null == K ? void 0 : K.sessions) && !activeExcludeList.length && "time_desc" === z) return K.sessions;
+            // Always regroup on the client so dedupe/merge stays in sync with filters
+            // (never trust a pre-built API `sessions` snapshot that can lag the bundle).
             return groupVisitSessions(el)
-        }, [null == K ? void 0 : K.sessions, el, activeExcludeRaw, z]),
+        }, [el]),
         toggleSession = key => {
             setExpandedSessions(prev => {
                 let next = new Set(prev);

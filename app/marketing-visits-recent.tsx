@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, type ReactNode } from 'react'
+import { looksLikeDatacenterVisit } from '@/lib/datacenter-ip'
 import {
   formatDurationMs,
   visitPace,
@@ -55,6 +56,8 @@ type Tm = {
   person2: string
   person5: string
   people: string
+  datacenterIp: string
+  datacenterIpTitle: string
 }
 
 type Props = {
@@ -119,6 +122,26 @@ function HideIpButton({
     >
       {label} {trimmed}
     </button>
+  )
+}
+
+function DatacenterBadge({
+  row,
+  label,
+  title,
+}: {
+  row: { ip?: string | null; city?: string | null; region?: string | null; country_code?: string | null }
+  label: string
+  title: string
+}) {
+  if (!looksLikeDatacenterVisit(row)) return null
+  return (
+    <span
+      className="inline-flex rounded border border-amber-800/70 bg-amber-950/40 px-1.5 py-0.5 text-[10px] text-amber-200"
+      title={title}
+    >
+      {label}
+    </span>
   )
 }
 
@@ -315,13 +338,16 @@ export default function MarketingVisitsRecent({
                 <div className="text-gray-100 font-medium leading-snug">{journeyLabel(session.event_types)}</div>
                 <div className="text-gray-400 leading-snug" title={labelPlace(session)}>
                   {labelPlace(session)}
-                  <HideIpButton
-                    ip={session.ip}
-                    label={tm.hideIp}
-                    title={tm.hideIpTitle}
-                    onHideIp={onHideIp}
-                    className="block text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5"
-                  />
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                    <DatacenterBadge row={session} label={tm.datacenterIp} title={tm.datacenterIpTitle} />
+                    <HideIpButton
+                      ip={session.ip}
+                      label={tm.hideIp}
+                      title={tm.hideIpTitle}
+                      onHideIp={onHideIp}
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300"
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                   <div>
@@ -374,13 +400,16 @@ export default function MarketingVisitsRecent({
               </div>
               <div className="text-gray-400 leading-snug" title={labelPlace(e)}>
                 {labelPlace(e)}
-                <HideIpButton
-                  ip={e.ip}
-                  label={tm.hideIp}
-                  title={tm.hideIpTitle}
-                  onHideIp={onHideIp}
-                  className="block text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5"
-                />
+                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                  <DatacenterBadge row={e} label={tm.datacenterIp} title={tm.datacenterIpTitle} />
+                  <HideIpButton
+                    ip={e.ip}
+                    label={tm.hideIp}
+                    title={tm.hideIpTitle}
+                    onHideIp={onHideIp}
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                 <div>
@@ -454,13 +483,16 @@ export default function MarketingVisitsRecent({
                         </td>
                         <td className="px-3 py-2 text-gray-400 min-w-[9rem] max-w-[14rem]" title={labelPlace(session)}>
                           <div className="break-words leading-snug">{labelPlace(session)}</div>
-                          <HideIpButton
-                            ip={session.ip}
-                            label={tm.hideIp}
-                            title={tm.hideIpTitle}
-                            onHideIp={onHideIp}
-                            className="text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5 whitespace-nowrap"
-                          />
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            <DatacenterBadge row={session} label={tm.datacenterIp} title={tm.datacenterIpTitle} />
+                            <HideIpButton
+                              ip={session.ip}
+                              label={tm.hideIp}
+                              title={tm.hideIpTitle}
+                              onHideIp={onHideIp}
+                              className="text-[10px] text-indigo-400 hover:text-indigo-300 whitespace-nowrap"
+                            />
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-gray-100 font-medium">
                           <div className="leading-snug">{journeyLabel(session.event_types)}</div>
@@ -512,13 +544,16 @@ export default function MarketingVisitsRecent({
                     </td>
                     <td className="px-3 py-2 text-gray-400 min-w-[9rem] max-w-[14rem]" title={labelPlace(e)}>
                       <div className="break-words leading-snug">{labelPlace(e)}</div>
-                      <HideIpButton
-                        ip={e.ip}
-                        label={tm.hideIp}
-                        title={tm.hideIpTitle}
-                        onHideIp={onHideIp}
-                        className="text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5 whitespace-nowrap"
-                      />
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <DatacenterBadge row={e} label={tm.datacenterIp} title={tm.datacenterIpTitle} />
+                        <HideIpButton
+                          ip={e.ip}
+                          label={tm.hideIp}
+                          title={tm.hideIpTitle}
+                          onHideIp={onHideIp}
+                          className="text-[10px] text-indigo-400 hover:text-indigo-300 whitespace-nowrap"
+                        />
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-gray-100 font-medium whitespace-nowrap">{labelEvent(e.event_type)}</td>
                     <td className="px-3 py-2 whitespace-nowrap" title={e.visitor_hint ?? undefined}>
