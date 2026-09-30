@@ -11,11 +11,13 @@ test('sanitizeMarketingVisitsPrefs keeps clicked IPs and flags', () => {
     excludeEnabled: true,
     clickedHideIps: ['1.1.1.1', '1.1.1.1', ' 3.3.3.3 '],
     excludeBots: true,
+    excludeDatacenter: true,
     host: 'prod',
     sort: 'time_asc',
   })
   assert.equal(prefs.excludeEnabled, true)
   assert.equal(prefs.excludeBots, true)
+  assert.equal(prefs.excludeDatacenter, true)
   assert.equal(prefs.host, 'prod')
   assert.equal(prefs.sort, 'time_asc')
   assert.deepEqual(prefs.clickedHideIps, ['1.1.1.1', '3.3.3.3'])

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRequest } from '@/lib/admin-auth'
 import { parseExcludeIps, rowIpIsExcluded } from '@/lib/exclude-ips'
 import { isMarketingHostMode, matchesMarketingHost } from '@/lib/marketing-host'
+import { groupVisitSessions } from '@/lib/marketing-visit-sessions'
 import { createServiceClient, fetchAllRows } from '@/lib/supabase-server'
 import { addDaysYmd, parseYmd, todayYmd, zonedDateTime } from '@/lib/query-range'
 
@@ -92,7 +93,14 @@ export async function GET(req: NextRequest) {
   const activeSessionIds = [...lastActivityBySession.entries()]
     .filter(([, at]) => now - new Date(at).getTime() <= activeWindowMs)
     .map(([sid]) => sid)
-  const uniqueSessions = lastActivityBySession.size
+  const recent = rows.map(row => {
+    const sid = (row.session_id ?? '').trim()
+    const last = sid ? lastActivityBySession.get(sid) : null
+    const sessionActive = !!(sid && last && now - new Date(last).getTime() <= activeWindowMs)
+    return { ...row, session_active: sessionActive }
+  })
+  const sessions = groupVisitSessions(recent)
+  const uniqueSessions = sessions.length
 
   return NextResponse.json({
     meta: {
@@ -107,6 +115,7 @@ export async function GET(req: NextRequest) {
       rangeFrom,
       rangeTo,
       sampleSize: rows.length,
+      uniqueSessions,
       limit,
       activeWindowMinutes: 15,
       activeSessionCount: activeSessionIds.length,
@@ -124,11 +133,7 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => a.key.localeCompare(b.key))
       .map(({ key, count }) => ({ date: key, count })),
     activeSessionIds,
-    recent: rows.map(row => {
-      const sid = (row.session_id ?? '').trim()
-      const last = sid ? lastActivityBySession.get(sid) : null
-      const sessionActive = !!(sid && last && now - new Date(last).getTime() <= activeWindowMs)
-      return { ...row, session_active: sessionActive }
-    }),
+    sessions,
+    recent,
   })
 }

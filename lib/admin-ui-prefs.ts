@@ -1,4 +1,4 @@
-/** UI prefs for the admin shell (tab order / visibility, etc.). Stored in localStorage. */
+/** UI prefs for the admin shell (tab order / visibility, etc.). */
 
 export const ADMIN_UI_PREFS_KEY = 'rd_admin_ui_prefs'
 
@@ -34,6 +34,8 @@ export type TabLayoutItem = {
 export type AdminUiPrefs = {
   version: 1
   tabs: TabLayoutItem[]
+  /** Unix ms — used for cross-device last-write-wins. */
+  updatedAt?: number
 }
 
 /** Default order matches the historic admin shell. */
@@ -54,6 +56,7 @@ export function defaultAdminUiPrefs(): AdminUiPrefs {
       key,
       visible: true,
     })),
+    updatedAt: 0,
   }
 }
 
@@ -87,7 +90,19 @@ export function sanitizeAdminUiPrefs(input: unknown): AdminUiPrefs {
     ordered.push({ key, visible: true })
   }
 
-  return { version: 1, tabs: ordered }
+  const rawUpdated = (input as { updatedAt?: unknown }).updatedAt
+  const updatedAt = typeof rawUpdated === 'number' && Number.isFinite(rawUpdated) && rawUpdated > 0
+    ? Math.floor(rawUpdated)
+    : 0
+
+  return { version: 1, tabs: ordered, updatedAt }
+}
+
+export function touchAdminUiPrefs(prefs: AdminUiPrefs): AdminUiPrefs {
+  return {
+    ...sanitizeAdminUiPrefs(prefs),
+    updatedAt: Date.now(),
+  }
 }
 
 export function loadAdminUiPrefs(): AdminUiPrefs {
@@ -124,10 +139,14 @@ export function isCustomAdminUiPrefs(prefs: AdminUiPrefs): boolean {
 /** Fetch account prefs from the server (Cloudflare KV). Falls back to null on error/empty. */
 export async function fetchAdminUiPrefsFromServer(): Promise<AdminUiPrefs | null> {
   try {
-    const res = await fetch('/api/ui-prefs', { cache: 'no-store' })
+    const res = await fetch('/api/ui-prefs', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
     if (!res.ok) return null
-    const json = await res.json() as { prefs?: unknown }
-    if (!json.prefs) return null
+    const json = await res.json() as { prefs?: unknown; source?: string }
+    if (!json.prefs || json.source === 'empty') return null
     return sanitizeAdminUiPrefs(json.prefs)
   } catch {
     return null
@@ -139,7 +158,8 @@ export async function pushAdminUiPrefsToServer(prefs: AdminUiPrefs): Promise<{ o
   try {
     const res = await fetch('/api/ui-prefs', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ prefs: sanitizeAdminUiPrefs(prefs) }),
     })
     const json = await res.json().catch(() => ({})) as { error?: string }
@@ -152,20 +172,44 @@ export async function pushAdminUiPrefsToServer(prefs: AdminUiPrefs): Promise<{ o
   }
 }
 
+export type SyncAdminUiPrefsOptions = {
+  /** Prefs already loaded on the server (SSR) — used if GET fails/empty. */
+  seed?: AdminUiPrefs | null
+}
+
 /**
  * Load prefs for the shell: prefer server (cross-device), else localStorage.
  * If server is empty but local has a custom layout, upload local once.
+ * If local is custom and newer than remote, push local (last-write-wins).
  */
-export async function syncAdminUiPrefs(): Promise<AdminUiPrefs> {
+export async function syncAdminUiPrefs(options?: SyncAdminUiPrefsOptions): Promise<AdminUiPrefs> {
   const local = loadAdminUiPrefs()
-  const remote = await fetchAdminUiPrefsFromServer()
+  const seed = options?.seed ? sanitizeAdminUiPrefs(options.seed) : null
+  const remote = (await fetchAdminUiPrefsFromServer()) ?? (seed && isCustomAdminUiPrefs(seed) ? seed : null)
+
   if (remote) {
+    const localTs = local.updatedAt ?? 0
+    const remoteTs = remote.updatedAt ?? 0
+    // Local custom layout newer than server → push so phone can pick it up.
+    if (isCustomAdminUiPrefs(local) && localTs > remoteTs) {
+      const touched = localTs > 0 ? local : touchAdminUiPrefs(local)
+      const pushed = await pushAdminUiPrefsToServer(touched)
+      if (pushed.ok) {
+        saveAdminUiPrefs(touched)
+        return touched
+      }
+    }
     saveAdminUiPrefs(remote)
     return remote
   }
+
   if (isCustomAdminUiPrefs(local)) {
-    await pushAdminUiPrefsToServer(local)
+    const touched = (local.updatedAt ?? 0) > 0 ? local : touchAdminUiPrefs(local)
+    await pushAdminUiPrefsToServer(touched)
+    saveAdminUiPrefs(touched)
+    return touched
   }
+
   return local
 }
 
@@ -204,7 +248,7 @@ export function moveTabAmong(
 }
 
 export function setTabVisible(tabs: TabLayoutItem[], key: NavTabKey, visible: boolean): TabLayoutItem[] {
-  if (key === 'settings') return tabs.map(item => item.key === 'settings' ? { ...item, visible: true } : item)
+  if (key === 'settings') return tabs.map(item => item.key === key ? { ...item, visible: true } : item)
   return tabs.map(item => item.key === key ? { ...item, visible } : item)
 }
 
