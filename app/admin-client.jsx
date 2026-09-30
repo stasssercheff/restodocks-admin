@@ -2023,6 +2023,26 @@ function ep({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
+    // Owner: poll for newly created establishments and email if notify is enabled.
+    (0, s.useEffect)(() => {
+        if (!(null == user ? void 0 : user.isOwner)) return;
+        let cancelled = !1;
+        let run = async () => {
+            if (cancelled || "visible" !== document.visibilityState) return;
+            try {
+                await fetch("/api/registration-notify", {
+                    method: "POST",
+                    credentials: "same-origin",
+                    cache: "no-store"
+                })
+            } catch (e) {}
+        };
+        run();
+        let timer = window.setInterval(run, 12e4);
+        return () => {
+            cancelled = !0, window.clearInterval(timer)
+        }
+    }, [null == user ? void 0 : user.isOwner]);
     (0, s.useEffect)(() => {
         let keys = visibleNavTabs(user, uiPrefs);
         if (!keys.includes(t)) a(keys[0] || "settings")
