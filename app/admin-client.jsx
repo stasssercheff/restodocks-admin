@@ -23,6 +23,7 @@ import {
   syncAdminUiPrefs,
   visibleNavTabs,
 } from '@/lib/admin-ui-prefs'
+import { looksLikeDatacenterVisit } from '@/lib/datacenter-ip'
 import { groupVisitSessions } from '@/lib/marketing-visit-sessions'
 import {
   loadMarketingVisitsPrefs,
@@ -5400,7 +5401,7 @@ function eL() {
         } = useI18n(),
         tm = i18n.marketing,
         savedVisitsPrefs = (0, s.useMemo)(() => loadMarketingVisitsPrefs(), []),
-        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)(() => savedVisitsPrefs.host || "all"), [F, M] = (0, s.useState)(() => !!savedVisitsPrefs.excludeBots), [q, H] = (0, s.useState)(() => !!savedVisitsPrefs.excludeEnabled), [W, J] = (0, s.useState)(() => savedVisitsPrefs.excludeIps || ""), [clickedHideIps, setClickedHideIps] = (0, s.useState)(() => savedVisitsPrefs.clickedHideIps || []), [z, G] = (0, s.useState)(() => savedVisitsPrefs.sort || "time_desc"), [viewMode, setViewMode] = (0, s.useState)("sessions"), [expandedSessions, setExpandedSessions] = (0, s.useState)(() => new Set), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
+        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)(() => savedVisitsPrefs.host || "all"), [F, M] = (0, s.useState)(() => !!savedVisitsPrefs.excludeBots), [excludeDatacenter, setExcludeDatacenter] = (0, s.useState)(() => !!savedVisitsPrefs.excludeDatacenter), [q, H] = (0, s.useState)(() => !!savedVisitsPrefs.excludeEnabled), [W, J] = (0, s.useState)(() => savedVisitsPrefs.excludeIps || ""), [clickedHideIps, setClickedHideIps] = (0, s.useState)(() => savedVisitsPrefs.clickedHideIps || []), [z, G] = (0, s.useState)(() => savedVisitsPrefs.sort || "time_desc"), [viewMode, setViewMode] = (0, s.useState)("sessions"), [expandedSessions, setExpandedSessions] = (0, s.useState)(() => new Set), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
     const hostOptions = (0, s.useMemo)(() => [{
             value: "all",
             label: tm.hostsAll
@@ -5450,11 +5451,12 @@ function eL() {
                 excludeEnabled: q,
                 clickedHideIps,
                 excludeBots: F,
+                excludeDatacenter: excludeDatacenter,
                 host: I,
                 sort: z
             })
         } catch (e) {}
-    }, [W, q, clickedHideIps, F, I, z]);
+    }, [W, q, clickedHideIps, F, excludeDatacenter, I, z]);
     let er = (0, s.useCallback)(e => {
             let t = normalizeExcludeIp(e);
             if (!t) return;
@@ -5490,6 +5492,9 @@ function eL() {
                 let excluded = new Set(activeExcludeList);
                 t = t.filter(row => !rowIpIsExcluded(row.ip, excluded))
             }
+            if (excludeDatacenter) {
+                t = t.filter(row => !looksLikeDatacenterVisit(row))
+            }
             return t.sort((e, t) => {
                 switch (z) {
                     case "time_asc":
@@ -5505,7 +5510,7 @@ function eL() {
                         return t.created_at.localeCompare(e.created_at)
                 }
             }), t
-        }, [null == K ? void 0 : K.recent, z, activeExcludeRaw, labelEvent, i18nLocale]),
+        }, [null == K ? void 0 : K.recent, z, activeExcludeRaw, excludeDatacenter, labelEvent, i18nLocale]),
         visitSessions = (0, s.useMemo)(() => {
             // Always regroup on the client so dedupe/merge stays in sync with filters
             // (never trust a pre-built API `sessions` snapshot that can lag the bundle).
@@ -5749,6 +5754,18 @@ function eL() {
                         onChange: e => M(e.target.checked),
                         className: "rounded border-gray-600"
                     }), tm.hideBots]
+                })
+            }), (0, r.jsx)("div", {
+                className: "flex flex-col gap-1 min-w-[12rem]",
+                children: (0, r.jsxs)("label", {
+                    className: "text-xs text-gray-500 flex items-center gap-2",
+                    title: tm.hideDatacenterTitle,
+                    children: [(0, r.jsx)("input", {
+                        type: "checkbox",
+                        checked: excludeDatacenter,
+                        onChange: e => setExcludeDatacenter(e.target.checked),
+                        className: "rounded border-gray-600"
+                    }), tm.hideDatacenter]
                 })
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col gap-1 min-w-[12rem]",

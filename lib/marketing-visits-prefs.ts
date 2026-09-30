@@ -10,6 +10,8 @@ export type MarketingVisitsPrefs = {
   /** IPs hidden via row «скрыть» clicks (active filter when non-empty). */
   clickedHideIps: string[]
   excludeBots: boolean
+  /** Hide Ashburn/AWS-style datacenter IPs (noise from bots / bad tracker IP). */
+  excludeDatacenter: boolean
   host: string
   sort: string
 }
@@ -38,6 +40,7 @@ export function defaultMarketingVisitsPrefs(): MarketingVisitsPrefs {
     excludeEnabled: false,
     clickedHideIps: [],
     excludeBots: false,
+    excludeDatacenter: false,
     host: 'all',
     sort: 'time_desc',
   }
@@ -56,6 +59,7 @@ export function sanitizeMarketingVisitsPrefs(input: unknown): MarketingVisitsPre
     excludeEnabled: raw.excludeEnabled === true,
     clickedHideIps: parseIpList(raw.clickedHideIps),
     excludeBots: raw.excludeBots === true,
+    excludeDatacenter: raw.excludeDatacenter === true,
     host,
     sort,
   }

@@ -58,6 +58,7 @@ type Tm = {
   people: string
   datacenterIp: string
   datacenterIpTitle: string
+  langVisitorTitle: string
 }
 
 type Props = {
@@ -356,7 +357,7 @@ export default function MarketingVisitsRecent({
                       {labelVisitor(session.visitor_kind)}
                     </span>
                   </div>
-                  <div>
+                  <div title={tm.langVisitorTitle}>
                     <span className="text-gray-600">{tm.lang}: </span>
                     <span>{labelLang(session.language_code)}</span>
                   </div>
@@ -455,7 +456,7 @@ export default function MarketingVisitsRecent({
                 </th>
                 <th className="px-3 py-2 whitespace-nowrap w-[7rem]">{tm.colVisitor}</th>
                 {viewMode === 'events' ? <th className="px-3 py-2 whitespace-nowrap w-[6rem]">{tm.colPage}</th> : null}
-                <th className="px-3 py-2 whitespace-nowrap w-[5rem]">{tm.colLang}</th>
+                <th className="px-3 py-2 whitespace-nowrap w-[5rem]" title={tm.langVisitorTitle}>{tm.colLang}</th>
                 {viewMode === 'events' ? <th className="px-3 py-2 whitespace-nowrap w-[5rem]">{tm.colScreen}</th> : null}
                 <th className="px-3 py-2 whitespace-nowrap w-[6rem]">{tm.colHost}</th>
               </tr>
@@ -512,7 +513,7 @@ export default function MarketingVisitsRecent({
                             <span className="block text-[10px] text-gray-500">{session.visitor_hint}</span>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2 whitespace-nowrap">{labelLang(session.language_code)}</td>
+                        <td className="px-3 py-2 whitespace-nowrap" title={tm.langVisitorTitle}>{labelLang(session.language_code)}</td>
                         <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{labelHost(session.client_host)}</td>
                       </tr>
                       {open ? (
