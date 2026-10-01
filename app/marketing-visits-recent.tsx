@@ -9,6 +9,12 @@ import {
   type VisitSession,
   type VisitTimelineStep,
 } from '@/lib/marketing-visit-sessions'
+import {
+  visitExitLabel,
+  visitJourneySteps,
+  visitStepLabel,
+  type VisitStepCopy,
+} from '@/lib/visit-step-label'
 
 type Tm = {
   recentTitle: string
@@ -45,6 +51,13 @@ type Tm = {
   paceNormal: string
   paceSlow: string
   startEvent: string
+  leftAt: string
+  leftAtTitle: string
+  promoView: string
+  journeyTitle: string
+  events: {
+    locale_chosen: string
+  }
   endOfList: string
   shownFirst: string
   shownPeriod: string
@@ -84,7 +97,6 @@ type Props = {
   sampleSize: number
   limit: number
   rangeLabel: string | null
-  journeyLabel: (types: string[]) => string
 }
 
 function SessionBadge({ active, label, title }: { active?: boolean; label: string; title: string }) {
@@ -203,6 +215,13 @@ function DurationMeta({
   )
 }
 
+function stepCopy(tm: Tm): VisitStepCopy {
+  return {
+    localePick: tm.events.locale_chosen,
+    promoView: tm.promoView,
+  }
+}
+
 function TimelineList({
   timeline,
   tm,
@@ -218,10 +237,13 @@ function TimelineList({
   labelPath: Props['labelPath']
   formatVisitTime: Props['formatVisitTime']
 }) {
+  const copy = stepCopy(tm)
   return (
     <ol className="space-y-0">
       {timeline.map((step, index) => {
         const ev = step.event
+        const title = visitStepLabel(ev, labelEvent, labelPath, copy)
+        const pathLabel = labelPath(ev.path)
         return (
           <li key={ev.id}>
             {step.gapFromPrevMs != null ? (
@@ -239,8 +261,10 @@ function TimelineList({
             )}
             <div className="flex items-start justify-between gap-2 rounded-lg border border-gray-800 bg-gray-950/50 px-2.5 py-1.5 text-[11px]">
               <div className="min-w-0">
-                <div className="text-gray-100 font-medium">{labelEvent(ev.event_type)}</div>
-                <div className="text-gray-500">{labelPath(ev.path)}</div>
+                <div className="text-gray-100 font-medium">{title}</div>
+                {pathLabel && pathLabel !== title ? (
+                  <div className="text-gray-500">{pathLabel}</div>
+                ) : null}
               </div>
               <div className="text-gray-400 font-mono shrink-0 text-right">
                 <div>{formatVisitTime(ev.created_at, ev.timezone)}</div>
@@ -255,6 +279,37 @@ function TimelineList({
         )
       })}
     </ol>
+  )
+}
+
+function SessionJourney({
+  session,
+  tm,
+  labelEvent,
+  labelPath,
+}: {
+  session: VisitSession
+  tm: Tm
+  labelEvent: Props['labelEvent']
+  labelPath: Props['labelPath']
+}) {
+  const copy = stepCopy(tm)
+  const steps = visitJourneySteps(session.timeline, labelEvent, labelPath, copy)
+  const exit = visitExitLabel(session.timeline, labelEvent, labelPath, copy)
+  const journey = steps.join(' → ') || '—'
+  return (
+    <div className="space-y-0.5">
+      <div className="text-emerald-200/90 font-medium leading-snug" title={tm.leftAtTitle}>
+        <span className="text-gray-500 font-normal">{tm.leftAt}: </span>
+        {exit}
+      </div>
+      {steps.length > 1 ? (
+        <div className="text-gray-400 text-[11px] leading-snug">
+          <span className="text-gray-600">{tm.journeyTitle}: </span>
+          {journey}
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -280,7 +335,6 @@ export default function MarketingVisitsRecent({
   sampleSize,
   limit,
   rangeLabel,
-  journeyLabel,
 }: Props) {
   const listEmpty = viewMode === 'sessions' ? sessions.length === 0 : events.length === 0
   const countNoun = (n: number, one: string, few: string, many: string) =>
@@ -337,7 +391,12 @@ export default function MarketingVisitsRecent({
                     {session.event_count} {tm.eventsInVisit}
                   </span>
                 </div>
-                <div className="text-gray-100 font-medium leading-snug">{journeyLabel(session.event_types)}</div>
+                <SessionJourney
+                  session={session}
+                  tm={tm}
+                  labelEvent={labelEvent}
+                  labelPath={labelPath}
+                />
                 <div className="text-gray-400 leading-snug" title={labelPlace(session)}>
                   {labelPlace(session)}
                   <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
@@ -372,7 +431,7 @@ export default function MarketingVisitsRecent({
                   onClick={() => onToggleSession(session.key)}
                   className="text-[11px] text-indigo-300 hover:text-indigo-200"
                 >
-                  {open ? tm.collapseVisit : tm.expandVisit}
+                  {open ? tm.collapseVisit : `${tm.expandVisit} (${session.event_count})`}
                 </button>
                 {open ? (
                   <div className="border-t border-gray-800 pt-2">
@@ -497,7 +556,12 @@ export default function MarketingVisitsRecent({
                           </div>
                         </td>
                         <td className="px-3 py-2 text-gray-100 font-medium">
-                          <div className="leading-snug">{journeyLabel(session.event_types)}</div>
+                          <SessionJourney
+                            session={session}
+                            tm={tm}
+                            labelEvent={labelEvent}
+                            labelPath={labelPath}
+                          />
                           <button
                             type="button"
                             onClick={() => onToggleSession(session.key)}
