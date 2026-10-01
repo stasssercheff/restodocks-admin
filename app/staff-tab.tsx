@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ADMIN_PAGES, type AdminPageKey } from '@/lib/admin-pages'
 import { useI18n } from '@/lib/i18n'
+import { useAdminTr } from '@/lib/admin-tr'
 
 type StaffUser = {
   id: string
@@ -23,6 +24,7 @@ function generatePassword(length = 12): string {
 
 export default function StaffTab() {
   const { t } = useI18n()
+  const tr = useAdminTr()
   const [users, setUsers] = useState<StaffUser[]>([])
   const [ownerEmail, setOwnerEmail] = useState('')
   const [loading, setLoading] = useState(true)
@@ -87,7 +89,7 @@ export default function StaffTab() {
     const json = await res.json().catch(() => ({}))
     setCreating(false)
     if (!res.ok) {
-      setError(typeof json.error === 'string' ? json.error : 'Не удалось создать учётку')
+      setError(typeof json.error === 'string' ? json.error : tr('Не удалось создать учётку'))
       return
     }
     setEmail('')
@@ -111,7 +113,7 @@ export default function StaffTab() {
     const json = await res.json().catch(() => ({}))
     setSavingId(null)
     if (!res.ok) {
-      setError(typeof json.error === 'string' ? json.error : 'Не удалось сохранить')
+      setError(typeof json.error === 'string' ? json.error : tr('Не удалось сохранить'))
       await load()
       return false
     }
@@ -130,10 +132,10 @@ export default function StaffTab() {
   }
 
   async function resetPassword(user: StaffUser) {
-    const next = prompt(`Новый пароль для ${user.email} (минимум 8 символов):`, generatePassword())
+    const next = prompt(`${tr('Новый пароль для ')}${user.email}${tr(' (минимум 8 символов):')}`, generatePassword())
     if (next == null) return
     if (next.trim().length < 8) {
-      alert('Пароль должен быть не короче 8 символов')
+      alert(tr('Пароль должен быть не короче 8 символов'))
       return
     }
     if (await patchUser(user.id, { password: next.trim() })) {
@@ -142,7 +144,7 @@ export default function StaffTab() {
   }
 
   async function removeUser(user: StaffUser) {
-    if (!confirm(`Удалить учётку ${user.email}?`)) return
+    if (!confirm(`${tr('Удалить учётку ')}${user.email}?`)) return
     setSavingId(user.id)
     const res = await fetch('/api/admin-users', {
       method: 'DELETE',
@@ -152,7 +154,7 @@ export default function StaffTab() {
     const json = await res.json().catch(() => ({}))
     setSavingId(null)
     if (!res.ok) {
-      setError(typeof json.error === 'string' ? json.error : 'Не удалось удалить')
+      setError(typeof json.error === 'string' ? json.error : tr('Не удалось удалить'))
       return
     }
     setUsers(current => current.filter(item => item.id !== user.id))
@@ -180,13 +182,13 @@ export default function StaffTab() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Пароль</label>
+            <label className="text-xs text-gray-500">{tr('Пароль')}</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="минимум 8 символов"
+                placeholder={tr('минимум 8 символов')}
                 className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-48 font-mono"
               />
               <button
@@ -204,7 +206,7 @@ export default function StaffTab() {
               type="text"
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
-              placeholder="Как отображать"
+              placeholder={tr('Как отображать')}
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 w-48"
             />
           </div>
@@ -291,7 +293,7 @@ export default function StaffTab() {
 
       <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden overflow-x-auto">
         {loading ? (
-          <div className="p-12 text-center text-gray-500">Загрузка...</div>
+          <div className="p-12 text-center text-gray-500">{tr('Загрузка...')}</div>
         ) : (
           <table className="w-full text-sm min-w-[720px]">
             <thead>
@@ -300,13 +302,13 @@ export default function StaffTab() {
                 {ADMIN_PAGES.map(page => (
                   <th key={page.key} className="px-4 py-3 text-center">{t.tabs[page.key]}</th>
                 ))}
-                <th className="px-4 py-3 text-right">Действия</th>
+                <th className="px-4 py-3 text-right">{tr('Действия')}</th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-b border-gray-800/50 bg-gray-800/20">
                 <td className="px-4 py-3">
-                  <div className="font-medium text-white">{ownerEmail || 'Владелец'}</div>
+                  <div className="font-medium text-white">{ownerEmail || tr('Владелец')}</div>
                   <div className="text-xs text-indigo-300 mt-0.5">{t.admins.fullAccess}</div>
                 </td>
                 {ADMIN_PAGES.map(page => (
@@ -325,7 +327,7 @@ export default function StaffTab() {
                   <td className="px-4 py-3">
                     <div className="font-medium text-white">{user.displayName || user.email}</div>
                     {user.displayName && <div className="text-xs text-gray-500">{user.email}</div>}
-                    {!user.isActive && <div className="text-xs text-red-400 mt-0.5">отключена</div>}
+                    {!user.isActive && <div className="text-xs text-red-400 mt-0.5">{tr('отключена')}</div>}
                     <div className="mt-2 flex flex-col gap-2 max-w-sm">
                       <input
                         type="text"
@@ -371,13 +373,13 @@ export default function StaffTab() {
                         onClick={() => resetPassword(user)}
                         className="text-gray-500 hover:text-white transition text-xs px-2 py-1 rounded border border-gray-700 hover:border-gray-500"
                       >
-                        Пароль
+                        {tr('Пароль')}
                       </button>
                       <button
                         onClick={() => removeUser(user)}
                         className="text-gray-500 hover:text-red-400 transition text-xs px-2 py-1 rounded border border-gray-700 hover:border-red-800"
                       >
-                        Удалить
+                        {tr('Удалить')}
                       </button>
                     </div>
                   </td>

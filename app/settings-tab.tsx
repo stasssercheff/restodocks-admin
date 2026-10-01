@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/lib/i18n'
+import { useAdminTr } from '@/lib/admin-tr'
 import {
   type AdminUiPrefs,
   type NavTabKey,
@@ -48,6 +49,7 @@ const NOTIFY_FIELDS: RegistrationNotifyField[] = [
 
 export default function SettingsTab({ user, onPrefsChange }: Props) {
   const { t } = useI18n()
+  const tr = useAdminTr()
   const s = t.settings
   const [prefs, setPrefs] = useState<AdminUiPrefs>(() => loadAdminUiPrefs())
   const [savedFlash, setSavedFlash] = useState(false)
@@ -87,13 +89,13 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
         const json = await res.json().catch(() => ({})) as { prefs?: unknown; error?: string }
         if (cancelled) return
         if (!res.ok) {
-          setNotifyError(typeof json.error === 'string' ? json.error : `Ошибка (${res.status})`)
+          setNotifyError(typeof json.error === 'string' ? json.error : `${tr('Ошибка (')}${res.status})`)
         } else {
           setNotify(sanitizeRegistrationNotifyPrefs(json.prefs))
           setNotifyError(null)
         }
       } catch {
-        if (!cancelled) setNotifyError('Сеть: не удалось загрузить настройки писем')
+        if (!cancelled) setNotifyError(tr('Сеть: не удалось загрузить настройки писем'))
       } finally {
         if (!cancelled) setNotifyLoading(false)
       }
@@ -101,7 +103,7 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
     return () => {
       cancelled = true
     }
-  }, [user.isOwner])
+  }, [user.isOwner, tr])
 
   const allowed = useMemo(() => {
     const set = new Set<NavTabKey>()
@@ -165,14 +167,14 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
       })
       const json = await res.json().catch(() => ({})) as { prefs?: unknown; error?: string }
       if (!res.ok) {
-        setNotifyError(typeof json.error === 'string' ? json.error : `Ошибка (${res.status})`)
+        setNotifyError(typeof json.error === 'string' ? json.error : `${tr('Ошибка (')}${res.status})`)
         return
       }
       setNotify(sanitizeRegistrationNotifyPrefs(json.prefs))
       setNotifyFlash(true)
       window.setTimeout(() => setNotifyFlash(false), 1600)
     } catch {
-      setNotifyError('Сеть: не удалось сохранить')
+      setNotifyError(tr('Сеть: не удалось сохранить'))
     } finally {
       setNotifySaving(false)
     }
@@ -195,18 +197,18 @@ export default function SettingsTab({ user, onPrefsChange }: Props) {
         errors?: string[]
       }
       if (!res.ok) {
-        setNotifyError(typeof json.error === 'string' ? json.error : `Ошибка (${res.status})`)
+        setNotifyError(typeof json.error === 'string' ? json.error : `${tr('Ошибка (')}${res.status})`)
         return
       }
       const parts = [
-        `проверено: ${json.checked ?? 0}`,
-        `писем: ${json.sent ?? 0}`,
-        json.skipped ? `пропущено: ${json.skipped}` : null,
-        json.errors?.length ? `ошибки: ${json.errors.join('; ')}` : null,
+        `${tr('проверено: ')}${json.checked ?? 0}`,
+        `${tr('писем: ')}${json.sent ?? 0}`,
+        json.skipped ? `${tr('пропущено: ')}${json.skipped}` : null,
+        json.errors?.length ? `${tr('ошибки: ')}${json.errors.join('; ')}` : null,
       ].filter(Boolean)
       setNotifyResult(parts.join(' · '))
     } catch {
-      setNotifyError('Сеть: проверка не удалась')
+      setNotifyError(tr('Сеть: проверка не удалась'))
     } finally {
       setNotifyChecking(false)
     }

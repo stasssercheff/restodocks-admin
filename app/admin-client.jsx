@@ -30,9 +30,16 @@ import {
   saveMarketingVisitsPrefs,
 } from '@/lib/marketing-visits-prefs'
 import { completedRegistrationCount } from '@/lib/registration-stat'
+import { adminLocaleTag, adminTr, useAdminLocaleTag, useAdminTr } from '@/lib/admin-tr'
 
 const r = { jsx, jsxs, Fragment }
 const l = { useRouter }
+
+// Module-level + helper fallback (hooks cannot run at import / outside components).
+// Tab components still shadow this with `const tr = useAdminTr()` for live locale updates.
+function tr(text) {
+  return adminTr(text)
+}
 
 const EST_FILTER_KEY = 'rd_admin_est_filters'
 
@@ -80,11 +87,12 @@ function firstAllowedTab(user) {
 }
 
 function ReferralLevelBadge({ level }) {
+  const tr = useAdminTr()
   if (!level) return null
   return (0, r.jsx)('span', {
     className: 'ml-1 inline-flex align-middle rounded border border-indigo-800/70 bg-indigo-950/50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-200',
-    title: `Реферальный уровень ${level}: 1 — промокод, 2+ — по реферальной ссылке`,
-    children: `ур. ${level}`,
+    title: tr('Реферальный уровень ') + level + tr(': 1 — промокод, 2+ — по реферальной ссылке'),
+    children: tr('ур. ') + level,
   })
 }
 
@@ -390,7 +398,7 @@ let visitTimeOpts = {
 
 function A(e, t) {
     try {
-        return new Date(e).toLocaleString("ru-RU", {
+        return new Date(e).toLocaleString(adminLocaleTag(), {
             ...visitTimeOpts,
             timeZone: t
         })
@@ -410,13 +418,13 @@ function D() {
 
 function R(e, t) {
     var a;
-    return e ? null !== (a = A(e, (null != t ? t : "").trim() || "UTC")) && void 0 !== a ? a : new Date(e).toLocaleString("ru-RU") : "—"
+    return e ? null !== (a = A(e, (null != t ? t : "").trim() || "UTC")) && void 0 !== a ? a : new Date(e).toLocaleString(adminLocaleTag()) : "—"
 }
 
 function U(e, t) {
     if (!e) return "—";
     let a = A(e, (null != t ? t : "").trim() || D());
-    return a ? "у вас: ".concat(a) : "у вас: ".concat(new Date(e).toLocaleString("ru-RU"))
+    return a ? "у вас: ".concat(a) : "у вас: ".concat(new Date(e).toLocaleString(adminLocaleTag()))
 }
 
 function O(e) {
@@ -505,11 +513,13 @@ function K() {
 }
 
 function V() {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     let [e, t] = (0, s.useState)([]), [a, l] = (0, s.useState)(!0), [n, i] = (0, s.useState)(!1), [o, d] = (0, s.useState)(null), [c, x] = (0, s.useState)(null), [m, u] = (0, s.useState)(K), [p, g] = (0, s.useState)(!1), h = (0, s.useCallback)(async () => {
         l(!0), d(null);
         let e = await fetch("/api/popup-campaigns"),
             a = await e.json();
-        e.ok ? t(Array.isArray(a) ? a : []) : (d("string" == typeof(null == a ? void 0 : a.error) ? a.error : "Ошибка загрузки"), t([])), l(!1)
+        e.ok ? t(Array.isArray(a) ? a : []) : (d("string" == typeof(null == a ? void 0 : a.error) ? a.error : tr("Ошибка загрузки")), t([])), l(!1)
     }, []);
     (0, s.useEffect)(() => {
         h()
@@ -554,7 +564,7 @@ function V() {
                 }),
                 a = await t.json().catch(() => ({}));
             if (!t.ok) {
-                d("string" == typeof(null == a ? void 0 : a.error) ? a.error : "Ошибка сохранения");
+                d("string" == typeof(null == a ? void 0 : a.error) ? a.error : tr("Ошибка сохранения"));
                 return
             }
             g(!1), x(null), await h()
@@ -575,7 +585,7 @@ function V() {
         }), await h()
     }
     async function j(e) {
-        confirm("Удалить кампанию попапа?") && (await fetch("/api/popup-campaigns", {
+        confirm(tr("Удалить кампанию попапа?")) && (await fetch("/api/popup-campaigns", {
             method: "DELETE",
             headers: {
                 "Content-Type": "application/json"
@@ -602,10 +612,10 @@ function V() {
             children: [(0, r.jsxs)("div", {
                 children: [(0, r.jsx)("h2", {
                     className: "text-lg font-semibold",
-                    children: "Попапы в приложении"
+                    children: tr("Попапы в приложении")
                 }), (0, r.jsx)("p", {
                     className: "text-sm text-gray-400 mt-1 max-w-2xl",
-                    children: "Кампании с условиями показа и текстами по языкам. Приоритет выше — проверяется раньше. Для промо на /promo: привязка к коду и лимиту погашений. Для app_shell: владелец-оплатчик, за N часов до окончания промо."
+                    children: tr("Кампании с условиями показа и текстами по языкам. Приоритет выше — проверяется раньше. Для промо на /promo: привязка к коду и лимиту погашений. Для app_shell: владелец-оплатчик, за N часов до окончания промо.")
                 })]
             }), (0, r.jsx)("button", {
                 type: "button",
@@ -613,7 +623,7 @@ function V() {
                     x(null), u(K()), g(!0)
                 },
                 className: "px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium",
-                children: "Новая кампания"
+                children: tr("Новая кампания")
             })]
         }), o ? (0, r.jsx)("p", {
             className: "text-sm text-red-400 bg-red-950/40 border border-red-900/50 rounded-lg px-3 py-2",
@@ -622,14 +632,14 @@ function V() {
             className: "border border-gray-800 rounded-xl p-4 sm:p-6 bg-gray-900/60 space-y-4",
             children: [(0, r.jsx)("h3", {
                 className: "font-medium",
-                children: c ? "Редактирование" : "Новая кампания"
+                children: c ? tr("Редактирование") : tr("Новая кампания")
             }), (0, r.jsxs)("div", {
                 className: "grid sm:grid-cols-2 gap-3",
                 children: [(0, r.jsxs)("label", {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Slug (уникальный id)"
+                        children: tr("Slug (уникальный id)")
                     }), (0, r.jsx)("input", {
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2",
                         value: m.slug,
@@ -644,7 +654,7 @@ function V() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Название (для админки)"
+                        children: tr("Название (для админки)")
                     }), (0, r.jsx)("input", {
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2",
                         value: m.name,
@@ -657,7 +667,7 @@ function V() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Приоритет"
+                        children: tr("Приоритет")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2",
@@ -676,12 +686,12 @@ function V() {
                             ...t,
                             is_enabled: e.target.checked
                         }))
-                    }), "Включена"]
+                    }), tr("Включена")]
                 }), (0, r.jsxs)("label", {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Где показывать"
+                        children: tr("Где показывать")
                     }), (0, r.jsxs)("select", {
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2",
                         value: m.placement,
@@ -701,7 +711,7 @@ function V() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Аудитория"
+                        children: tr("Аудитория")
                     }), (0, r.jsxs)("select", {
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2",
                         value: m.audience,
@@ -721,7 +731,7 @@ function V() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Тип UI"
+                        children: tr("Тип UI")
                     }), (0, r.jsxs)("select", {
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2",
                         value: m.ui_type,
@@ -741,7 +751,7 @@ function V() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Активна с (дата)"
+                        children: tr("Активна с (дата)")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2",
@@ -755,7 +765,7 @@ function V() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Активна до (дата)"
+                        children: tr("Активна до (дата)")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2",
@@ -770,12 +780,12 @@ function V() {
                 className: "border border-gray-800 rounded-lg p-3 space-y-2",
                 children: [(0, r.jsx)("legend", {
                     className: "text-sm text-gray-300 px-1",
-                    children: "Условия"
+                    children: tr("Условия")
                 }), (0, r.jsxs)("label", {
                     className: "block text-sm sm:max-w-xs",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Промокод (для проверки лимита)"
+                        children: tr("Промокод (для проверки лимита)")
                     }), (0, r.jsx)("input", {
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2 uppercase",
                         value: m.promo_code,
@@ -794,12 +804,12 @@ function V() {
                             ...t,
                             require_promo_available: e.target.checked
                         }))
-                    }), "Показывать только если промокод ещё доступен (лимит не исчерпан)"]
+                    }), tr("Показывать только если промокод ещё доступен (лимит не исчерпан)")]
                 }), (0, r.jsxs)("label", {
                     className: "block text-sm sm:max-w-xs",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "За сколько часов до окончания промо (app_shell)"
+                        children: tr("За сколько часов до окончания промо (app_shell)")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         className: "mt-1 w-full rounded-lg bg-gray-950 border border-gray-700 px-3 py-2",
@@ -819,44 +829,44 @@ function V() {
                             ...t,
                             require_active_establishment_promo: e.target.checked
                         }))
-                    }), "Требуется активное промо у заведения"]
+                    }), tr("Требуется активное промо у заведения")]
                 })]
             }), ["contentRu", "contentEn"].map(e => {
-                let t = "contentRu" === e ? "Тексты RU" : "Тексты EN",
+                let t = "contentRu" === e ? tr("Тексты RU") : tr("Тексты EN"),
                     a = m[e],
                     s = "promo_code" === m.ui_type ? [{
                         key: "title",
-                        label: "Заголовок"
+                        label: tr("Заголовок")
                     }, {
                         key: "valid_until",
-                        label: "Срок действия (строка)"
+                        label: tr("Срок действия (строка)")
                     }, {
                         key: "promo_code",
-                        label: "Код в попапе"
+                        label: tr("Код в попапе")
                     }, {
                         key: "how_to_btn",
-                        label: "Кнопка \xabкак ввести\xbb"
+                        label: tr("Кнопка \xabкак ввести\xbb")
                     }, {
                         key: "how_to_title",
-                        label: "Заголовок инструкции"
+                        label: tr("Заголовок инструкции")
                     }, {
                         key: "how_to_body",
-                        label: "Текст инструкции"
+                        label: tr("Текст инструкции")
                     }, {
                         key: "back",
-                        label: "Назад"
+                        label: tr("Назад")
                     }, {
                         key: "close",
-                        label: "Закрыть"
+                        label: tr("Закрыть")
                     }] : [{
                         key: "title",
-                        label: "Заголовок"
+                        label: tr("Заголовок")
                     }, {
                         key: "message",
-                        label: "Текст ({date} — дата окончания)"
+                        label: tr("Текст ({date} — дата окончания)")
                     }, {
                         key: "close",
-                        label: "Закрыть (необяз.)"
+                        label: tr("Закрыть (необяз.)")
                     }];
                 return (0, r.jsxs)("fieldset", {
                     className: "border border-gray-800 rounded-lg p-3 space-y-2",
@@ -884,7 +894,7 @@ function V() {
                 }, e)
             }), (0, r.jsxs)("p", {
                 className: "text-xs text-gray-500",
-                children: ["Остальные языки (", H.filter(e => "ru" !== e && "en" !== e).join(", "), ") — fallback на EN, затем RU. Позже можно расширить форму."]
+                children: [tr("Остальные языки ("), H.filter(e => "ru" !== e && "en" !== e).join(", "), tr(") — fallback на EN, затем RU. Позже можно расширить форму.")]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-wrap gap-2",
                 children: [(0, r.jsx)("button", {
@@ -892,19 +902,19 @@ function V() {
                     disabled: n,
                     onClick: () => void b(),
                     className: "px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-sm disabled:opacity-50",
-                    children: n ? "Сохранение…" : "Сохранить"
+                    children: n ? tr("Сохранение…") : tr("Сохранить")
                 }), (0, r.jsx)("button", {
                     type: "button",
                     onClick: () => {
                         g(!1), x(null)
                     },
                     className: "px-4 py-2 rounded-lg border border-gray-700 text-sm",
-                    children: "Отмена"
+                    children: tr("Отмена")
                 })]
             })]
         }) : null, a ? (0, r.jsx)("p", {
             className: "text-gray-500 text-sm",
-            children: "Загрузка…"
+            children: tr("Загрузка…")
         }) : (0, r.jsx)("div", {
             className: "overflow-x-auto border border-gray-800 rounded-xl",
             children: (0, r.jsxs)("table", {
@@ -914,22 +924,22 @@ function V() {
                     children: (0, r.jsxs)("tr", {
                         children: [(0, r.jsx)("th", {
                             className: "text-left p-3",
-                            children: "Название"
+                            children: tr("Название")
                         }), (0, r.jsx)("th", {
                             className: "text-left p-3",
-                            children: "Место"
+                            children: tr("Место")
                         }), (0, r.jsx)("th", {
                             className: "text-left p-3",
-                            children: "Аудитория"
+                            children: tr("Аудитория")
                         }), (0, r.jsx)("th", {
                             className: "text-left p-3",
-                            children: "Приор."
+                            children: tr("Приор.")
                         }), (0, r.jsx)("th", {
                             className: "text-left p-3",
-                            children: "Статус"
+                            children: tr("Статус")
                         }), (0, r.jsx)("th", {
                             className: "text-right p-3",
-                            children: "Действия"
+                            children: tr("Действия")
                         })]
                     })
                 }), (0, r.jsxs)("tbody", {
@@ -957,10 +967,10 @@ function V() {
                             className: "p-3",
                             children: e.is_enabled ? (0, r.jsx)("span", {
                                 className: "text-emerald-400",
-                                children: "Вкл"
+                                children: tr("Вкл")
                             }) : (0, r.jsx)("span", {
                                 className: "text-gray-500",
-                                children: "Выкл"
+                                children: tr("Выкл")
                             })
                         }), (0, r.jsxs)("td", {
                             className: "p-3 text-right space-x-2 whitespace-nowrap",
@@ -992,24 +1002,24 @@ function V() {
                                         show_once: e.show_once
                                     }), g(!0)
                                 },
-                                children: "Изменить"
+                                children: tr("Изменить")
                             }), (0, r.jsx)("button", {
                                 type: "button",
                                 className: "text-amber-400 hover:underline",
                                 onClick: () => void v(e),
-                                children: e.is_enabled ? "Выкл" : "Вкл"
+                                children: e.is_enabled ? tr("Выкл") : tr("Вкл")
                             }), (0, r.jsx)("button", {
                                 type: "button",
                                 className: "text-red-400 hover:underline",
                                 onClick: () => void j(e.id),
-                                children: "Удалить"
+                                children: tr("Удалить")
                             })]
                         })]
                     }, e.id)), 0 === y.length ? (0, r.jsx)("tr", {
                         children: (0, r.jsx)("td", {
                             colSpan: 6,
                             className: "p-6 text-center text-gray-500",
-                            children: "Нет кампаний. После миграции появятся seed WELCOME26 и предупреждение за 48 ч."
+                            children: tr("Нет кампаний. После миграции появятся seed WELCOME26 и предупреждение за 48 ч.")
                         })
                     }) : null]
                 })]
@@ -1019,6 +1029,8 @@ function V() {
 }
 
 function B() {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     let [e, t] = (0, s.useState)([]), [a, l] = (0, s.useState)(0), [n, i] = (0, s.useState)(0), [o, d] = (0, s.useState)(0), [c, x] = (0, s.useState)(!0), [m, u] = (0, s.useState)(!1), [p, g] = (0, s.useState)(null), [h, y] = (0, s.useState)(null), [b, v] = (0, s.useState)(null), [j, N] = (0, s.useState)(null), f = (0, s.useCallback)(async e => {
         let a = (null == e ? void 0 : e.silent) === !0;
         g(null), a ? u(!0) : x(!0);
@@ -1033,7 +1045,7 @@ function B() {
                     ...e,
                     allow_public_display: !1 !== e.allow_public_display
                 }))), l(null !== (m = null !== (c = null === (r = x.summary) || void 0 === r ? void 0 : r.total) && void 0 !== c ? c : null === (s = x.rows) || void 0 === s ? void 0 : s.length) && void 0 !== m ? m : 0), i(null !== (p = null === (n = x.summary) || void 0 === n ? void 0 : n.demo) && void 0 !== p ? p : 0), d(null !== (h = null === (o = x.summary) || void 0 === o ? void 0 : o.on_promo) && void 0 !== h ? h : 0), y(new Date)
-            } else g("string" == typeof(null == x ? void 0 : x.error) ? x.error : "Ошибка (".concat(e.status, ")")), a || (t([]), l(0), i(0), d(0))
+            } else g("string" == typeof(null == x ? void 0 : x.error) ? x.error : tr("Ошибка (").concat(e.status, ")")), a || (t([]), l(0), i(0), d(0))
         } catch (e) {
             g(e instanceof Error ? e.message : "load_failed")
         } finally {
@@ -1041,7 +1053,7 @@ function B() {
         }
     }, []), _ = (0, s.useCallback)(async (e, a) => {
         if (a && !0 !== e.allow_public_display) {
-            g("Нет согласия на публикацию — отзыв нельзя показать на промо.");
+            g(tr("Нет согласия на публикацию — отзыв нельзя показать на промо."));
             return
         }
         N(e.id), g(null), t(t => t.map(t => t.id === e.id ? {
@@ -1063,7 +1075,7 @@ function B() {
             r.ok || (t(t => t.map(t => t.id === e.id ? {
                 ...t,
                 show_on_promo: e.show_on_promo
-            } : t)), d(e => e + (a ? -1 : 1)), g("string" == typeof(null == s ? void 0 : s.error) ? s.error : "Ошибка (".concat(r.status, ")")))
+            } : t)), d(e => e + (a ? -1 : 1)), g("string" == typeof(null == s ? void 0 : s.error) ? s.error : tr("Ошибка (").concat(r.status, ")")))
         } catch (r) {
             t(t => t.map(t => t.id === e.id ? {
                 ...t,
@@ -1089,10 +1101,10 @@ function B() {
             children: [(0, r.jsxs)("div", {
                 children: [(0, r.jsx)("h2", {
                     className: "text-lg font-semibold",
-                    children: "Отзывы"
+                    children: tr("Отзывы")
                 }), (0, r.jsx)("p", {
                     className: "text-sm text-gray-500 mt-1 max-w-3xl",
-                    children: "Сообщения из приложения: Настройки → \xabОставить отзыв\xbb. Колонка \xabПублично\xbb — согласие пользователя на показ отзыва (сайт, промо, открытые источники). Без согласия отзыв виден здесь, но галочку \xabНа промо\xbb поставить нельзя."
+                    children: tr("Сообщения из приложения: Настройки → \xabОставить отзыв\xbb. Колонка \xabПублично\xbb — согласие пользователя на показ отзыва (сайт, промо, открытые источники). Без согласия отзыв виден здесь, но галочку \xabНа промо\xbb поставить нельзя.")
                 })]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col items-end gap-1",
@@ -1101,10 +1113,10 @@ function B() {
                     onClick: () => void f(),
                     disabled: c || m,
                     className: "text-sm px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50",
-                    children: c || m ? "Обновление…" : "Обновить"
+                    children: c || m ? tr("Обновление…") : tr("Обновить")
                 }), h ? (0, r.jsxs)("span", {
                     className: "text-xs text-gray-500",
-                    children: ["Обновлено: ", h.toLocaleTimeString("ru-RU")]
+                    children: [tr("Обновлено: "), h.toLocaleTimeString(localeTag)]
                 }) : null]
             })]
         }), p && (0, r.jsx)("p", {
@@ -1116,7 +1128,7 @@ function B() {
                 className: "rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3",
                 children: [(0, r.jsx)("div", {
                     className: "text-xs text-gray-500",
-                    children: "Всего"
+                    children: tr("Всего")
                 }), (0, r.jsx)("div", {
                     className: "text-xl font-semibold",
                     children: c && !e.length ? "—" : a
@@ -1125,7 +1137,7 @@ function B() {
                 className: "rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3",
                 children: [(0, r.jsx)("div", {
                     className: "text-xs text-gray-500",
-                    children: "Из демо"
+                    children: tr("Из демо")
                 }), (0, r.jsx)("div", {
                     className: "text-xl font-semibold",
                     children: c && !e.length ? "—" : n
@@ -1134,7 +1146,7 @@ function B() {
                 className: "rounded-lg border border-gray-800 bg-gray-900/40 px-4 py-3",
                 children: [(0, r.jsx)("div", {
                     className: "text-xs text-gray-500",
-                    children: "На промо"
+                    children: tr("На промо")
                 }), (0, r.jsx)("div", {
                     className: "text-xl font-semibold",
                     children: c && !e.length ? "—" : o
@@ -1142,10 +1154,10 @@ function B() {
             })]
         }), c && !e.length ? (0, r.jsx)("p", {
             className: "text-gray-500 text-sm",
-            children: "Загрузка…"
+            children: tr("Загрузка…")
         }) : 0 === e.length ? (0, r.jsx)("p", {
             className: "text-gray-500 text-sm",
-            children: "Пока нет отзывов."
+            children: tr("Пока нет отзывов.")
         }) : (0, r.jsx)("div", {
             className: "overflow-x-auto border border-gray-800 rounded-lg",
             children: (0, r.jsxs)("table", {
@@ -1155,28 +1167,28 @@ function B() {
                     children: (0, r.jsxs)("tr", {
                         children: [(0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "На промо"
+                            children: tr("На промо")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Публично"
+                            children: tr("Публично")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Дата"
+                            children: tr("Дата")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Имя"
+                            children: tr("Имя")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Страна"
+                            children: tr("Страна")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Почта"
+                            children: tr("Почта")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Источник"
+                            children: tr("Источник")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Отзыв"
+                            children: tr("Отзыв")
                         })]
                     })
                 }), (0, r.jsx)("tbody", {
@@ -1193,26 +1205,26 @@ function B() {
                                     checked: !0 === e.show_on_promo,
                                     disabled: j === e.id || !0 !== e.allow_public_display && !0 !== e.show_on_promo,
                                     onChange: t => void _(e, t.target.checked),
-                                    title: !0 === e.allow_public_display ? "Показать на промостранице" : "Нет согласия на публикацию",
-                                    "aria-label": "Показать на промостранице"
+                                    title: !0 === e.allow_public_display ? tr("Показать на промостранице") : tr("Нет согласия на публикацию"),
+                                    "aria-label": tr("Показать на промостранице")
                                 })
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2 whitespace-nowrap",
                                 children: !0 === e.allow_public_display ? (0, r.jsx)("span", {
                                     className: "text-emerald-400",
-                                    children: "Да"
+                                    children: tr("Да")
                                 }) : (0, r.jsx)("span", {
                                     className: "text-gray-500",
-                                    children: "Нет"
+                                    children: tr("Нет")
                                 })
                             }), (0, r.jsxs)("td", {
                                 className: "px-3 py-2 text-gray-400 whitespace-nowrap",
-                                children: [(t = e.created_at) ? new Date(t).toLocaleString("ru-RU") : "—", (0, r.jsxs)("div", {
+                                children: [(t = e.created_at) ? new Date(t).toLocaleString(localeTag) : "—", (0, r.jsxs)("div", {
                                     className: "text-[10px] text-gray-500 mt-0.5",
                                     children: [function(e) {
                                         switch ((null != e ? e : "").trim().toLowerCase()) {
                                             case "web":
-                                                return "Веб";
+                                                return tr("Веб");
                                             case "ios":
                                                 return "iOS";
                                             case "android":
@@ -1240,10 +1252,10 @@ function B() {
                                 className: "px-3 py-2 whitespace-nowrap",
                                 children: e.is_demo ? (0, r.jsx)("span", {
                                     className: "text-amber-400",
-                                    children: "Демо"
+                                    children: tr("Демо")
                                 }) : (0, r.jsx)("span", {
                                     className: "text-emerald-400",
-                                    children: "Аккаунт"
+                                    children: tr("Аккаунт")
                                 })
                             }), (0, r.jsxs)("td", {
                                 className: "px-3 py-2 text-gray-200 max-w-[36rem]",
@@ -1254,7 +1266,7 @@ function B() {
                                     type: "button",
                                     onClick: () => v(a ? null : e.id),
                                     className: "text-[11px] text-indigo-400 hover:text-indigo-300 mt-1",
-                                    children: a ? "Свернуть" : "Показать полностью"
+                                    children: a ? tr("Свернуть") : tr("Показать полностью")
                                 }) : null]
                             })]
                         }, e.id)
@@ -1283,23 +1295,25 @@ let Z = {
         updated_at: null
     },
     $ = {
-        brand: "Красный RD Restodocks, как на facebook.com/Restodocks и на /promo.",
-        ttk: "Экран списка ТТК / import-review: кривой Excel → чистые карточки (как demo_promo screenshot TTK).",
-        cost: "Карточка блюда с себестоимостью (promo money / ttk cost).",
-        prep: "Чеклист заготовок, не WhatsApp-чат.",
-        lang: "Переключатель языка интерфейса + ТТК на языке повара.",
-        inv: "Входящие / слияние бланков инвентаризации.",
-        honest: "В тексте честно: демо по email, 1 день; не обещать \xabбез регистрации\xbb и \xab100 карт\xbb."
+        brand: tr("Красный RD Restodocks, как на facebook.com/Restodocks и на /promo."),
+        ttk: tr("Экран списка ТТК / import-review: кривой Excel → чистые карточки (как demo_promo screenshot TTK)."),
+        cost: tr("Карточка блюда с себестоимостью (promo money / ttk cost)."),
+        prep: tr("Чеклист заготовок, не WhatsApp-чат."),
+        lang: tr("Переключатель языка интерфейса + ТТК на языке повара."),
+        inv: tr("Входящие / слияние бланков инвентаризации."),
+        honest: tr("В тексте честно: демо по email, 1 день; не обещать \xabбез регистрации\xbb и \xab100 карт\xbb.")
     },
     Y = ("".concat($.brand, " ").concat($.ttk, " ").concat($.honest), "".concat($.brand, " ").concat($.cost, " ").concat($.honest), "".concat($.brand, " ").concat($.prep, " ").concat($.honest), "".concat($.brand, " ").concat($.lang, " ").concat($.honest), "".concat($.brand, " ").concat($.inv, " ").concat($.honest), "".concat($.brand, " ").concat($.ttk, " ").concat($.honest), "".concat($.brand, " ").concat($.cost, " ").concat($.honest), "".concat($.brand, " ").concat($.prep, " ").concat($.honest), "".concat($.brand, " ").concat($.lang, " ").concat($.honest), "".concat($.brand, " ").concat($.inv, " ").concat($.honest), "".concat($.brand, " ").concat($.ttk, " ").concat($.honest), "".concat($.brand, " ").concat($.cost, " ").concat($.honest), "".concat($.brand, " ").concat($.prep, " ").concat($.honest), "".concat($.brand, " ").concat($.lang, " ").concat($.honest), "".concat($.brand, " ").concat($.inv, " ").concat($.honest), "".concat($.brand, " ").concat($.ttk, " ").concat($.honest), "".concat($.brand, " ").concat($.cost, " ").concat($.honest), "".concat($.brand, " ").concat($.prep, " ").concat($.honest), "".concat($.brand, " ").concat($.lang, " ").concat($.honest), "".concat($.brand, " ").concat($.inv, " ").concat($.honest), "".concat($.brand, " ").concat($.ttk, " ").concat($.honest), "".concat($.brand, " ").concat($.cost, " ").concat($.honest), "".concat($.brand, " ").concat($.prep, " ").concat($.honest), "".concat($.brand, " ").concat($.lang, " ").concat($.honest), "".concat($.brand, " ").concat($.inv, " ").concat($.honest), {
-        idle: "Простой — нет бюджета",
-        configured: "Настроено — ждут ваше \xabвооружить\xbb",
-        awaiting_approval: "Ждёт одобрения черновиков",
-        armed: "Вооружён — готов к API / ручному запуску по плану",
-        paused: "Пауза"
+        idle: tr("Простой — нет бюджета"),
+        configured: tr("Настроено — ждут ваше \xabвооружить\xbb"),
+        awaiting_approval: tr("Ждёт одобрения черновиков"),
+        armed: tr("Вооружён — готов к API / ручному запуску по плану"),
+        paused: tr("Пауза")
     });
 
 function Q() {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     var e, t, a;
     let [l, n] = (0, s.useState)(Z), [i, o] = (0, s.useState)(null), [d, c] = (0, s.useState)(""), [x, m] = (0, s.useState)(!0), [u, p] = (0, s.useState)(!1), [g, h] = (0, s.useState)(null), [y, b] = (0, s.useState)(null), v = (0, s.useCallback)(e => {
         var t, a;
@@ -1308,7 +1322,7 @@ function Q() {
         m(!0), h(null);
         let e = await fetch("/api/ads-agent"),
             t = await e.json();
-        e.ok ? v(t) : (h("string" == typeof(null == t ? void 0 : t.error) ? t.error : "Ошибка загрузки"), n(Z), o(null)), m(!1)
+        e.ok ? v(t) : (h("string" == typeof(null == t ? void 0 : t.error) ? t.error : tr("Ошибка загрузки")), n(Z), o(null)), m(!1)
     }, [v]);
     async function N(e, t) {
         p(!0), h(null), b(null);
@@ -1327,7 +1341,7 @@ function Q() {
                 })
             }),
             r = await a.json();
-        a.ok ? (v(r), b("arm" === e ? "План обновлён. Отметьте черновики и нажмите \xabОдобрить план\xbb." : "regenerate_offers" === e ? "Новые офферы по углам индустрии — только Ок/Нет." : "approve_plan" === e ? "Агент вооружён. Автосписание в Meta пока выключено — крутите по плану вручную или дождитесь токена." : "Сохранено.")) : h("string" == typeof(null == r ? void 0 : r.error) ? r.error : "Ошибка сохранения"), p(!1)
+        a.ok ? (v(r), b("arm" === e ? tr("План обновлён. Отметьте черновики и нажмите \xabОдобрить план\xbb.") : "regenerate_offers" === e ? tr("Новые офферы по углам индустрии — только Ок/Нет.") : "approve_plan" === e ? tr("Агент вооружён. Автосписание в Meta пока выключено — крутите по плану вручную или дождитесь токена.") : tr("Сохранено."))) : h("string" == typeof(null == r ? void 0 : r.error) ? r.error : tr("Ошибка сохранения")), p(!1)
     }
 
     function f(e, t) {
@@ -1350,7 +1364,7 @@ function Q() {
         j()
     }, [j]), x) ? (0, r.jsx)("p", {
         className: "text-gray-400 text-sm",
-        children: "Загрузка Ads Agent…"
+        children: tr("Загрузка Ads Agent…")
     }) : (0, r.jsxs)("div", {
         className: "space-y-8 max-w-3xl",
         children: [(0, r.jsxs)("div", {
@@ -1359,10 +1373,10 @@ function Q() {
                 children: "Ads Agent"
             }), (0, r.jsx)("p", {
                 className: "text-sm text-gray-400 mt-1",
-                children: "Свой бот Restodocks — не ИИ Meta/Google. Вы задаёте потолки бюджета и цели; агент держит план, тексты и правила \xabне слить\xbb. Автозапуск в кабинете — после Meta API."
+                children: tr("Свой бот Restodocks — не ИИ Meta/Google. Вы задаёте потолки бюджета и цели; агент держит план, тексты и правила \xabне слить\xbb. Автозапуск в кабинете — после Meta API.")
             }), (0, r.jsxs)("p", {
                 className: "text-sm mt-3 text-amber-200/90 bg-amber-950/40 border border-amber-800/50 rounded-lg px-3 py-2",
-                children: ["Статус: ", (0, r.jsx)("span", {
+                children: [tr("Статус: "), (0, r.jsx)("span", {
                     className: "font-medium text-white",
                     children: Y[l.status]
                 })]
@@ -1380,17 +1394,17 @@ function Q() {
             className: "space-y-4 border border-gray-800 rounded-xl p-4",
             children: [(0, r.jsx)("h3", {
                 className: "font-medium text-white",
-                children: "Бюджет (вы задаёте вручную)"
+                children: tr("Бюджет (вы задаёте вручную)")
             }), (0, r.jsx)("p", {
                 className: "text-xs text-gray-500",
-                children: "Агент не выбирает сумму за вас. Без лимита — не тратит. Оценки кликов — ориентир, не гарантия регистраций."
+                children: tr("Агент не выбирает сумму за вас. Без лимита — не тратит. Оценки кликов — ориентир, не гарантия регистраций.")
             }), (0, r.jsxs)("div", {
                 className: "grid grid-cols-1 sm:grid-cols-2 gap-3",
                 children: [(0, r.jsxs)("label", {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Валюта"
+                        children: tr("Валюта")
                     }), (0, r.jsxs)("select", {
                         className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2",
                         value: l.currency,
@@ -1410,46 +1424,46 @@ function Q() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Лимит на день"
+                        children: tr("Лимит на день")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         min: 0,
                         className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2",
                         value: l.daily_limit || "",
                         onChange: e => f("daily_limit", Number(e.target.value) || 0),
-                        placeholder: "0 = выкл"
+                        placeholder: tr("0 = выкл")
                     })]
                 }), (0, r.jsxs)("label", {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Лимит на неделю"
+                        children: tr("Лимит на неделю")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         min: 0,
                         className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2",
                         value: l.weekly_limit || "",
                         onChange: e => f("weekly_limit", Number(e.target.value) || 0),
-                        placeholder: "0 = выкл"
+                        placeholder: tr("0 = выкл")
                     })]
                 }), (0, r.jsxs)("label", {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Лимит на период"
+                        children: tr("Лимит на период")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         min: 0,
                         className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2",
                         value: l.period_limit || "",
                         onChange: e => f("period_limit", Number(e.target.value) || 0),
-                        placeholder: "0 = выкл"
+                        placeholder: tr("0 = выкл")
                     })]
                 }), (0, r.jsxs)("label", {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Период с"
+                        children: tr("Период с")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2",
@@ -1460,7 +1474,7 @@ function Q() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Период по"
+                        children: tr("Период по")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2",
@@ -1478,41 +1492,41 @@ function Q() {
             className: "space-y-4 border border-gray-800 rounded-xl p-4",
             children: [(0, r.jsx)("h3", {
                 className: "font-medium text-white",
-                children: "Цель и гео"
+                children: tr("Цель и гео")
             }), (0, r.jsxs)("div", {
                 className: "grid grid-cols-1 sm:grid-cols-2 gap-3",
                 children: [(0, r.jsxs)("label", {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Куда ведём"
+                        children: tr("Куда ведём")
                     }), (0, r.jsxs)("select", {
                         className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2",
                         value: l.landing,
                         onChange: e => f("landing", e.target.value),
                         children: [(0, r.jsx)("option", {
                             value: "demo",
-                            children: "/demo — демо по email"
+                            children: tr("/demo — демо по email")
                         }), (0, r.jsx)("option", {
                             value: "register_owner",
-                            children: "/register-owner — регистрация"
+                            children: tr("/register-owner — регистрация")
                         }), (0, r.jsx)("option", {
                             value: "promo",
-                            children: "/promo — витрина"
+                            children: tr("/promo — витрина")
                         })]
                     })]
                 }), (0, r.jsxs)("label", {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Язык объявлений"
+                        children: tr("Язык объявлений")
                     }), (0, r.jsxs)("select", {
                         className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2",
                         value: l.primary_language,
                         onChange: e => f("primary_language", e.target.value),
                         children: [(0, r.jsx)("option", {
                             value: "ru",
-                            children: "Русский (не РФ)"
+                            children: tr("Русский (не РФ)")
                         }), (0, r.jsx)("option", {
                             value: "en",
                             children: "English"
@@ -1532,7 +1546,7 @@ function Q() {
                 className: "block text-sm",
                 children: [(0, r.jsx)("span", {
                     className: "text-gray-400",
-                    children: "Гео / заметки"
+                    children: tr("Гео / заметки")
                 }), (0, r.jsx)("textarea", {
                     className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 min-h-[72px]",
                     value: l.geo_notes,
@@ -1554,18 +1568,18 @@ function Q() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Page ID (когда будет)"
+                        children: tr("Page ID (когда будет)")
                     }), (0, r.jsx)("input", {
                         className: "mt-1 w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 font-mono text-xs",
                         value: l.meta_page_id,
                         onChange: e => f("meta_page_id", e.target.value),
-                        placeholder: "опционально"
+                        placeholder: tr("опционально")
                     })]
                 }), (0, r.jsxs)("label", {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Пауза без результата (дней)"
+                        children: tr("Пауза без результата (дней)")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         min: 1,
@@ -1578,7 +1592,7 @@ function Q() {
                     className: "block text-sm",
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: "Предупреждение % дня"
+                        children: tr("Предупреждение % дня")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         min: 50,
@@ -1596,37 +1610,37 @@ function Q() {
                 disabled: u,
                 onClick: () => void N("save"),
                 className: "px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm disabled:opacity-50",
-                children: "Сохранить лимиты"
+                children: tr("Сохранить лимиты")
             }), (0, r.jsx)("button", {
                 type: "button",
                 disabled: u,
                 onClick: () => void N("arm"),
                 className: "px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium disabled:opacity-50",
-                children: "Собрать / обновить план"
+                children: tr("Собрать / обновить план")
             }), (0, r.jsx)("button", {
                 type: "button",
                 disabled: u,
                 onClick: () => void N("regenerate_offers"),
                 className: "px-4 py-2 rounded-lg bg-violet-700 hover:bg-violet-600 text-sm font-medium disabled:opacity-50",
-                children: "Новые офферы (агент)"
+                children: tr("Новые офферы (агент)")
             }), (0, r.jsx)("button", {
                 type: "button",
                 disabled: u || "armed" !== l.status,
                 onClick: () => void N("pause"),
                 className: "px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm disabled:opacity-50",
-                children: "Пауза"
+                children: tr("Пауза")
             }), (0, r.jsx)("button", {
                 type: "button",
                 disabled: u || "paused" !== l.status,
                 onClick: () => void N("resume"),
                 className: "px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm disabled:opacity-50",
-                children: "Снять паузу"
+                children: tr("Снять паузу")
             })]
         }), i ? (0, r.jsxs)("section", {
             className: "space-y-4 border border-gray-800 rounded-xl p-4",
             children: [(0, r.jsx)("h3", {
                 className: "font-medium text-white",
-                children: "План агента"
+                children: tr("План агента")
             }), i.offer_process ? (0, r.jsx)("p", {
                 className: "text-sm text-violet-200/90 bg-violet-950/30 border border-violet-800/40 rounded-lg px-3 py-2",
                 children: i.offer_process
@@ -1634,7 +1648,7 @@ function Q() {
                 className: "text-sm text-gray-300",
                 children: [(0, r.jsx)("span", {
                     className: "text-gray-500",
-                    children: "Цель:"
+                    children: tr("Цель:")
                 }), " ", i.objective]
             }), (0, r.jsxs)("p", {
                 className: "text-sm text-gray-300",
@@ -1657,7 +1671,7 @@ function Q() {
             }), (0, r.jsxs)("div", {
                 children: [(0, r.jsx)("p", {
                     className: "text-xs text-gray-500 mb-1",
-                    children: "Правила анти-слива"
+                    children: tr("Правила анти-слива")
                 }), (0, r.jsx)("ul", {
                     className: "text-sm text-gray-300 space-y-1 list-disc pl-5",
                     children: i.safety_rules.map(e => (0, r.jsx)("li", {
@@ -1668,7 +1682,7 @@ function Q() {
                 className: "space-y-3 pt-2",
                 children: [(0, r.jsx)("p", {
                     className: "text-sm font-medium text-white",
-                    children: "Офферы от агента (вы только проверяете)"
+                    children: tr("Офферы от агента (вы только проверяете)")
                 }), i.drafts.map(e => (0, r.jsxs)("div", {
                     className: "rounded-lg border border-gray-700 bg-gray-900/50 p-3 space-y-2",
                     children: [(0, r.jsxs)("div", {
@@ -1696,7 +1710,7 @@ function Q() {
                         className: "text-xs text-gray-400 border-t border-gray-800 pt-2",
                         children: [(0, r.jsx)("span", {
                             className: "text-gray-500",
-                            children: "Креатив под сайт: "
+                            children: tr("Креатив под сайт: ")
                         }), e.creative_brief]
                     }) : null, (0, r.jsxs)("div", {
                         className: "flex gap-2 pt-1",
@@ -1704,12 +1718,12 @@ function Q() {
                             type: "button",
                             className: "text-xs px-2 py-1 rounded ".concat(!0 === e.approved ? "bg-emerald-700 text-white" : "bg-gray-800 text-gray-300"),
                             onClick: () => _(e.id, !0),
-                            children: "Ок"
+                            children: tr("Ок")
                         }), (0, r.jsx)("button", {
                             type: "button",
                             className: "text-xs px-2 py-1 rounded ".concat(!1 === e.approved ? "bg-red-800 text-white" : "bg-gray-800 text-gray-300"),
                             onClick: () => _(e.id, !1),
-                            children: "Нет"
+                            children: tr("Нет")
                         })]
                     })]
                 }, e.id)), (0, r.jsx)("button", {
@@ -1717,7 +1731,7 @@ function Q() {
                     disabled: u,
                     onClick: () => void N("approve_plan", i.drafts),
                     className: "px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-sm font-medium disabled:opacity-50",
-                    children: "Одобрить выбранные (вооружить агента)"
+                    children: tr("Одобрить выбранные (вооружить агента)")
                 })]
             })]
         }) : null]
@@ -1830,27 +1844,27 @@ async function er(e) {
                 Тип: function(e) {
                     switch (e) {
                         case "branch":
-                            return "Филиал";
+                            return tr("Филиал");
                         case "separate":
-                            return "Отдельное";
+                            return tr("Отдельное");
                         case "main":
-                            return "Основное";
+                            return tr("Основное");
                         default:
                             return "—"
                     }
                 }(e.establishment_type),
-                "Родительское заведение": null !== (t = e.parent_establishment_name) && void 0 !== t ? t : "",
+                [tr("Родительское заведение")]: null !== (t = e.parent_establishment_name) && void 0 !== t ? t : "",
                 Владелец: "—" === e.owner_name ? "" : e.owner_name,
                 Email: "—" === e.owner_email ? "" : e.owner_email,
-                "Email (ожидает confirm)": e.owner_pending_confirmation ? "да" : "",
+                [tr("Email (ожидает confirm)")]: e.owner_pending_confirmation ? tr("да") : "",
                 Людей: e.employee_count,
-                "Статус подписки": null !== (a = null == x ? void 0 : x.statusLabel) && void 0 !== a ? a : "",
+                [tr("Статус подписки")]: null !== (a = null == x ? void 0 : x.statusLabel) && void 0 !== a ? a : "",
                 Оплата: null !== (r = null == x ? void 0 : x.paymentLabel) && void 0 !== r ? r : "",
                 Промокод: null !== (s = null == x ? void 0 : x.promoCode) && void 0 !== s ? s : "",
-                "Уровень реферала": e.referral_level ?? "",
-                "С подпиской": e.effective_pro ? "да" : "нет",
-                "Детали подписки": null !== (l = null == x ? void 0 : x.detail) && void 0 !== l ? l : "",
-                Регистрация: e.created_at ? new Date(e.created_at).toLocaleString("ru-RU", {
+                [tr("Уровень реферала")]: e.referral_level ?? "",
+                [tr("С подпиской")]: e.effective_pro ? tr("да") : tr("нет"),
+                [tr("Детали подписки")]: null !== (l = null == x ? void 0 : x.detail) && void 0 !== l ? l : "",
+                Регистрация: e.created_at ? new Date(e.created_at).toLocaleString(adminLocaleTag(), {
                     day: "2-digit",
                     month: "2-digit",
                     year: "numeric",
@@ -1860,20 +1874,20 @@ async function er(e) {
                 Клиент: function(e) {
                     switch (null == e ? void 0 : e.trim().toLowerCase()) {
                         case "ios_app":
-                            return "iOS (приложение)";
+                            return tr("iOS (приложение)");
                         case "android_app":
-                            return "Android (приложение)";
+                            return tr("Android (приложение)");
                         case "web_mobile":
-                            return "Сайт, телефон";
+                            return tr("Сайт, телефон");
                         case "web_desktop":
-                            return "Сайт, ПК";
+                            return tr("Сайт, ПК");
                         case "native_other":
-                            return "Нативно (другое)";
+                            return tr("Нативно (другое)");
                         default:
                             return ""
                     }
                 }(e.registration_client),
-                "IP регистрации": null !== (n = e.registration_ip) && void 0 !== n ? n : "",
+                [tr("IP регистрации")]: null !== (n = e.registration_ip) && void 0 !== n ? n : "",
                 Город: null !== (i = e.registration_city) && void 0 !== i ? i : "",
                 Страна: null !== (o = e.registration_country) && void 0 !== o ? o : "",
                 Адрес: null !== (d = e.address) && void 0 !== d ? d : "",
@@ -1882,7 +1896,7 @@ async function er(e) {
         }),
         l = r.utils.json_to_sheet(s),
         n = r.utils.book_new();
-    r.utils.book_append_sheet(n, l, "Заведения");
+    r.utils.book_append_sheet(n, l, tr("Заведения"));
     let i = new Date().toISOString().slice(0, 10);
     r.writeFile(n, "".concat(t, "-").concat(i, ".xlsx"))
 }
@@ -1921,7 +1935,7 @@ function el(e) {
             },
             className: "shrink-0 px-1.5 py-0.5 rounded border border-gray-700 bg-gray-950 text-[10px] text-indigo-300 hover:text-white hover:border-indigo-500",
             title: t,
-            children: a ? "Скопировано" : "Копировать"
+            children: a ? tr("Скопировано") : tr("Копировать")
         })]
     })
 }
@@ -1930,7 +1944,7 @@ function en(e) {
     let t = e.owner_email;
     return t && "—" !== t ? e.owner_pending_confirmation ? (0, r.jsxs)("span", {
         className: "text-amber-200/90",
-        title: "Email из pending_owner_registrations — ждёт подтверждения, сотрудник owner ещё не в employees",
+        title: tr("Email из pending_owner_registrations — ждёт подтверждения, сотрудник owner ещё не в employees"),
         children: [t, (0, r.jsx)("span", {
             className: "text-amber-500/80 ml-1 whitespace-nowrap",
             children: "(confirm)"
@@ -1941,7 +1955,7 @@ function en(e) {
 function ei(e) {
     let t = e.owner_name;
     return t && "—" !== t ? e.owner_pending_confirmation ? (0, r.jsx)("span", {
-        title: "ФИО из pending_owner_registrations до complete_pending_owner_registration",
+        title: tr("ФИО из pending_owner_registrations до complete_pending_owner_registration"),
         children: t
     }) : t : "—"
 }
@@ -1966,7 +1980,7 @@ function ed(e) {
 }
 
 function ec(e) {
-    return e ? new Date(e).toLocaleString("ru-RU", {
+    return e ? new Date(e).toLocaleString(adminLocaleTag(), {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
@@ -2126,6 +2140,8 @@ function ep({
 }
 
 function eg(e) {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     let {
         onSupportShellActiveChange: t
     } = e, [a, l] = (0, s.useState)(""), [n, i] = (0, s.useState)(""), [o, d] = (0, s.useState)("https://restodocks-beta.pages.dev"), [c, x] = (0, s.useState)(null), [m, u] = (0, s.useState)(null), [p, g] = (0, s.useState)([]), [h, y] = (0, s.useState)(null), [b, v] = (0, s.useState)(!1);
@@ -2133,7 +2149,7 @@ function eg(e) {
         let t = await fetch("/api/support?establishment_id=".concat(encodeURIComponent(e))),
             a = await t.json();
         if (!t.ok) {
-            y("string" == typeof(null == a ? void 0 : a.error) ? a.error : "Ошибка журнала");
+            y("string" == typeof(null == a ? void 0 : a.error) ? a.error : tr("Ошибка журнала"));
             return
         }
         g(Array.isArray(a) ? a : [])
@@ -2155,7 +2171,7 @@ function eg(e) {
                 }),
                 l = await s.json().catch(() => ({}));
             if (!s.ok) {
-                y("string" == typeof(null == l ? void 0 : l.error) ? l.error : "Ошибка (".concat(s.status, ")"));
+                y("string" == typeof(null == l ? void 0 : l.error) ? l.error : tr("Ошибка (").concat(s.status, ")"));
                 return
             }
             let i = null == l ? void 0 : l.establishment;
@@ -2168,7 +2184,7 @@ function eg(e) {
                 } catch (e) {}
                 await j(i.id)
             }
-            null == t || t(!0), "string" == typeof(null == l ? void 0 : l.warning) && l.warning.length > 0 && alert(l.warning), "string" == typeof(null == l ? void 0 : l.action_link) && l.action_link.length > 0 && window.open(l.action_link, "_blank", "noopener,noreferrer"), alert("Сеанс техподдержки открыт: верхняя панель админки подсвечена фиолетовым — так видно, что вы в режиме входа в аккаунт пользователя. Ссылка для входа открыта в новой вкладке.")
+            null == t || t(!0), "string" == typeof(null == l ? void 0 : l.warning) && l.warning.length > 0 && alert(l.warning), "string" == typeof(null == l ? void 0 : l.action_link) && l.action_link.length > 0 && window.open(l.action_link, "_blank", "noopener,noreferrer"), alert(tr("Сеанс техподдержки открыт: верхняя панель админки подсвечена фиолетовым — так видно, что вы в режиме входа в аккаунт пользователя. Ссылка для входа открыта в новой вкладке."))
         } finally {
             v(!1)
         }
@@ -2188,13 +2204,13 @@ function eg(e) {
                     }),
                     a = await e.json().catch(() => ({}));
                 if (!e.ok) {
-                    y("string" == typeof(null == a ? void 0 : a.error) ? a.error : "Ошибка (".concat(e.status, ")"));
+                    y("string" == typeof(null == a ? void 0 : a.error) ? a.error : tr("Ошибка (").concat(e.status, ")"));
                     return
                 }
                 try {
                     sessionStorage.removeItem("rd_admin_support_meta")
                 } catch (e) {}
-                null == t || t(!1), await j(c), alert("Сеанс техподдержки завершён.")
+                null == t || t(!1), await j(c), alert(tr("Сеанс техподдержки завершён."))
             } finally {
                 v(!1)
             }
@@ -2220,27 +2236,27 @@ function eg(e) {
             className: "bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-3",
             children: [(0, r.jsx)("h2", {
                 className: "text-sm font-semibold text-white",
-                children: "Доступ техподдержки"
+                children: tr("Доступ техподдержки")
             }), (0, r.jsx)("p", {
                 className: "text-xs text-gray-500",
-                children: "Введите логин учётной записи (email). PIN вводит владелец на своей стороне вместе с тумблером доступа."
+                children: tr("Введите логин учётной записи (email). PIN вводит владелец на своей стороне вместе с тумблером доступа.")
             }), (0, r.jsxs)("div", {
                 className: "grid sm:grid-cols-2 gap-2",
                 children: [(0, r.jsx)("input", {
                     value: a,
                     onChange: e => l(e.target.value),
-                    placeholder: "Логин оператора",
+                    placeholder: tr("Логин оператора"),
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
                 }), (0, r.jsx)("input", {
                     value: n,
                     onChange: e => i(e.target.value),
-                    placeholder: "Логин учётной записи (email)",
+                    placeholder: tr("Логин учётной записи (email)"),
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
                 })]
             }), (0, r.jsx)("input", {
                 value: o,
                 onChange: e => d(e.target.value),
-                placeholder: "Origin веб-приложения, куда входить (например https://restodocks-beta.pages.dev)",
+                placeholder: tr("Origin веб-приложения, куда входить (например https://restodocks-beta.pages.dev)"),
                 className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs"
             }), (0, r.jsxs)("div", {
                 className: "flex gap-2",
@@ -2248,19 +2264,19 @@ function eg(e) {
                     onClick: N,
                     disabled: b || !n.trim(),
                     className: "bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                    children: "Открыть доступ"
+                    children: tr("Открыть доступ")
                 }), (0, r.jsx)("button", {
                     onClick: f,
                     disabled: b || !c,
                     className: "bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                    children: "Закрыть доступ"
+                    children: tr("Закрыть доступ")
                 })]
             })]
         }), c && (0, r.jsxs)("div", {
             className: "bg-gray-900 rounded-xl border border-gray-800 p-4",
             children: [(0, r.jsxs)("div", {
                 className: "text-sm text-gray-300 mb-2",
-                children: ["Активное заведение: ", (0, r.jsx)("span", {
+                children: [tr("Активное заведение: "), (0, r.jsx)("span", {
                     className: "text-white",
                     children: null != m ? m : c
                 })]
@@ -2273,16 +2289,16 @@ function eg(e) {
                         children: [(0, r.jsx)("span", {
                             children: e.event_type
                         }), (0, r.jsxs)("span", {
-                            children: ["Оператор: ", null !== (t = e.support_operator_login) && void 0 !== t ? t : "—"]
+                            children: [tr("Оператор: "), null !== (t = e.support_operator_login) && void 0 !== t ? t : "—"]
                         }), (0, r.jsxs)("span", {
-                            children: ["Логин: ", null !== (a = e.account_login) && void 0 !== a ? a : "—"]
+                            children: [tr("Логин: "), null !== (a = e.account_login) && void 0 !== a ? a : "—"]
                         }), (0, r.jsx)("span", {
                             children: ec(e.created_at)
                         })]
                     }, e.id)
                 }), 0 === p.length && (0, r.jsx)("div", {
                     className: "text-gray-600",
-                    children: "Записей пока нет"
+                    children: tr("Записей пока нет")
                 })]
             })]
         })]
@@ -2295,14 +2311,16 @@ function ey() {
         user
     } = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : {};
     let canMutate = !!(null == user ? void 0 : user.isOwner);
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     function e(e) {
         switch (e.establishment_type) {
             case "branch":
-                return "Филиал";
+                return tr("Филиал");
             case "separate":
-                return "Отдельное";
+                return tr("Отдельное");
             default:
-                return "Основное"
+                return tr("Основное")
         }
     }
 
@@ -2327,11 +2345,11 @@ function ey() {
             className: "text-gray-600 text-xs",
             children: "—"
         });
-        let l = "App Store (In-App Purchase)" === s.paymentLabel ? "Подписка через App Store (In-App Purchase). Дата окончания в БД обычно уже учитывает отсрочку оплаты (grace period), если она пришла в чеке из App Store Connect." : void 0;
+        let l = "App Store (In-App Purchase)" === s.paymentLabel ? tr("Подписка через App Store (In-App Purchase). Дата окончания в БД обычно уже учитывает отсрочку оплаты (grace period), если она пришла в чеке из App Store Connect.") : void 0;
         return (0, r.jsxs)("div", {
             className: "space-y-0.5 max-w-full min-w-0",
             children: [(0, r.jsx)("div", {
-                className: "text-xs font-medium ".concat("Без подписки" === (t = s.statusLabel) || "Без Pro" === t ? "text-gray-500" : t.startsWith("Пробный") ? "text-sky-300" : t.includes("истёк") ? "text-red-300/90" : t.includes("промокод") && !t.includes("истёк") ? "text-amber-200" : t.includes("(оплата)") || t.includes("оплачен") ? "text-emerald-300" : t.includes("Без") ? "text-gray-200" : "text-emerald-200"),
+                className: "text-xs font-medium ".concat(tr("Без подписки") === (t = s.statusLabel) || tr("Без Pro") === t ? "text-gray-500" : t.startsWith(tr("Пробный")) ? "text-sky-300" : t.includes(tr("истёк")) ? "text-red-300/90" : t.includes(tr("промокод")) && !t.includes(tr("истёк")) ? "text-amber-200" : t.includes(tr("(оплата)")) || t.includes(tr("оплачен")) ? "text-emerald-300" : t.includes(tr("Без")) ? "text-gray-200" : "text-emerald-200"),
                 children: s.statusLabel
             }), (0, r.jsxs)("div", {
                 className: "text-[11px] text-gray-500",
@@ -2350,7 +2368,7 @@ function ey() {
         o(!0), w(null);
         let e = await fetch("/api/establishments"),
             t = await e.json();
-        e.ok ? n(Array.isArray(t) ? t : []) : (w("string" == typeof(null == t ? void 0 : t.error) ? t.error : "Ошибка загрузки"), n([])), o(!1)
+        e.ok ? n(Array.isArray(t) ? t : []) : (w("string" == typeof(null == t ? void 0 : t.error) ? t.error : tr("Ошибка загрузки")), n([])), o(!1)
     }, []);
     (0, s.useEffect)(() => {
         E()
@@ -2387,7 +2405,7 @@ function ey() {
             let i = d.toLowerCase(),
                 o = e.subscription_summary,
                 c = o ? [o.statusLabel, o.paymentLabel, o.promoCode, o.detail].filter(Boolean).join(" ").toLowerCase() : "";
-            return !!((e.id.toLowerCase().includes(i) || e.name.toLowerCase().includes(i) || e.owner_email.toLowerCase().includes(i) || e.owner_name.toLowerCase().includes(i) || (null !== (t = e.registration_ip) && void 0 !== t ? t : "").toLowerCase().includes(i) || (null !== (a = e.registration_country) && void 0 !== a ? a : "").toLowerCase().includes(i) || (null !== (r = e.registration_city) && void 0 !== r ? r : "").toLowerCase().includes(i) || (null !== (s = e.registration_client) && void 0 !== s ? s : "").toLowerCase().includes(i) || H(e).toLowerCase().includes(i) || (null !== (l = e.created_at) && void 0 !== l ? l : "").toLowerCase().includes(i) || ec(e.created_at).toLowerCase().includes(i) || c.includes(i) || (e.referral_level ? "ур. ".concat(e.referral_level).includes(i) || String(e.referral_level) === i : false)) && ("all" === x || e.establishment_type === x) && h(e.subscription_filter_key, u) && y(e.subscription_filter_key, v)) && (n = e.employee_count, "all" === N || ("0" === N ? 0 === n : "1" === N ? 1 === n : "2-5" === N ? !!(n >= 2) && !!(n <= 5) : !!(n >= 6)))
+            return !!((e.id.toLowerCase().includes(i) || e.name.toLowerCase().includes(i) || e.owner_email.toLowerCase().includes(i) || e.owner_name.toLowerCase().includes(i) || (null !== (t = e.registration_ip) && void 0 !== t ? t : "").toLowerCase().includes(i) || (null !== (a = e.registration_country) && void 0 !== a ? a : "").toLowerCase().includes(i) || (null !== (r = e.registration_city) && void 0 !== r ? r : "").toLowerCase().includes(i) || (null !== (s = e.registration_client) && void 0 !== s ? s : "").toLowerCase().includes(i) || H(e).toLowerCase().includes(i) || (null !== (l = e.created_at) && void 0 !== l ? l : "").toLowerCase().includes(i) || ec(e.created_at).toLowerCase().includes(i) || c.includes(i) || (e.referral_level ? tr("ур. ").concat(e.referral_level).includes(i) || String(e.referral_level) === i : false)) && ("all" === x || e.establishment_type === x) && h(e.subscription_filter_key, u) && y(e.subscription_filter_key, v)) && (n = e.employee_count, "all" === N || ("0" === N ? 0 === n : "1" === N ? 1 === n : "2-5" === N ? !!(n >= 2) && !!(n <= 5) : !!(n >= 6)))
         }),
         R = (0, s.useMemo)(() => new Set(D.map(e => e.id)), [D]),
         U = (0, s.useMemo)(() => ea(baseRows).filter(e => R.has(e.id)), [baseRows, R]);
@@ -2412,8 +2430,8 @@ function ey() {
             try {
                 await er(U)
             } catch (t) {
-                let e = t instanceof Error ? t.message : "Ошибка выгрузки";
-                w(e), alert("Не удалось выгрузить Excel.\n\n".concat(e))
+                let e = t instanceof Error ? t.message : tr("Ошибка выгрузки");
+                w(e), alert(tr("Не удалось выгрузить Excel.\n\n").concat(e))
             } finally {
                 P(!1)
             }
@@ -2430,22 +2448,22 @@ function ey() {
     }
 
     function q(e) {
-        return (null == e ? void 0 : e.trim()) ? "Последний вход любого сотрудника заведения: ".concat(e) : "Нет входов в приложение / на сайт (last_login_at сотрудников)"
+        return (null == e ? void 0 : e.trim()) ? tr("Последний вход любого сотрудника заведения: ").concat(e) : tr("Нет входов в приложение / на сайт (last_login_at сотрудников)")
     }
 
     function H(e) {
         var t;
         switch (null === (t = e.registration_client) || void 0 === t ? void 0 : t.trim().toLowerCase()) {
             case "ios_app":
-                return "iOS (приложение)";
+                return tr("iOS (приложение)");
             case "android_app":
-                return "Android (приложение)";
+                return tr("Android (приложение)");
             case "web_mobile":
-                return "Сайт, телефон";
+                return tr("Сайт, телефон");
             case "web_desktop":
-                return "Сайт, ПК";
+                return tr("Сайт, ПК");
             case "native_other":
-                return "Нативно (другое)";
+                return tr("Нативно (другое)");
             default:
                 return "—"
         }
@@ -2465,19 +2483,19 @@ function ey() {
                     method: "POST"
                 }),
                 i = await n.json();
-            if (!n.ok) throw Error((null == i ? void 0 : i.error) || "Ошибка");
-            await E(), alert("IP подставлено из входа (владелец / сотрудники): ".concat(null !== (t = i.ip_backfilled) && void 0 !== t ? t : 0, "\n") + "Гео по IP обновлено: ".concat(null !== (r = null !== (a = i.geo_updated) && void 0 !== a ? a : i.updated) && void 0 !== r ? r : 0, "\n") + "Без IP в БД (никто не входил): ".concat(null !== (s = i.skipped_no_login_ip) && void 0 !== s ? s : 0, "\n") + "Всего заведений: ".concat(null !== (l = i.total) && void 0 !== l ? l : 0) + ((null === (e = i.errors) || void 0 === e ? void 0 : e.length) ? "\nОшибки: ".concat(i.errors.length) : ""))
+            if (!n.ok) throw Error((null == i ? void 0 : i.error) || tr("Ошибка"));
+            await E(), alert(tr("IP подставлено из входа (владелец / сотрудники): ").concat(null !== (t = i.ip_backfilled) && void 0 !== t ? t : 0, "\n") + tr("Гео по IP обновлено: ").concat(null !== (r = null !== (a = i.geo_updated) && void 0 !== a ? a : i.updated) && void 0 !== r ? r : 0, "\n") + tr("Без IP в БД (никто не входил): ").concat(null !== (s = i.skipped_no_login_ip) && void 0 !== s ? s : 0, "\n") + tr("Всего заведений: ").concat(null !== (l = i.total) && void 0 !== l ? l : 0) + ((null === (e = i.errors) || void 0 === e ? void 0 : e.length) ? tr("\nОшибки: ").concat(i.errors.length) : ""))
         } catch (e) {
-            w(e instanceof Error ? e.message : "Ошибка обновления гео")
+            w(e instanceof Error ? e.message : tr("Ошибка обновления гео"))
         } finally {
             L(!1)
         }
     }
     async function V(e) {
-        if (!confirm("Удалить заведение \xab".concat(e.name, "\xbb?\n\nБудут удалены все данные: номенклатура, ТТК, чеклисты, сотрудники и т.д. Действие необратимо."))) return;
+        if (!confirm(tr("Удалить заведение \xab").concat(e.name, tr("\xbb?\n\nБудут удалены все данные: номенклатура, ТТК, чеклисты, сотрудники и т.д. Действие необратимо.")))) return;
         let t = prompt('Для подтверждения введите "'.concat(eh, '":'));
         if ((null == t ? void 0 : t.trim()) !== eh) {
-            null !== t && alert("Отменено: текст не совпадает.");
+            null !== t && alert(tr("Отменено: текст не совпадает."));
             return
         }
         C(e.id);
@@ -2488,12 +2506,12 @@ function ey() {
                 a = await t.json().catch(() => ({}));
             if (!t.ok) {
                 let e = [null == a ? void 0 : a.error, (null == a ? void 0 : a.code) ? "(".concat(a.code, ")") : ""].filter(Boolean);
-                throw Error(e.join(" ") || "Ошибка удаления")
+                throw Error(e.join(" ") || tr("Ошибка удаления"))
             }
-            await E(), alert("Заведение \xab".concat(e.name, "\xbb удалено из базы (строка establishments)."))
+            await E(), alert(tr("Заведение \xab").concat(e.name, tr("\xbb удалено из базы (строка establishments).")))
         } catch (a) {
-            let t = a instanceof Error ? a.message : "Ошибка удаления";
-            w(t), alert("Не удалось удалить заведение \xab".concat(e.name, "\xbb.\n\n").concat(t, "\n\nЕсли здесь про миграцию или функцию admin_delete_establishment — выполните её в Supabase (см. репозиторий, папка supabase/migrations).")), await E()
+            let t = a instanceof Error ? a.message : tr("Ошибка удаления");
+            w(t), alert(tr("Не удалось удалить заведение \xab").concat(e.name, "\xbb.\n\n").concat(t, tr("\n\nЕсли здесь про миграцию или функцию admin_delete_establishment — выполните её в Supabase (см. репозиторий, папка supabase/migrations)."))), await E()
         } finally {
             C(null)
         }
@@ -2503,78 +2521,78 @@ function ey() {
             className: "mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm",
             children: [_, (0, r.jsxs)("span", {
                 className: "block mt-2 text-gray-500 text-xs",
-                children: ["Нет колонки или схема старая — открой Supabase → SQL Editor и выполни миграции:", " ", (0, r.jsx)("code", {
+                children: [tr("Нет колонки или схема старая — открой Supabase → SQL Editor и выполни миграции:"), " ", (0, r.jsx)("code", {
                     className: "text-gray-400",
                     children: "supabase/migrations/20260502120000_pro_paid_until_and_status_rpc.sql"
-                }), " ", "(колонка ", (0, r.jsx)("code", {
+                }), " ", tr("(колонка "), (0, r.jsx)("code", {
                     className: "text-gray-500",
                     children: "pro_paid_until"
-                }), "). Ошибка входа/401 — проверь Secrets в Cloudflare (", (0, r.jsx)("code", {
+                }), tr("). Ошибка входа/401 — проверь Secrets в Cloudflare ("), (0, r.jsx)("code", {
                     className: "text-gray-500",
                     children: "SUPABASE_URL"
                 }), ",", " ", (0, r.jsx)("code", {
                     className: "text-gray-500",
                     children: "SERVICE_ROLE_KEY"
-                }), ") и перелогинься в админке."]
+                }), tr(") и перелогинься в админке.")]
             })]
         }), (0, r.jsxs)("div", {
             className: "grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 sm:gap-3 sm:mb-8",
             children: [(0, r.jsx)(eP, {
-                label: dateFilterActive ? "Заведений за период" : "Заведений",
+                label: dateFilterActive ? tr("Заведений за период") : tr("Заведений"),
                 value: W
             }), (0, r.jsx)(eP, {
-                label: "Людей (влад.+сотр.)",
+                label: tr("Людей (влад.+сотр.)"),
                 value: J
             }), (0, r.jsx)(eP, {
-                label: "С платной подпиской",
+                label: tr("С платной подпиской"),
                 value: z
             }), (0, r.jsx)(eP, {
-                label: "С промокодом",
+                label: tr("С промокодом"),
                 value: G
             })]
         }), "hide" === demoFilter && hiddenDemoCount > 0 ? (0, r.jsxs)("div", {
             className: "mb-4 px-4 py-3 rounded-xl border border-gray-800 bg-gray-900/60 text-sm text-gray-400",
-            children: ["Системные демо-кухни (", hiddenDemoCount, ") скрыты — это не удаления, они в БД с флагом ", (0, r.jsx)("code", {
+            children: [tr("Системные демо-кухни ("), hiddenDemoCount, tr(") скрыты — это не удаления, они в БД с флагом "), (0, r.jsx)("code", {
                 className: "text-gray-500 text-xs",
                 children: "is_demo"
-            }), ". Показать: фильтр «Демо» ниже."]
+            }), tr(". Показать: фильтр «Демо» ниже.")]
         }) : null, dateFilterActive ? (0, r.jsxs)("div", {
             className: "mb-4 px-4 py-3 rounded-xl border border-sky-900/50 bg-sky-950/30 text-sm text-sky-100",
-            children: ["Фильтр дат применён", appliedFrom ? " с ".concat(appliedFrom) : "", appliedTo ? " по ".concat(appliedTo) : "", ": ", (0, r.jsx)("span", {
+            children: [tr("Фильтр дат применён"), appliedFrom ? tr(" с ").concat(appliedFrom) : "", appliedTo ? tr(" по ").concat(appliedTo) : "", ": ", (0, r.jsx)("span", {
                 className: "font-semibold text-white",
                 children: W
-            }), " заведений", D.length !== W ? (0, r.jsxs)("span", {
+            }), tr(" заведений"), D.length !== W ? (0, r.jsxs)("span", {
                 className: "text-sky-300/80",
-                children: [" · в таблице с учётом поиска/типа: ", D.length]
+                children: [tr(" · в таблице с учётом поиска/типа: "), D.length]
             }) : null]
         }) : null, datesDirty ? (0, r.jsx)("div", {
             className: "mb-4 px-4 py-3 rounded-xl border border-amber-900/50 bg-amber-950/30 text-sm text-amber-100",
-            children: "Даты изменены, но ещё не применены — нажми «Применить»."
+            children: tr("Даты изменены, но ещё не применены — нажми «Применить».")
         }) : null, (0, r.jsxs)("div", {
             className: "mb-4 p-4 bg-gray-900/80 border border-gray-800 rounded-xl text-gray-400 text-sm leading-relaxed",
             children: [(0, r.jsx)("p", {
                 className: "font-medium text-gray-300 mb-1",
-                children: "Регистрация и пробный Pro"
+                children: tr("Регистрация и пробный Pro")
             }), (0, r.jsxs)("p", {
-                children: ["Колонка \xabРегистрация\xbb — дата и время создания ", (0, r.jsx)("span", {
+                children: [tr("Колонка \xabРегистрация\xbb — дата и время создания "), (0, r.jsx)("span", {
                     className: "text-gray-500",
-                    children: "записи заведения"
-                }), " в базе (", (0, r.jsx)("code", {
+                    children: tr("записи заведения")
+                }), tr(" в базе ("), (0, r.jsx)("code", {
                     className: "text-gray-500 text-xs",
                     children: "establishments.created_at"
-                }), "). Для входа", " ", (0, r.jsx)("span", {
+                }), tr("). Для входа"), " ", (0, r.jsx)("span", {
                     className: "text-gray-300",
-                    children: "без промокода"
-                }), " в продукте действует", " ", (0, r.jsx)("span", {
+                    children: tr("без промокода")
+                }), tr(" в продукте действует"), " ", (0, r.jsx)("span", {
                     className: "text-gray-300",
-                    children: "72 часа полного Pro"
-                }), " с этого момента (в БД — поле", " ", (0, r.jsx)("code", {
+                    children: tr("72 часа полного Pro")
+                }), tr(" с этого момента (в БД — поле"), " ", (0, r.jsx)("code", {
                     className: "text-gray-500 text-xs",
                     children: "pro_trial_ends_at"
-                }), "). С промокодом триал обычно не заполняется — тариф даёт промо."]
+                }), tr("). С промокодом триал обычно не заполняется — тариф даёт промо.")]
             }), (0, r.jsxs)("p", {
                 className: "mt-2 text-xs text-gray-600",
-                children: ["Если у старых аккаунтов без промо пропала дата окончания триала, выполни в Supabase миграцию", " ", (0, r.jsx)("code", {
+                children: [tr("Если у старых аккаунтов без промо пропала дата окончания триала, выполни в Supabase миграцию"), " ", (0, r.jsx)("code", {
                     className: "text-gray-500",
                     children: "20260621120000_backfill_pro_trial_ends_at_no_promo_main.sql"
                 }), "."]
@@ -2582,32 +2600,32 @@ function ey() {
                 className: "mt-2 text-xs text-gray-500",
                 children: [(0, r.jsx)("span", {
                     className: "text-gray-400",
-                    children: "Владелец / Email:"
-                }), " из ", (0, r.jsx)("code", {
+                    children: tr("Владелец / Email:")
+                }), tr(" из "), (0, r.jsx)("code", {
                     className: "text-gray-500",
                     children: "employees"
-                }), " (роль owner или ", (0, r.jsx)("code", {
+                }), tr(" (роль owner или "), (0, r.jsx)("code", {
                     className: "text-gray-500",
                     children: "establishments.owner_id"
-                }), "). До confirm — из", " ", (0, r.jsx)("code", {
+                }), tr("). До confirm — из"), " ", (0, r.jsx)("code", {
                     className: "text-gray-500",
                     children: "pending_owner_registrations"
                 }), " (", (0, r.jsx)("span", {
                     className: "text-amber-400/90",
                     children: "confirm"
-                }), "). Под названием заведения — ", (0, r.jsx)("span", {
+                }), tr("). Под названием заведения — "), (0, r.jsx)("span", {
                     className: "text-gray-300",
                     children: "ID"
-                }), " (полный UUID, клик копирует). Колонка \xabЛюди\xbb — уникальные ", (0, r.jsx)("span", {
+                }), tr(" (полный UUID, клик копирует). Колонка \xabЛюди\xbb — уникальные "), (0, r.jsx)("span", {
                     className: "text-gray-300",
-                    children: "активные"
-                }), " сотрудники этого заведения (собственник + шеф в одной строке = 1; неактивные не считаются)."]
+                    children: tr("активные")
+                }), tr(" сотрудники этого заведения (собственник + шеф в одной строке = 1; неактивные не считаются).")]
             }), (0, r.jsxs)("p", {
                 className: "mt-3 text-xs text-gray-500 leading-relaxed border-t border-gray-800 pt-3",
                 children: [(0, r.jsx)("span", {
                     className: "text-gray-400",
-                    children: "Заведения и филиалы"
-                }), " создаются только в приложении (регистрация, экран \xabМои заведения\xbb / добавление филиала). В этой админке нет кнопки \xabсоздать заведение\xbb — здесь только список из БД, удаление и гео. Если строка \xabвидна в админке, но не в приложении\xbb, это всё равно записи в Supabase; после успешного удаления появится подтверждение; при ошибке — текст в алерте и в красном блоке выше."]
+                    children: tr("Заведения и филиалы")
+                }), tr(" создаются только в приложении (регистрация, экран \xabМои заведения\xbb / добавление филиала). В этой админке нет кнопки \xabсоздать заведение\xbb — здесь только список из БД, удаление и гео. Если строка \xabвидна в админке, но не в приложении\xbb, это всё равно записи в Supabase; после успешного удаления появится подтверждение; при ошибке — текст в алерте и в красном блоке выше.")]
             })]
         }), (0, r.jsxs)("div", {
             className: "flex flex-wrap gap-2 mb-3 md:hidden",
@@ -2617,16 +2635,16 @@ function ey() {
                 className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[6rem]",
                 children: [(0, r.jsx)("option", {
                     value: "all",
-                    children: "Тип: все"
+                    children: tr("Тип: все")
                 }), (0, r.jsx)("option", {
                     value: "main",
-                    children: "Основное"
+                    children: tr("Основное")
                 }), (0, r.jsx)("option", {
                     value: "branch",
-                    children: "Филиал"
+                    children: tr("Филиал")
                 }), (0, r.jsx)("option", {
                     value: "separate",
-                    children: "Отдельное"
+                    children: tr("Отдельное")
                 })]
             }), (0, r.jsx)("select", {
                 value: u,
@@ -2636,7 +2654,7 @@ function ey() {
                     var t;
                     return (0, r.jsxs)("option", {
                         value: e.value,
-                        children: [e.label, " (", null !== (t = I.get(e.value)) && void 0 !== t ? t : 0, ")"]
+                        children: [tr(e.label), " (", null !== (t = I.get(e.value)) && void 0 !== t ? t : 0, ")"]
                     }, e.value)
                 })
             }), (0, r.jsx)("select", {
@@ -2647,7 +2665,7 @@ function ey() {
                     var t;
                     return (0, r.jsxs)("option", {
                         value: e.value,
-                        children: ["Допы: ", e.label, " (", null !== (t = A.get(e.value)) && void 0 !== t ? t : 0, ")"]
+                        children: [tr("Допы: "), tr(e.label), " (", null !== (t = A.get(e.value)) && void 0 !== t ? t : 0, ")"]
                     }, e.value)
                 })
             }), (0, r.jsxs)("select", {
@@ -2656,7 +2674,7 @@ function ey() {
                 className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[6rem]",
                 children: [(0, r.jsx)("option", {
                     value: "all",
-                    children: "Сотр.: все"
+                    children: tr("Сотр.: все")
                 }), (0, r.jsx)("option", {
                     value: "0",
                     children: "0"
@@ -2677,17 +2695,17 @@ function ey() {
                 className: "min-w-0",
                 children: [(0, r.jsx)("p", {
                     className: "text-sm font-medium text-emerald-100",
-                    children: "Выгрузка в Excel"
+                    children: tr("Выгрузка в Excel")
                 }), (0, r.jsxs)("p", {
                     className: "text-xs text-gray-500 mt-0.5",
-                    children: ["В файл попадут ", U.length, " строк из текущего фильтра (даты, демо, поиск). Формат .xlsx."]
+                    children: [tr("В файл попадут "), U.length, tr(" строк из текущего фильтра (даты, демо, поиск). Формат .xlsx.")]
                 })]
             }), (0, r.jsx)("button", {
                 type: "button",
                 onClick: O,
                 disabled: T || i || 0 === U.length,
                 className: "shrink-0 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed",
-                children: T ? "Формируем файл…" : "Скачать Excel (.xlsx)"
+                children: T ? tr("Формируем файл…") : tr("Скачать Excel (.xlsx)")
             })]
         }), (0, r.jsxs)("form", {
             className: "mb-3 flex flex-wrap gap-2 items-end",
@@ -2699,7 +2717,7 @@ function ey() {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-[11px] text-gray-500 uppercase tracking-wide",
-                    children: "Создано с"
+                    children: tr("Создано с")
                 }), (0, r.jsx)("input", {
                     type: "date",
                     value: dateFrom,
@@ -2710,7 +2728,7 @@ function ey() {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-[11px] text-gray-500 uppercase tracking-wide",
-                    children: "по"
+                    children: tr("по")
                 }), (0, r.jsx)("input", {
                     type: "date",
                     value: dateTo,
@@ -2721,31 +2739,31 @@ function ey() {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-[11px] text-gray-500 uppercase tracking-wide",
-                    children: "Демо"
+                    children: tr("Демо")
                 }), (0, r.jsxs)("select", {
                     value: demoFilter,
                     onChange: e => setDemoFilter(e.target.value),
                     className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm",
                     children: [(0, r.jsxs)("option", {
                         value: "hide",
-                        children: ["Скрыть системные (", hiddenDemoCount, ")"]
+                        children: [tr("Скрыть системные ("), hiddenDemoCount, ")"]
                     }), (0, r.jsx)("option", {
                         value: "only",
-                        children: "Только системные демо"
+                        children: tr("Только системные демо")
                     }), (0, r.jsxs)("option", {
                         value: "all",
-                        children: ["Все (", l.length, ")"]
+                        children: [tr("Все ("), l.length, ")"]
                     })]
                 })]
             }), (0, r.jsx)("button", {
                 type: "submit",
                 className: "text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium ".concat(datesDirty ? "ring-2 ring-amber-400/70" : ""),
-                children: "Применить"
+                children: tr("Применить")
             }), dateFilterActive || "hide" !== demoFilter || datesDirty ? (0, r.jsx)("button", {
                 type: "button",
                 onClick: clearDateDemoFilters,
                 className: "text-xs px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500",
-                children: "Сбросить"
+                children: tr("Сбросить")
             }) : null]
         }), (0, r.jsxs)("div", {
             className: "flex gap-2 mb-4 flex-wrap",
@@ -2753,14 +2771,14 @@ function ey() {
                 type: "text",
                 value: d,
                 onChange: e => c(e.target.value),
-                placeholder: "Поиск (название, email, ID)...",
+                placeholder: tr("Поиск (название, email, ID)..."),
                 className: "bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-0 text-sm"
             }), canMutate ? (0, r.jsx)("button", {
                 onClick: K,
                 disabled: S,
                 className: "text-gray-500 hover:text-white transition px-3 py-2 rounded-lg border border-gray-800 text-sm shrink-0 disabled:opacity-50",
-                title: "Догнать registration_ip из last_login (владелец по owner_id, любой сотрудник) и город/страну по IP",
-                children: S ? "…" : "\uD83C\uDF10 IP и гео регистрации"
+                title: tr("Догнать registration_ip из last_login (владелец по owner_id, любой сотрудник) и город/страну по IP"),
+                children: S ? "…" : tr("\uD83C\uDF10 IP и гео регистрации")
             }) : null, (0, r.jsx)("button", {
                 onClick: E,
                 className: "text-gray-500 hover:text-white transition px-3 py-2 rounded-lg border border-gray-800 text-sm shrink-0",
@@ -2768,13 +2786,13 @@ function ey() {
             })]
         }), (0, r.jsx)("p", {
             className: "text-[11px] text-gray-500 mb-3 -mt-2",
-            children: "Список отсортирован по связям: один владелец — блоком, филиалы сразу под головным заведением (↳ и строка \xabголовное: …\xbb)."
+            children: tr("Список отсортирован по связям: один владелец — блоком, филиалы сразу под головным заведением (↳ и строка \xabголовное: …\xbb).")
         }), i ? (0, r.jsx)("div", {
             className: "p-12 text-center text-gray-500",
-            children: "Загрузка..."
+            children: tr("Загрузка...")
         }) : 0 === D.length ? (0, r.jsx)("div", {
             className: "p-12 text-center text-gray-500",
-            children: "Заведений нет"
+            children: tr("Заведений нет")
         }) : (0, r.jsxs)(r.Fragment, {
             children: [(0, r.jsx)("div", {
                 className: "hidden md:block bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
@@ -2785,37 +2803,37 @@ function ey() {
                             className: "border-b border-gray-800 text-gray-500 text-[10px] uppercase tracking-wide",
                             children: [(0, r.jsx)("th", {
                                 className: "px-2 py-2 text-left w-[14%]",
-                                children: "Заведение / ID"
+                                children: tr("Заведение / ID")
                             }), (0, r.jsxs)("th", {
                                 className: "px-2 py-2 text-left w-[7%] align-top",
                                 children: [(0, r.jsx)("div", {
                                     className: "mb-1",
-                                    children: "Тип"
+                                    children: tr("Тип")
                                 }), (0, r.jsxs)("select", {
                                     value: x,
                                     onChange: e => m(e.target.value),
-                                    title: "Фильтр по типу заведения",
+                                    title: tr("Фильтр по типу заведения"),
                                     className: "w-full bg-gray-950 border border-gray-700 rounded-md px-1 py-0.5 text-[10px] text-gray-200 font-normal normal-case tracking-normal",
                                     children: [(0, r.jsx)("option", {
                                         value: "all",
-                                        children: "Все"
+                                        children: tr("Все")
                                     }), (0, r.jsx)("option", {
                                         value: "main",
-                                        children: "Основное"
+                                        children: tr("Основное")
                                     }), (0, r.jsx)("option", {
                                         value: "branch",
-                                        children: "Филиал"
+                                        children: tr("Филиал")
                                     }), (0, r.jsx)("option", {
                                         value: "separate",
-                                        children: "Отдельное"
+                                        children: tr("Отдельное")
                                     })]
                                 })]
                             }), (0, r.jsxs)("th", {
                                 className: "px-2 py-2 text-left w-[14%] align-top",
-                                title: "Тариф; допы — второй список",
+                                title: tr("Тариф; допы — второй список"),
                                 children: [(0, r.jsx)("div", {
                                     className: "mb-1",
-                                    children: "Подписка"
+                                    children: tr("Подписка")
                                 }), (0, r.jsx)("select", {
                                     value: u,
                                     onChange: e => b(e.target.value),
@@ -2824,7 +2842,7 @@ function ey() {
                                         var t;
                                         return (0, r.jsxs)("option", {
                                             value: e.value,
-                                            children: [e.label, " (", null !== (t = I.get(e.value)) && void 0 !== t ? t : 0, ")"]
+                                            children: [tr(e.label), " (", null !== (t = I.get(e.value)) && void 0 !== t ? t : 0, ")"]
                                         }, e.value)
                                     })
                                 }), (0, r.jsx)("select", {
@@ -2835,13 +2853,13 @@ function ey() {
                                         var t;
                                         return (0, r.jsxs)("option", {
                                             value: e.value,
-                                            children: [e.label, " (", null !== (t = A.get(e.value)) && void 0 !== t ? t : 0, ")"]
+                                            children: [tr(e.label), " (", null !== (t = A.get(e.value)) && void 0 !== t ? t : 0, ")"]
                                         }, e.value)
                                     })
                                 })]
                             }), (0, r.jsx)("th", {
                                 className: "px-2 py-2 text-left w-[9%]",
-                                children: "Владелец"
+                                children: tr("Владелец")
                             }), (0, r.jsx)("th", {
                                 className: "px-2 py-2 text-left w-[11%]",
                                 children: "Email"
@@ -2849,14 +2867,14 @@ function ey() {
                                 className: "px-2 py-2 text-center w-[4%] align-top",
                                 children: [(0, r.jsx)("div", {
                                     className: "mb-1",
-                                    children: "Люди"
+                                    children: tr("Люди")
                                 }), (0, r.jsxs)("select", {
                                     value: N,
                                     onChange: e => f(e.target.value),
                                     className: "w-full bg-gray-950 border border-gray-700 rounded-md px-0.5 py-0.5 text-[10px] text-gray-200 font-normal normal-case tracking-normal",
                                     children: [(0, r.jsx)("option", {
                                         value: "all",
-                                        children: "Все"
+                                        children: tr("Все")
                                     }), (0, r.jsx)("option", {
                                         value: "0",
                                         children: "0"
@@ -2873,22 +2891,22 @@ function ey() {
                                 })]
                             }), (0, r.jsx)("th", {
                                 className: "px-2 py-2 text-left w-[9%]",
-                                children: "Регистрация"
+                                children: tr("Регистрация")
                             }), (0, r.jsx)("th", {
                                 className: "px-2 py-2 text-left w-[7%]",
-                                title: "max(last_login_at) сотрудников",
-                                children: "Последний вход"
+                                title: tr("max(last_login_at) сотрудников"),
+                                children: tr("Последний вход")
                             }), (0, r.jsx)("th", {
                                 className: "px-2 py-2 text-left w-[6%]",
-                                children: "Клиент"
+                                children: tr("Клиент")
                             }), (0, r.jsx)("th", {
                                 className: "px-2 py-2 text-left w-[8%]",
-                                children: "IP рег."
+                                children: tr("IP рег.")
                             }), (0, r.jsx)("th", {
                                 className: "px-1 py-2 text-right w-[3%] sticky right-0 z-20 bg-gray-900 border-l border-gray-800",
                                 children: (0, r.jsx)("span", {
                                     className: "sr-only",
-                                    children: "Действия"
+                                    children: tr("Действия")
                                 })
                             })]
                         })
@@ -2903,16 +2921,16 @@ function ey() {
                                         className: "px-3 py-2 text-xs text-indigo-200/90",
                                         children: [(0, r.jsx)("span", {
                                             className: "font-medium",
-                                            children: "Связанные заведения"
+                                            children: tr("Связанные заведения")
                                         }), (0, r.jsx)("span", {
                                             className: "text-gray-500 mx-2",
                                             children: "\xb7"
-                                        }), "—" !== l.owner_name ? l.owner_name : "владелец", l.owner_email && "—" !== l.owner_email ? (0, r.jsx)("span", {
+                                        }), "—" !== l.owner_name ? l.owner_name : tr("владелец"), l.owner_email && "—" !== l.owner_email ? (0, r.jsx)("span", {
                                             className: "text-indigo-300/80 ml-1",
                                             children: l.owner_email
                                         }) : null, (0, r.jsxs)("span", {
                                             className: "text-gray-500 ml-2",
-                                            children: ["(", l.ownerGroupSize, " шт.)"]
+                                            children: ["(", l.ownerGroupSize, tr(" шт.)")]
                                         })]
                                     })
                                 }) : null, (0, r.jsxs)("tr", {
@@ -2945,12 +2963,12 @@ function ey() {
                                             },
                                             children: (0, r.jsx)("span", {
                                                 className: "inline-flex rounded border border-amber-800/60 bg-amber-950/40 px-1.5 py-0.5 text-[10px] text-amber-200",
-                                                children: "системное демо"
+                                                children: tr("системное демо")
                                             })
                                         }) : null, l.parent_establishment_name ? (0, r.jsxs)("div", {
                                             className: "text-[10px] text-gray-500 font-normal mt-0.5 truncate",
                                             title: null !== (c = l.parent_establishment_id) && void 0 !== c ? c : "",
-                                            children: ["головное: ", l.parent_establishment_name]
+                                            children: [tr("головное: "), l.parent_establishment_name]
                                         }) : null, (0, r.jsx)(ReferralLevelBadge, {
                                             level: l.referral_level
                                         })]
@@ -2980,7 +2998,7 @@ function ey() {
                                         className: "px-2 py-2 text-center",
                                         children: (0, r.jsx)("span", {
                                             className: "bg-gray-800 px-1.5 py-0.5 rounded text-[10px] font-mono",
-                                            title: "Активные сотрудники этого заведения (1 человек с несколькими ролями = 1)",
+                                            title: tr("Активные сотрудники этого заведения (1 человек с несколькими ролями = 1)"),
                                             children: l.employee_count
                                         })
                                     }), (0, r.jsx)("td", {
@@ -3013,7 +3031,7 @@ function ey() {
                                             onClick: () => V(l),
                                             disabled: k === l.id,
                                             className: "text-red-400 hover:text-red-300 text-xs disabled:opacity-50 px-0.5",
-                                            title: "Удалить заведение",
+                                            title: tr("Удалить заведение"),
                                             children: k === l.id ? "…" : "\uD83D\uDDD1"
                                         })
                                     }) : (0, r.jsx)("td", {
@@ -3031,7 +3049,7 @@ function ey() {
                     return (0, r.jsxs)(s.Fragment, {
                         children: [l.isOwnerGroupStart && (null !== (n = l.ownerGroupSize) && void 0 !== n ? n : 0) > 1 ? (0, r.jsxs)("div", {
                             className: "px-3 py-2 rounded-lg bg-indigo-950/40 border border-indigo-900/50 text-xs text-indigo-200/90",
-                            children: ["Связанные заведения \xb7 ", "—" !== l.owner_email ? l.owner_email : l.owner_name, " (", l.ownerGroupSize, " шт.)"]
+                            children: [tr("Связанные заведения \xb7 "), "—" !== l.owner_email ? l.owner_email : l.owner_name, " (", l.ownerGroupSize, tr(" шт.)")]
                         }) : null, (0, r.jsxs)("div", {
                             className: "bg-gray-900 rounded-xl border border-gray-800 p-4 ".concat(l.isOwnerGroupStart ? "mt-3 first:mt-0 ring-1 ring-gray-700/40" : "", " ").concat((null !== (i = l.ownerGroupSize) && void 0 !== i ? i : 0) > 1 ? "border-indigo-900/30" : ""),
                             children: [(0, r.jsxs)("div", {
@@ -3051,12 +3069,12 @@ function ey() {
                                     className: "flex items-center gap-2 shrink-0",
                                     children: [(0, r.jsxs)("span", {
                                         className: "bg-gray-800 px-2 py-0.5 rounded text-xs font-mono text-gray-400",
-                                        children: [l.employee_count, " чел."]
+                                        children: [l.employee_count, tr(" чел.")]
                                     }), canMutate ? (0, r.jsx)("button", {
                                         onClick: () => V(l),
                                         disabled: k === l.id,
                                         className: "text-red-400 hover:text-red-300 text-sm disabled:opacity-50",
-                                        title: "Удалить заведение",
+                                        title: tr("Удалить заведение"),
                                         children: k === l.id ? "..." : "\uD83D\uDDD1"
                                     }) : null]
                                 })]
@@ -3070,7 +3088,7 @@ function ey() {
                                 children: ei(l)
                             }), l.parent_establishment_name ? (0, r.jsxs)("div", {
                                 className: "text-[11px] text-gray-500 mb-1",
-                                children: ["головное: ", l.parent_establishment_name]
+                                children: [tr("головное: "), l.parent_establishment_name]
                             }) : null, (0, r.jsx)("div", {
                                 className: "mt-1",
                                 children: (0, r.jsx)("span", {
@@ -3088,11 +3106,11 @@ function ey() {
                             }), (0, r.jsxs)("div", {
                                 className: "text-gray-600 text-xs mt-1",
                                 title: l.created_at,
-                                children: ["Регистрация: ", ec(l.created_at)]
+                                children: [tr("Регистрация: "), ec(l.created_at)]
                             }), (0, r.jsxs)("div", {
                                 className: "text-gray-600 text-xs mt-1",
                                 title: q(l.last_activity_at),
-                                children: ["Последний вход: ", M(l.last_activity_at)]
+                                children: [tr("Последний вход: "), M(l.last_activity_at)]
                             }), (0, r.jsx)("div", {
                                 className: "text-gray-400 text-xs mt-1",
                                 children: H(l)
@@ -3129,11 +3147,11 @@ function eb(e) {
         value: c,
         onChange: e => l(a, e.target.value),
         disabled: s,
-        title: "Тариф при погашении кода (subscription_type в заведении на момент активации)",
+        title: tr("Тариф при погашении кода (subscription_type в заведении на момент активации)"),
         className: null != i ? i : "mt-0.5 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-[10px] text-gray-200 max-w-[11rem]",
         children: [x && (0, r.jsxs)("option", {
             value: c,
-            children: ["Текущий (legacy): ", d(c), " (", c, ")"]
+            children: [tr("Текущий (legacy): "), d(c), " (", c, ")"]
         }), n.map(e => (0, r.jsxs)("option", {
             value: e,
             children: [d(e), " (", e, ")"]
@@ -3168,7 +3186,7 @@ function ev(e) {
             }, "".concat(e.establishment_id, "-").concat(t))
         }), a.note ? (0, r.jsxs)("div", {
             className: "text-gray-600 text-[10px] pt-1 border-t border-gray-800/80 mt-1",
-            children: ["Заметка: ", a.note]
+            children: [tr("Заметка: "), a.note]
         }) : null]
     }) : a.is_used && (null === (t = a.establishments) || void 0 === t ? void 0 : t.name) ? (0, r.jsx)("span", {
         className: "text-white",
@@ -3180,6 +3198,8 @@ function ev(e) {
 }
 
 function ej() {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     var e;
     let t = [0, 5, 8, 12, 15],
         a = [0, 1, 3, 5, 10],
@@ -3210,38 +3230,38 @@ function ej() {
             x(!0), g(null);
             let e = await fetch("/api/promo"),
                 t = await e.json();
-            e.ok ? o(Array.isArray(t) ? t : []) : (g("string" == typeof(null == t ? void 0 : t.error) ? t.error : "Ошибка загрузки"), o([])), x(!1)
+            e.ok ? o(Array.isArray(t) ? t : []) : (g("string" == typeof(null == t ? void 0 : t.error) ? t.error : tr("Ошибка загрузки")), o([])), x(!1)
         }, []);
     async function X() {
         if (!h.trim()) return;
         let e = D.trim() ? parseInt(D.trim(), 10) : 0,
             r = U.trim() ? parseInt(U.trim(), 10) : 0;
         if (Number.isNaN(e) || Number.isNaN(r) || !t.includes(e) || !a.includes(r)) {
-            alert("Выберите пакет из списка для сотрудников и заведений.");
+            alert(tr("Выберите пакет из списка для сотрудников и заведений."));
             return
         }
         if ("activation" === C) {
             let e = w.trim(),
                 t = e ? parseInt(e, 10) : NaN;
             if (!e || Number.isNaN(t) || t < 1) {
-                alert("Для нового типа укажи целое число дней Pro с активации (или переключись на \xabкак раньше\xbb).");
+                alert(tr("Для нового типа укажи целое число дней Pro с активации (или переключись на \xabкак раньше\xbb)."));
                 return
             }
         }
         let s = W.trim() ? parseInt(W.trim(), 10) : NaN;
         if (Number.isNaN(s) || s < 1 || s > 1e5) {
-            alert("\xabСколько учётных записей\xbb: целое число от 1 до 100000 (по умолчанию 1).");
+            alert(tr("\xabСколько учётных записей\xbb: целое число от 1 до 100000 (по умолчанию 1)."));
             return
         }
         if ("" !== I.trim()) {
             let e = parseInt(I.trim(), 10);
             if (Number.isNaN(e) || e < 0 || e > 1e4) {
-                alert("\xabМакс. фил.\xbb: целое от 0 до 10000 или оставь пустым.");
+                alert(tr("\xabМакс. фил.\xbb: целое от 0 до 10000 или оставь пустым."));
                 return
             }
         }
         if (!f.trim()) {
-            alert("Укажите дату окончания (\xabДействует до\xbb / \xabВвод кода до\xbb) — без неё промокод не создать.");
+            alert(tr("Укажите дату окончания (\xabДействует до\xbb / \xabВвод кода до\xbb) — без неё промокод не создать."));
             return
         }
         u(!0), g(null);
@@ -3269,7 +3289,7 @@ function ej() {
                 }),
                 a = await t.json().catch(() => ({}));
             if (!t.ok) {
-                g("string" == typeof(null == a ? void 0 : a.error) ? a.error : "Не удалось создать промокод (".concat(t.status, ")"));
+                g("string" == typeof(null == a ? void 0 : a.error) ? a.error : tr("Не удалось создать промокод (").concat(t.status, ")"));
                 return
             }
             y(""), v(""), N(""), _(""), k(""), S("legacy"), T("ultra"), E(""), A(""), R("0"), O("0"), M(!1), H(!1), J("1"), await Q()
@@ -3278,7 +3298,7 @@ function ej() {
         }
     }
     async function ee(e) {
-        confirm("Удалить промокод?") && (await fetch("/api/promo", {
+        confirm(tr("Удалить промокод?")) && (await fetch("/api/promo", {
             method: "DELETE",
             headers: {
                 "Content-Type": "application/json"
@@ -3336,7 +3356,7 @@ function ej() {
                 }),
                 r = await e.json().catch(() => ({}));
             if (!e.ok) {
-                g("string" == typeof(null == r ? void 0 : r.error) ? r.error : "Не удалось сохранить дату (".concat(e.status, ")"));
+                g("string" == typeof(null == r ? void 0 : r.error) ? r.error : tr("Не удалось сохранить дату (").concat(e.status, ")"));
                 return
             }
             er(), await Q()
@@ -3363,7 +3383,7 @@ function ej() {
                     }),
                     a = await t.json().catch(() => ({}));
                 if (!t.ok) {
-                    g("string" == typeof(null == a ? void 0 : a.error) ? a.error : "Не удалось сохранить тариф (".concat(t.status, ")"));
+                    g("string" == typeof(null == a ? void 0 : a.error) ? a.error : tr("Не удалось сохранить тариф (").concat(t.status, ")"));
                     return
                 }
                 await Q()
@@ -3373,12 +3393,12 @@ function ej() {
         }
     }
     async function ei(e, t) {
-        let a = prompt("Дней Pro с момента активации (1–36500). Пусто — вернуть промокод к классической логике (как раньше в базе), только дата \xabдействует до\xbb:", null != t ? String(t) : "");
+        let a = prompt(tr("Дней Pro с момента активации (1–36500). Пусто — вернуть промокод к классической логике (как раньше в базе), только дата \xabдействует до\xbb:"), null != t ? String(t) : "");
         if (null === a) return;
         let r = a.trim(),
             s = "" === r ? null : parseInt(r, 10);
         if ("" !== r && (Number.isNaN(s) || s < 1 || s > 36500)) {
-            alert("Введи целое от 1 до 36500 или оставь пустым");
+            alert(tr("Введи целое от 1 до 36500 или оставь пустым"));
             return
         }
         await fetch("/api/promo", {
@@ -3393,12 +3413,12 @@ function ej() {
         }), await Q()
     }
     async function eo(e, t) {
-        let a = prompt("Сколько раз можно применить этот код (разные учётные записи). Уже погашенные не снимаются.", null != t ? String(t) : "1");
+        let a = prompt(tr("Сколько раз можно применить этот код (разные учётные записи). Уже погашенные не снимаются."), null != t ? String(t) : "1");
         if (null === a) return;
         let r = a.trim(),
             s = "" === r ? 1 : parseInt(r, 10);
         if (Number.isNaN(s) || s < 1 || s > 1e5) {
-            alert("Введи целое от 1 до 100000");
+            alert(tr("Введи целое от 1 до 100000"));
             return
         }
         u(!0), g(null);
@@ -3415,7 +3435,7 @@ function ej() {
                 }),
                 a = await t.json().catch(() => ({}));
             if (!t.ok) {
-                g("string" == typeof(null == a ? void 0 : a.error) ? a.error : "Не удалось сохранить лимит (".concat(t.status, ")"));
+                g("string" == typeof(null == a ? void 0 : a.error) ? a.error : tr("Не удалось сохранить лимит (").concat(t.status, ")"));
                 return
             }
             await Q()
@@ -3425,11 +3445,11 @@ function ej() {
     }
     async function ed(e, t) {
         var a;
-        let r = prompt("Макс. сотрудников (пусто — без ограничений):", null !== (a = null == t ? void 0 : t.toString()) && void 0 !== a ? a : "");
+        let r = prompt(tr("Макс. сотрудников (пусто — без ограничений):"), null !== (a = null == t ? void 0 : t.toString()) && void 0 !== a ? a : "");
         if (null === r) return;
         let s = r.trim() ? parseInt(r.trim()) : null;
         if (r.trim() && (isNaN(s) || s < 1)) {
-            alert("Введи целое число больше 0");
+            alert(tr("Введи целое число больше 0"));
             return
         }
         await fetch("/api/promo", {
@@ -3445,11 +3465,11 @@ function ej() {
     }
     async function eu(e, t) {
         var a;
-        let r = prompt("Макс. доп. филиалов на владельца (пусто — только пакеты/IAP, без базы из промокода):", null !== (a = null == t ? void 0 : t.toString()) && void 0 !== a ? a : "");
+        let r = prompt(tr("Макс. доп. филиалов на владельца (пусто — только пакеты/IAP, без базы из промокода):"), null !== (a = null == t ? void 0 : t.toString()) && void 0 !== a ? a : "");
         if (null === r) return;
         let s = r.trim() ? parseInt(r.trim(), 10) : null;
         if (r.trim() && (Number.isNaN(s) || s < 0 || s > 1e4)) {
-            alert("Введи целое от 0 до 10000 или оставь пустым");
+            alert(tr("Введи целое от 0 до 10000 или оставь пустым"));
             return
         }
         await fetch("/api/promo", {
@@ -3489,7 +3509,7 @@ function ej() {
     }
     async function eh(e) {
         let t = !e.grants_additive_only;
-        (t ? confirm("Включить \xabтолько расширения\xbb? Код не меняет тариф Pro/Ultra — только начисляет подписки расширения (+5 сотр. / +1 филиал), если они заданы.") : confirm("Выключить \xabтолько расширения\xbb?")) && (await fetch("/api/promo", {
+        (t ? confirm(tr("Включить \xabтолько расширения\xbb? Код не меняет тариф Pro/Ultra — только начисляет подписки расширения (+5 сотр. / +1 филиал), если они заданы.")) : confirm(tr("Выключить \xabтолько расширения\xbb?"))) && (await fetch("/api/promo", {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json"
@@ -3516,7 +3536,7 @@ function ej() {
     async function ej(e) {
         var t;
         let a = !e.is_disabled;
-        (!a || !e.is_used && !((null !== (t = e.redemption_count) && void 0 !== t ? t : 0) > 0) || confirm("Отключить промокод? У заведений, которые уже его применили, доступ будет заблокирован (как при истечении срока).")) && (u(!0), await fetch("/api/promo", {
+        (!a || !e.is_used && !((null !== (t = e.redemption_count) && void 0 !== t ? t : 0) > 0) || confirm(tr("Отключить промокод? У заведений, которые уже его применили, доступ будет заблокирован (как при истечении срока)."))) && (u(!0), await fetch("/api/promo", {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json"
@@ -3561,10 +3581,10 @@ function ej() {
                 children: [(0, r.jsx)("h3", {
                     id: "promo-expiry-title",
                     className: "text-white font-medium mb-2",
-                    children: "Дата окончания / срок ввода"
+                    children: tr("Дата окончания / срок ввода")
                 }), (0, r.jsx)("p", {
                     className: "text-gray-400 text-sm mb-3 leading-relaxed",
-                    children: (null !== (e = B.activation_duration_days) && void 0 !== e ? e : 0) > 0 ? "Последний день, когда код ещё можно ввести. Без даты — нет ограничения по календарю." : "Действует до (классический промокод без режима \xabдней с активации\xbb). Без даты — без ограничения."
+                    children: (null !== (e = B.activation_duration_days) && void 0 !== e ? e : 0) > 0 ? tr("Последний день, когда код ещё можно ввести. Без даты — нет ограничения по календарю.") : tr("Действует до (классический промокод без режима \xabдней с активации\xbb). Без даты — без ограничения.")
                 }), (0, r.jsx)("p", {
                     className: "text-gray-500 text-xs font-mono mb-3",
                     children: B.code
@@ -3583,95 +3603,95 @@ function ej() {
                         },
                         disabled: m,
                         className: "px-4 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm disabled:opacity-50",
-                        children: "Отмена"
+                        children: tr("Отмена")
                     }), (0, r.jsx)("button", {
                         type: "button",
                         onClick: () => void el(null),
                         disabled: m,
                         className: "px-4 py-2 rounded-lg border border-amber-800/80 text-amber-200/90 hover:bg-amber-950/40 text-sm disabled:opacity-50",
-                        children: "Без даты"
+                        children: tr("Без даты")
                     }), (0, r.jsx)("button", {
                         type: "button",
                         onClick: () => void el(),
                         disabled: m,
                         className: "px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm disabled:opacity-50",
-                        children: m ? "…" : "Сохранить"
+                        children: m ? "…" : tr("Сохранить")
                     })]
                 })]
             })
         }), (0, r.jsxs)("div", {
             className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4 sm:gap-3 sm:mb-6",
             children: [(0, r.jsx)(eP, {
-                label: "Всего",
+                label: tr("Всего"),
                 value: ef
             }), (0, r.jsx)(eP, {
-                label: "Свободно",
+                label: tr("Свободно"),
                 value: ew
             }), (0, r.jsx)(eP, {
-                label: "Использовано",
+                label: tr("Использовано"),
                 value: e_
             }), (0, r.jsx)(eP, {
-                label: "Истекло",
+                label: tr("Истекло"),
                 value: ek
             }), (0, r.jsx)(eP, {
-                label: "Отключено",
+                label: tr("Отключено"),
                 value: eC
             })]
         }), (0, r.jsxs)("p", {
             className: "text-gray-500 text-sm mb-4 leading-relaxed",
-            children: ["Регистрация ", (0, r.jsx)("span", {
+            children: [tr("Регистрация "), (0, r.jsx)("span", {
                 className: "text-gray-400",
-                children: "без промокода"
-            }), " в приложении даёт владельцу", " ", (0, r.jsx)("span", {
+                children: tr("без промокода")
+            }), tr(" в приложении даёт владельцу"), " ", (0, r.jsx)("span", {
                 className: "text-gray-400",
-                children: "72 часа полного Pro"
-            }), " (см. вкладку \xabЗаведения\xbb: колонка \xabРегистрация\xbb и поле ", (0, r.jsx)("code", {
+                children: tr("72 часа полного Pro")
+            }), tr(" (см. вкладку \xabЗаведения\xbb: колонка \xabРегистрация\xbb и поле "), (0, r.jsx)("code", {
                 className: "text-gray-600 text-xs",
                 children: "pro_trial_ends_at"
-            }), "). Промокоды ниже — отдельный способ выдать тариф и срок."]
+            }), tr("). Промокоды ниже — отдельный способ выдать тариф и срок.")]
         }), (0, r.jsxs)("p", {
             className: "text-gray-600 text-xs mb-4 leading-relaxed border-l-2 border-gray-800 pl-3",
-            children: ["Тариф в строке промокода задаёт, что запишется в", " ", (0, r.jsx)("code", {
+            children: [tr("Тариф в строке промокода задаёт, что запишется в"), " ", (0, r.jsx)("code", {
                 className: "text-gray-500 text-[10px]",
                 children: "establishments.subscription_type"
-            }), " в момент", " ", (0, r.jsx)("span", {
+            }), tr(" в момент"), " ", (0, r.jsx)("span", {
                 className: "text-gray-500",
-                children: "первого погашения"
-            }), " кода. Уже активированный код не переписывает заведение — смена тарифа здесь влияет на новые активации и на отображение в админке."]
+                children: tr("первого погашения")
+            }), tr(" кода. Уже активированный код не переписывает заведение — смена тарифа здесь влияет на новые активации и на отображение в админке.")]
         }), (0, r.jsxs)("div", {
             className: "bg-gray-900 rounded-xl p-4 border border-gray-800 mb-4",
             children: [(0, r.jsx)("h2", {
                 className: "text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide",
-                children: "Новый промокод"
+                children: tr("Новый промокод")
             }), (0, r.jsxs)("p", {
                 className: "text-[11px] text-gray-600 mb-3 leading-snug",
                 children: [(0, r.jsx)("span", {
                     className: "text-gray-500 font-medium",
-                    children: "Промокод"
-                }), " — код выдачи тарифа (Pro/Ultra), сроков и при необходимости лимита сотрудников; это не то же самое, что платные подписки расширения в приложении. Уже созданные коды ", (0, r.jsx)("span", {
+                    children: tr("Промокод")
+                }), tr(" — код выдачи тарифа (Pro/Ultra), сроков и при необходимости лимита сотрудников; это не то же самое, что платные подписки расширения в приложении. Уже созданные коды "), (0, r.jsx)("span", {
                     className: "text-gray-500",
-                    children: "не меняются"
-                }), " автоматически: у старых пустое \xabдней с активации\xbb. Ниже можно завести ", (0, r.jsx)("span", {
+                    children: tr("не меняются")
+                }), tr(" автоматически: у старых пустое \xabдней с активации\xbb. Ниже можно завести "), (0, r.jsx)("span", {
                     className: "text-gray-500",
-                    children: "второй тип срока"
-                }), " — дни Pro с момента активации кода."]
+                    children: tr("второй тип срока")
+                }), tr(" — дни Pro с момента активации кода.")]
             }), (0, r.jsxs)("p", {
                 className: "text-[11px] text-gray-600 mb-3 leading-snug border-l-2 border-indigo-700/50 pl-3",
                 children: [(0, r.jsx)("span", {
                     className: "text-gray-500 font-medium",
-                    children: "Подписки расширения Lite"
-                }), ": выбор только из фиксированных пакетов. Для сотрудников: ", (0, r.jsx)("span", {
+                    children: tr("Подписки расширения Lite")
+                }), tr(": выбор только из фиксированных пакетов. Для сотрудников: "), (0, r.jsx)("span", {
                     className: "text-gray-400",
                     children: "+5 / +8 / +12 / +15"
-                }), ". Для заведений: ", (0, r.jsx)("span", {
+                }), tr(". Для заведений: "), (0, r.jsx)("span", {
                     className: "text-gray-400",
                     children: "+1 / +2 / +3 / +4"
-                }), " (+5 / +10 — старые коды)."]
+                }), tr(" (+5 / +10 — старые коды).")]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col gap-2 mb-3",
                 children: [(0, r.jsx)("span", {
                     className: "text-[11px] text-gray-500 uppercase tracking-wide",
-                    children: "Логика"
+                    children: tr("Логика")
                 }), (0, r.jsxs)("div", {
                     className: "flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4",
                     children: [(0, r.jsxs)("label", {
@@ -3684,7 +3704,7 @@ function ej() {
                             onChange: () => {
                                 S("legacy"), k("")
                             }
-                        }), "Как раньше (классика)"]
+                        }), tr("Как раньше (классика)")]
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 text-sm text-gray-300 cursor-pointer",
                         children: [(0, r.jsx)("input", {
@@ -3693,19 +3713,19 @@ function ej() {
                             className: "accent-indigo-500",
                             checked: "activation" === C,
                             onChange: () => S("activation")
-                        }), "Новый тип: дни Pro с активации"]
+                        }), tr("Новый тип: дни Pro с активации")]
                     })]
                 }), (0, r.jsxs)("p", {
                     className: "text-[11px] text-gray-600 mb-2",
-                    children: ["Тариф промокода — отдельно от \xabклассика / с активации\xbb: попадёт в", " ", (0, r.jsx)("span", {
+                    children: [tr("Тариф промокода — отдельно от \xabклассика / с активации\xbb: попадёт в"), " ", (0, r.jsx)("span", {
                         className: "text-gray-500",
                         children: "subscription_type"
-                    }), " заведения. Публичная линейка — только Lite / Pro / Ultra. Ultimate — скрытый тариф только по промокоду (POS Restodocks: столы, зал, заказы на prod; не показывать в витрине и прайсе)."]
+                    }), tr(" заведения. Публичная линейка — только Lite / Pro / Ultra. Ultimate — скрытый тариф только по промокоду (POS Restodocks: столы, зал, заказы на prod; не показывать в витрине и прайсе).")]
                 }), (0, r.jsxs)("div", {
                     className: "flex flex-col gap-1 mb-3 max-w-xs",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "Выдаваемый тариф"
+                        children: tr("Выдаваемый тариф")
                     }), (0, r.jsx)("select", {
                         value: L,
                         onChange: e => T(e.target.value),
@@ -3718,7 +3738,7 @@ function ej() {
                 })]
             }), (0, r.jsx)("div", {
                 className: "text-[10px] text-gray-500 uppercase tracking-wide mb-1",
-                children: "Промокод — код, заметка, даты"
+                children: tr("Промокод — код, заметка, даты")
             }), (0, r.jsxs)("div", {
                 className: "grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end",
                 children: [(0, r.jsx)("input", {
@@ -3731,13 +3751,13 @@ function ej() {
                     type: "text",
                     value: b,
                     onChange: e => v(e.target.value),
-                    placeholder: "Заметка",
+                    placeholder: tr("Заметка"),
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm"
                 }), (0, r.jsxs)("div", {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "legacy" === C ? "Действует с" : "Ввод кода с"
+                        children: "legacy" === C ? tr("Действует с") : tr("Ввод кода с")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         value: j,
@@ -3748,7 +3768,7 @@ function ej() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "legacy" === C ? "Действует до" : "Ввод кода до"
+                        children: "legacy" === C ? tr("Действует до") : tr("Ввод кода до")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         value: f,
@@ -3759,22 +3779,22 @@ function ej() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        title: "Только для нового типа: длина Pro от момента применения кода",
-                        children: "Дней Pro с активации"
+                        title: tr("Только для нового типа: длина Pro от момента применения кода"),
+                        children: tr("Дней Pro с активации")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         min: "1",
                         max: "36500",
                         value: w,
                         onChange: e => k(e.target.value),
-                        placeholder: "напр. 30",
+                        placeholder: tr("напр. 30"),
                         className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
                     })]
                 }), (0, r.jsxs)("div", {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "Макс. сотр."
+                        children: tr("Макс. сотр.")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         min: "1",
@@ -3787,8 +3807,8 @@ function ej() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        title: "Базовое число дополнительных филиалов на владельца (не пакет +1 в блоке расширений)",
-                        children: "Макс. фил."
+                        title: tr("Базовое число дополнительных филиалов на владельца (не пакет +1 в блоке расширений)"),
+                        children: tr("Макс. фил.")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         min: "0",
@@ -3801,8 +3821,8 @@ function ej() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        title: "Один и тот же строковый код можно применить к указанному числу разных заведений (регистраций).",
-                        children: "Учётных записей"
+                        title: tr("Один и тот же строковый код можно применить к указанному числу разных заведений (регистраций)."),
+                        children: tr("Учётных записей")
                     }), (0, r.jsx)("input", {
                         type: "number",
                         min: "1",
@@ -3815,35 +3835,35 @@ function ej() {
                 })]
             }), (0, r.jsx)("div", {
                 className: "text-[10px] text-gray-500 uppercase tracking-wide mt-3 mb-1",
-                children: "Подписки расширения (отдельно от промокода тарифа)"
+                children: tr("Подписки расширения (отдельно от промокода тарифа)")
             }), (0, r.jsxs)("div", {
                 className: "grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end rounded-lg border border-gray-800 bg-gray-950/40 p-3",
                 children: [(0, r.jsxs)("div", {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-400",
-                        children: "Увеличение сотрудников (пакет)"
+                        children: tr("Увеличение сотрудников (пакет)")
                     }), (0, r.jsx)("select", {
                         value: D,
                         onChange: e => R(e.target.value),
                         className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28",
                         children: t.map(e => (0, r.jsx)("option", {
                             value: e,
-                            children: 0 === e ? "нет" : "+".concat(e)
+                            children: 0 === e ? tr("нет") : "+".concat(e)
                         }, e))
                     })]
                 }), (0, r.jsxs)("div", {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-400",
-                        children: "Доп. заведения/филиалы (пакет)"
+                        children: tr("Доп. заведения/филиалы (пакет)")
                     }), (0, r.jsx)("select", {
                         value: U,
                         onChange: e => O(e.target.value),
                         className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28",
                         children: a.map(e => (0, r.jsx)("option", {
                             value: e,
-                            children: 0 === e ? "нет" : "+".concat(e)
+                            children: 0 === e ? tr("нет") : "+".concat(e)
                         }, e))
                     })]
                 }), (0, r.jsxs)("label", {
@@ -3853,54 +3873,54 @@ function ej() {
                         className: "accent-indigo-500 rounded",
                         checked: F,
                         onChange: e => M(e.target.checked)
-                    }), "Только расширения (без смены тарифа промокодом)"]
+                    }), tr("Только расширения (без смены тарифа промокодом)")]
                 }), (0, r.jsxs)("label", {
                     className: "flex items-center gap-2 text-xs text-gray-400 cursor-pointer sm:mb-0 col-span-2 sm:col-auto",
-                    title: "ИИ-лимиты тарифа (ТТК с ИИ, меню-ИИ и др.): если включено — сброс каждый месяц в календарное число погашения; если выкл. — одноразовый пул на весь срок промо",
+                    title: tr("ИИ-лимиты тарифа (ТТК с ИИ, меню-ИИ и др.): если включено — сброс каждый месяц в календарное число погашения; если выкл. — одноразовый пул на весь срок промо"),
                     children: [(0, r.jsx)("input", {
                         type: "checkbox",
                         className: "accent-indigo-500 rounded",
                         checked: q,
                         onChange: e => H(e.target.checked)
-                    }), "Возобновляемые ИИ-лимиты каждый месяц (от даты применения)"]
+                    }), tr("Возобновляемые ИИ-лимиты каждый месяц (от даты применения)")]
                 }), (0, r.jsx)("button", {
                     onClick: X,
                     disabled: m || !h.trim(),
                     className: "col-span-2 sm:col-auto bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2 rounded-lg font-medium transition text-sm",
-                    children: m ? "..." : "+ Создать"
+                    children: m ? "..." : tr("+ Создать")
                 })]
             }), (0, r.jsxs)("div", {
                 className: "text-[11px] text-gray-600 mt-3 border-t border-gray-800 pt-3 leading-snug space-y-1.5",
                 children: [(0, r.jsxs)("div", {
                     children: [(0, r.jsx)("span", {
                         className: "text-gray-500",
-                        children: "Промокод при погашении: "
+                        children: tr("Промокод при погашении: ")
                     }), (0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: F ? "только расширения (тариф по коду не меняется)" : "тариф ".concat(d(L), "; даты, макс. сотр. и макс. фил. — как в полях выше")
+                        children: F ? tr("только расширения (тариф по коду не меняется)") : tr("тариф ").concat(d(L), tr("; даты, макс. сотр. и макс. фил. — как в полях выше"))
                     })]
                 }), (() => {
                     let e = "" === D.trim() ? 0 : parseInt(D.trim(), 10),
                         s = "" === U.trim() ? 0 : parseInt(U.trim(), 10);
                     return Number.isNaN(e) || Number.isNaN(s) || !t.includes(e) || !a.includes(s) ? (0, r.jsx)("div", {
                         className: "text-amber-600/90",
-                        children: "Выберите пакеты только из фиксированного списка."
+                        children: tr("Выберите пакеты только из фиксированного списка.")
                     }) : (0, r.jsxs)(r.Fragment, {
                         children: [(0, r.jsxs)("div", {
                             children: [(0, r.jsx)("span", {
                                 className: "text-gray-500",
-                                children: "Пакет сотрудников: "
+                                children: tr("Пакет сотрудников: ")
                             }), (0, r.jsx)("span", {
                                 className: "text-gray-400",
-                                children: 0 === e ? "не включен" : "+".concat(e)
+                                children: 0 === e ? tr("не включен") : "+".concat(e)
                             })]
                         }), (0, r.jsxs)("div", {
                             children: [(0, r.jsx)("span", {
                                 className: "text-gray-500",
-                                children: "Пакет заведений: "
+                                children: tr("Пакет заведений: ")
                             }), (0, r.jsx)("span", {
                                 className: "text-gray-400",
-                                children: 0 === s ? "не включен" : "+".concat(s)
+                                children: 0 === s ? tr("не включен") : "+".concat(s)
                             })]
                         })]
                     })
@@ -3912,7 +3932,7 @@ function ej() {
                 type: "text",
                 value: z,
                 onChange: e => G(e.target.value),
-                placeholder: "Поиск...",
+                placeholder: tr("Поиск..."),
                 className: "bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-32 text-sm"
             }), (0, r.jsx)("div", {
                 className: "flex gap-1 flex-wrap",
@@ -3920,20 +3940,20 @@ function ej() {
                     onClick: () => V(e),
                     className: "px-2.5 py-1.5 rounded-lg text-xs transition ".concat(K === e ? "bg-indigo-600 text-white" : "bg-gray-900 border border-gray-800 text-gray-400 hover:text-white"),
                     children: {
-                        all: "Все",
-                        free: "Своб.",
-                        used: "Исп.",
-                        expired: "Истёк",
-                        disabled: "Выкл."
+                        all: tr("Все"),
+                        free: tr("Своб."),
+                        used: tr("Исп."),
+                        expired: tr("Истёк"),
+                        disabled: tr("Выкл.")
                     } [e]
                 }, e))
             })]
         }), c ? (0, r.jsx)("div", {
             className: "p-12 text-center text-gray-500",
-            children: "Загрузка..."
+            children: tr("Загрузка...")
         }) : 0 === eN.length ? (0, r.jsx)("div", {
             className: "p-12 text-center text-gray-500",
-            children: "Промокодов нет"
+            children: tr("Промокодов нет")
         }) : (0, r.jsxs)(r.Fragment, {
             children: [(0, r.jsx)("div", {
                 className: "hidden md:block bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
@@ -3946,50 +3966,50 @@ function ej() {
                                 className: "border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide",
                                 children: [(0, r.jsx)("th", {
                                     className: "px-4 py-3 text-left",
-                                    children: "Код"
+                                    children: tr("Код")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-left",
-                                    children: "Статус"
+                                    children: tr("Статус")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-center text-[10px] uppercase max-w-[6rem]",
-                                    title: "Сколько раз код уже применён / максимум разных учётных записей",
-                                    children: "Активации"
+                                    title: tr("Сколько раз код уже применён / максимум разных учётных записей"),
+                                    children: tr("Активации")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-left",
-                                    children: "Кому применён"
+                                    children: tr("Кому применён")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-left",
-                                    title: "Классика: дата \xabдействует до\xbb. Новый тип: дни с активации и при необходимости срок ввода кода.",
-                                    children: "Логика / срок"
+                                    title: tr("Классика: дата \xabдействует до\xbb. Новый тип: дни с активации и при необходимости срок ввода кода."),
+                                    children: tr("Логика / срок")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-center",
-                                    children: "Сотр."
+                                    children: tr("Сотр.")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-center",
-                                    title: "Базовое число доп. филиалов на владельца (не пакет +1)",
-                                    children: "Фил."
+                                    title: tr("Базовое число доп. филиалов на владельца (не пакет +1)"),
+                                    children: tr("Фил.")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-center text-[10px] uppercase max-w-[5.5rem]",
-                                    title: "Отдельная подписка расширения Lite: число активаций в коде, каждая даёт +5 к лимиту сотрудников на заведение погашения",
-                                    children: "+5 сотр."
+                                    title: tr("Отдельная подписка расширения Lite: число активаций в коде, каждая даёт +5 к лимиту сотрудников на заведение погашения"),
+                                    children: tr("+5 сотр.")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-center text-[10px] uppercase max-w-[5.5rem]",
-                                    title: "Отдельная подписка расширения: число активаций в коде, каждая даёт +1 филиал на владельца",
-                                    children: "+1 фил."
+                                    title: tr("Отдельная подписка расширения: число активаций в коде, каждая даёт +1 филиал на владельца"),
+                                    children: tr("+1 фил.")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-center text-[10px] uppercase",
-                                    title: "Только подписки расширения в коде, без выдачи тарифа Pro/Ultra",
-                                    children: "Только расш."
+                                    title: tr("Только подписки расширения в коде, без выдачи тарифа Pro/Ultra"),
+                                    children: tr("Только расш.")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-center text-[10px] uppercase max-w-[6rem]",
-                                    title: "ИИ-лимиты: ежемесячно от даты погашения или одноразовый пул",
-                                    children: "ИИ/мес"
+                                    title: tr("ИИ-лимиты: ежемесячно от даты погашения или одноразовый пул"),
+                                    children: tr("ИИ/мес")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-left",
-                                    children: "Создан"
+                                    children: tr("Создан")
                                 }), (0, r.jsx)("th", {
                                     className: "px-4 py-3 text-right",
-                                    children: "Действия"
+                                    children: tr("Действия")
                                 })]
                             })
                         }), (0, r.jsx)("tbody", {
@@ -3997,23 +4017,23 @@ function ej() {
                                 var n, i, o, d, c;
                                 let x = {
                                         disabled: {
-                                            label: "Отключён",
+                                            label: tr("Отключён"),
                                             cls: "bg-amber-900/40 text-amber-200"
                                         },
                                         used: {
-                                            label: "Закончился",
+                                            label: tr("Закончился"),
                                             cls: "bg-blue-900/40 text-blue-300"
                                         },
                                         partial: {
-                                            label: "Есть активации",
+                                            label: tr("Есть активации"),
                                             cls: "bg-cyan-900/40 text-cyan-200"
                                         },
                                         expired: {
-                                            label: "Истёк",
+                                            label: tr("Истёк"),
                                             cls: "bg-red-900/40 text-red-300"
                                         },
                                         free: {
-                                            label: "Свободен",
+                                            label: tr("Свободен"),
                                             cls: "bg-emerald-900/40 text-emerald-300"
                                         }
                                     } [em(e)],
@@ -4032,10 +4052,10 @@ function ej() {
                                                 children: e.code
                                             }), (0, r.jsx)("span", {
                                                 className: "text-[10px] text-gray-600 font-normal tracking-normal",
-                                                children: p ? "тип: с активации" : "тип: классика"
+                                                children: p ? tr("тип: с активации") : tr("тип: классика")
                                             }), (0, r.jsx)("span", {
                                                 className: "text-[10px] text-gray-500",
-                                                children: "тариф"
+                                                children: tr("тариф")
                                             }), (0, r.jsx)(eb, {
                                                 row: e,
                                                 saving: m,
@@ -4053,7 +4073,7 @@ function ej() {
                                         className: "px-4 py-3 text-center align-top",
                                         children: (0, r.jsxs)("button", {
                                             type: "button",
-                                            title: "Изменить лимит активаций",
+                                            title: tr("Изменить лимит активаций"),
                                             onClick: () => {
                                                 var t;
                                                 return eo(e.id, null !== (t = e.max_redemptions) && void 0 !== t ? t : 1)
@@ -4086,15 +4106,15 @@ function ej() {
                                                     return ei(e.id, null !== (t = e.activation_duration_days) && void 0 !== t ? t : null)
                                                 },
                                                 className: "block text-left text-emerald-300/95 hover:text-emerald-200 text-xs",
-                                                children: [e.activation_duration_days, " дн. с активации"]
+                                                children: [e.activation_duration_days, tr(" дн. с активации")]
                                             }), e.expires_at ? (0, r.jsxs)("button", {
                                                 type: "button",
                                                 onClick: () => ea(e),
                                                 className: "block text-[10px] text-gray-500 hover:text-gray-300 ".concat(ex(e.expires_at) ? "text-red-400" : ""),
-                                                children: ["ввести до ", es(e.expires_at)]
+                                                children: [tr("ввести до "), es(e.expires_at)]
                                             }) : (0, r.jsx)("span", {
                                                 className: "text-[10px] text-gray-600",
-                                                children: "ввод кода без крайней даты"
+                                                children: tr("ввод кода без крайней даты")
                                             })]
                                         }) : (0, r.jsx)("button", {
                                             type: "button",
@@ -4131,41 +4151,41 @@ function ej() {
                                     }), (0, r.jsx)("td", {
                                         className: "px-4 py-3 text-center align-top",
                                         children: (0, r.jsx)("select", {
-                                            title: "Пакет сотрудников",
+                                            title: tr("Пакет сотрудников"),
                                             value: String(null !== (d = e.grants_employee_slot_packs) && void 0 !== d ? d : 0),
                                             onChange: t => ep(e.id, parseInt(t.target.value, 10)),
                                             className: "bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200",
                                             children: t.map(e => (0, r.jsx)("option", {
                                                 value: e,
-                                                children: 0 === e ? "нет" : "+".concat(e)
+                                                children: 0 === e ? tr("нет") : "+".concat(e)
                                             }, e))
                                         })
                                     }), (0, r.jsx)("td", {
                                         className: "px-4 py-3 text-center align-top",
                                         children: (0, r.jsx)("select", {
-                                            title: "Пакет заведений",
+                                            title: tr("Пакет заведений"),
                                             value: String(null !== (c = e.grants_branch_slot_packs) && void 0 !== c ? c : 0),
                                             onChange: t => eg(e.id, parseInt(t.target.value, 10)),
                                             className: "bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200",
                                             children: a.map(e => (0, r.jsx)("option", {
                                                 value: e,
-                                                children: 0 === e ? "нет" : "+".concat(e)
+                                                children: 0 === e ? tr("нет") : "+".concat(e)
                                             }, e))
                                         })
                                     }), (0, r.jsx)("td", {
                                         className: "px-4 py-3 text-center",
                                         children: (0, r.jsx)("button", {
                                             type: "button",
-                                            title: "Только подписки расширения, без смены тарифа",
+                                            title: tr("Только подписки расширения, без смены тарифа"),
                                             onClick: () => eh(e),
                                             className: "text-[10px] px-2 py-0.5 rounded border transition ".concat(e.grants_additive_only ? "border-amber-600/60 text-amber-200 bg-amber-950/40" : "border-gray-700 text-gray-600 hover:border-gray-500"),
-                                            children: e.grants_additive_only ? "да" : "нет"
+                                            children: e.grants_additive_only ? tr("да") : tr("нет")
                                         })
                                     }), (0, r.jsx)("td", {
                                         className: "px-4 py-3 text-center",
                                         children: (0, r.jsx)("label", {
                                             className: "inline-flex items-center justify-center cursor-pointer",
-                                            title: "Возобновляемые ИИ-лимиты каждый месяц (от даты применения промокода)",
+                                            title: tr("Возобновляемые ИИ-лимиты каждый месяц (от даты применения промокода)"),
                                             children: (0, r.jsx)("input", {
                                                 type: "checkbox",
                                                 className: "accent-emerald-500 rounded",
@@ -4183,7 +4203,7 @@ function ej() {
                                             className: "flex gap-2 justify-end flex-wrap",
                                             children: [(0, r.jsx)("button", {
                                                 type: "button",
-                                                title: e.is_disabled ? "Включить промокод" : "Отключить промокод",
+                                                title: e.is_disabled ? tr("Включить промокод") : tr("Отключить промокод"),
                                                 onClick: () => ej(e),
                                                 disabled: m,
                                                 className: "text-xs px-2 py-1 rounded border transition ".concat(e.is_disabled ? "border-amber-700 text-amber-300 hover:bg-amber-900/30" : "border-gray-700 text-gray-500 hover:text-amber-200 hover:border-amber-800"),
@@ -4210,23 +4230,23 @@ function ej() {
                     var s, n, i, o, d, c, x, u;
                     let p = {
                             disabled: {
-                                label: "Отключён",
+                                label: tr("Отключён"),
                                 cls: "bg-amber-900/40 text-amber-200"
                             },
                             used: {
-                                label: "Закончился",
+                                label: tr("Закончился"),
                                 cls: "bg-blue-900/40 text-blue-300"
                             },
                             partial: {
-                                label: "Есть активации",
+                                label: tr("Есть активации"),
                                 cls: "bg-cyan-900/40 text-cyan-200"
                             },
                             expired: {
-                                label: "Истёк",
+                                label: tr("Истёк"),
                                 cls: "bg-red-900/40 text-red-300"
                             },
                             free: {
-                                label: "Свободен",
+                                label: tr("Свободен"),
                                 cls: "bg-emerald-900/40 text-emerald-300"
                             }
                         } [em(e)],
@@ -4246,7 +4266,7 @@ function ej() {
                             })]
                         }), (0, r.jsxs)("div", {
                             className: "text-[11px] text-gray-500 mb-2",
-                            children: ["Активации:", " ", (0, r.jsxs)("button", {
+                            children: [tr("Активации:"), " ", (0, r.jsxs)("button", {
                                 type: "button",
                                 className: "font-mono text-gray-300 hover:text-indigo-400",
                                 onClick: () => {
@@ -4263,12 +4283,12 @@ function ej() {
                         }), (0, r.jsxs)("div", {
                             className: "text-[10px] text-gray-600 mb-1 space-y-1",
                             children: [(0, r.jsx)("div", {
-                                children: (null !== (i = e.activation_duration_days) && void 0 !== i ? i : 0) > 0 ? "тип: с активации" : "тип: классика"
+                                children: (null !== (i = e.activation_duration_days) && void 0 !== i ? i : 0) > 0 ? tr("тип: с активации") : tr("тип: классика")
                             }), (0, r.jsxs)("div", {
                                 className: "flex flex-col gap-0.5",
                                 children: [(0, r.jsx)("span", {
                                     className: "text-gray-500",
-                                    children: "Тариф"
+                                    children: tr("Тариф")
                                 }), (0, r.jsx)(eb, {
                                     row: e,
                                     saving: m,
@@ -4286,22 +4306,22 @@ function ej() {
                                     return ei(e.id, null !== (t = e.activation_duration_days) && void 0 !== t ? t : null)
                                 },
                                 className: "text-emerald-300",
-                                children: [e.activation_duration_days, " дн. с активации"]
+                                children: [e.activation_duration_days, tr(" дн. с активации")]
                             }), e.expires_at && (0, r.jsxs)("span", {
                                 className: ex(e.expires_at) ? "text-red-400" : "",
-                                children: [(null !== (o = e.activation_duration_days) && void 0 !== o ? o : 0) > 0 ? "ввести до " : "до ", es(e.expires_at)]
+                                children: [(null !== (o = e.activation_duration_days) && void 0 !== o ? o : 0) > 0 ? tr("ввести до ") : tr("до "), es(e.expires_at)]
                             }), null != e.max_employees && (0, r.jsxs)("span", {
                                 className: "text-indigo-300",
-                                children: ["≤", e.max_employees, " сотр."]
+                                children: ["≤", e.max_employees, tr(" сотр.")]
                             }), null != e.max_branches && (0, r.jsxs)("span", {
                                 className: "text-indigo-300",
-                                children: ["≤", e.max_branches, " фил."]
+                                children: ["≤", e.max_branches, tr(" фил.")]
                             }), (0, r.jsxs)("span", {
                                 className: "text-gray-600 block",
-                                children: ["Пакет сотрудников: ", (null !== (d = e.grants_employee_slot_packs) && void 0 !== d ? d : 0) > 0 ? "+".concat(e.grants_employee_slot_packs) : "нет"]
+                                children: [tr("Пакет сотрудников: "), (null !== (d = e.grants_employee_slot_packs) && void 0 !== d ? d : 0) > 0 ? "+".concat(e.grants_employee_slot_packs) : tr("нет")]
                             }), (0, r.jsxs)("span", {
                                 className: "text-gray-600 block",
-                                children: ["Пакет заведений: ", (null !== (c = e.grants_branch_slot_packs) && void 0 !== c ? c : 0) > 0 ? "+".concat(e.grants_branch_slot_packs) : "нет", e.grants_additive_only ? " \xb7 только расширения" : ""]
+                                children: [tr("Пакет заведений: "), (null !== (c = e.grants_branch_slot_packs) && void 0 !== c ? c : 0) > 0 ? "+".concat(e.grants_branch_slot_packs) : tr("нет"), e.grants_additive_only ? tr(" \xb7 только расширения") : ""]
                             }), (0, r.jsxs)("label", {
                                 className: "flex items-center gap-2 text-xs text-gray-500 cursor-pointer",
                                 children: [(0, r.jsx)("input", {
@@ -4309,9 +4329,9 @@ function ej() {
                                     className: "accent-emerald-500 rounded",
                                     checked: !!e.grants_limits_renew_monthly,
                                     onChange: () => void ey(e)
-                                }), "ИИ-лимиты/мес"]
+                                }), tr("ИИ-лимиты/мес")]
                             }), (0, r.jsxs)("span", {
-                                children: ["создан ", es(e.created_at)]
+                                children: [tr("создан "), es(e.created_at)]
                             })]
                         }), (0, r.jsxs)("div", {
                             className: "flex gap-2 flex-wrap",
@@ -4320,50 +4340,50 @@ function ej() {
                                 onClick: () => ej(e),
                                 disabled: m,
                                 className: "px-3 py-2 rounded-lg border text-sm ".concat(e.is_disabled ? "border-amber-700 text-amber-300" : "border-gray-700 text-gray-400 hover:text-amber-200"),
-                                title: e.is_disabled ? "Включить" : "Отключить",
+                                title: e.is_disabled ? tr("Включить") : tr("Отключить"),
                                 children: "⏻"
                             }), (0, r.jsx)("button", {
                                 onClick: () => et(e),
                                 className: "flex-1 min-w-[8rem] text-center text-gray-400 hover:text-white active:text-white transition text-sm py-2 rounded-lg border border-gray-700 active:border-gray-500",
-                                children: e.is_used ? "↩ Сбросить" : "✓ Отметить исп."
+                                children: e.is_used ? tr("↩ Сбросить") : tr("✓ Отметить исп.")
                             }), (0, r.jsx)("button", {
                                 onClick: () => ea(e),
                                 className: "px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white active:text-white text-sm",
-                                title: "Дата окончания / ввода",
+                                title: tr("Дата окончания / ввода"),
                                 children: "\uD83D\uDCC5"
                             }), (0, r.jsx)("button", {
                                 onClick: () => ed(e.id, e.max_employees),
                                 className: "px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white active:text-white text-sm",
-                                title: "Макс. сотрудников (промо)",
+                                title: tr("Макс. сотрудников (промо)"),
                                 children: "\uD83D\uDC65"
                             }), (0, r.jsx)("button", {
                                 onClick: () => eu(e.id, e.max_branches),
                                 className: "px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white active:text-white text-sm",
-                                title: "Макс. филиалов (промо)",
+                                title: tr("Макс. филиалов (промо)"),
                                 children: "\uD83C\uDFE2"
                             }), (0, r.jsx)("select", {
                                 value: String(null !== (x = e.grants_employee_slot_packs) && void 0 !== x ? x : 0),
                                 onChange: t => ep(e.id, parseInt(t.target.value, 10)),
                                 className: "px-3 py-2 rounded-lg border border-gray-700 bg-gray-900 text-gray-200 text-sm",
-                                title: "Пакет сотрудников",
+                                title: tr("Пакет сотрудников"),
                                 children: t.map(e => (0, r.jsx)("option", {
                                     value: e,
-                                    children: 0 === e ? "Сотр.: нет" : "Сотр.: +".concat(e)
+                                    children: 0 === e ? tr("Сотр.: нет") : tr("Сотр.: +").concat(e)
                                 }, e))
                             }), (0, r.jsx)("select", {
                                 value: String(null !== (u = e.grants_branch_slot_packs) && void 0 !== u ? u : 0),
                                 onChange: t => eg(e.id, parseInt(t.target.value, 10)),
                                 className: "px-3 py-2 rounded-lg border border-gray-700 bg-gray-900 text-gray-200 text-sm",
-                                title: "Пакет заведений",
+                                title: tr("Пакет заведений"),
                                 children: a.map(e => (0, r.jsx)("option", {
                                     value: e,
-                                    children: 0 === e ? "Филиалы: нет" : "Филиалы: +".concat(e)
+                                    children: 0 === e ? tr("Филиалы: нет") : tr("Филиалы: +").concat(e)
                                 }, e))
                             }), (0, r.jsx)("button", {
                                 type: "button",
                                 onClick: () => eh(e),
                                 className: "px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-amber-200 text-sm",
-                                title: "Только подписки расширения",
+                                title: tr("Только подписки расширения"),
                                 children: "+"
                             }), (0, r.jsx)("button", {
                                 onClick: () => ee(e.id),
@@ -4379,17 +4399,19 @@ function ej() {
 }
 
 function eN() {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     let [e, t] = (0, s.useState)(null), [a, l] = (0, s.useState)(!0), [n, i] = (0, s.useState)(null), o = (0, s.useCallback)(async () => {
         l(!0), i(null);
         let e = await fetch("/api/security-snapshot"),
             a = await e.json();
-        e.ok ? t(a) : (i("string" == typeof(null == a ? void 0 : a.error) ? a.error : "Ошибка загрузки"), t(null)), l(!1)
+        e.ok ? t(a) : (i("string" == typeof(null == a ? void 0 : a.error) ? a.error : tr("Ошибка загрузки")), t(null)), l(!1)
     }, []);
     if ((0, s.useEffect)(() => {
             o()
         }, [o]), a) return (0, r.jsx)("div", {
         className: "p-12 text-center text-gray-500",
-        children: "Загрузка..."
+        children: tr("Загрузка...")
     });
     if (n) return (0, r.jsxs)("div", {
         className: "space-y-4",
@@ -4400,12 +4422,12 @@ function eN() {
             type: "button",
             onClick: () => o(),
             className: "bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium",
-            children: "Обновить"
+            children: tr("Обновить")
         })]
     });
     if (!e) return null;
     let d = e.cloudflare,
-        c = "number" == typeof d.requests24hApprox ? d.requests24hApprox.toLocaleString("ru-RU") : "—",
+        c = "number" == typeof d.requests24hApprox ? d.requests24hApprox.toLocaleString(localeTag) : "—",
         x = e.monitoring,
         m = "alert" === x.alertLevel ? "border-red-800/60 bg-red-950/30 text-red-100" : "attention" === x.alertLevel ? "border-amber-800/50 bg-amber-950/20 text-amber-100" : "border-emerald-800/50 bg-emerald-950/20 text-emerald-100";
     return (0, r.jsxs)("div", {
@@ -4414,10 +4436,10 @@ function eN() {
             className: "rounded-xl border p-4 ".concat(m),
             children: [(0, r.jsxs)("h2", {
                 className: "text-base font-semibold mb-1",
-                children: ["Периметр: ", x.alertLevelLabel]
+                children: [tr("Периметр: "), x.alertLevelLabel]
             }), (0, r.jsxs)("p", {
                 className: "text-sm opacity-90 leading-relaxed",
-                children: ["Постоянная защита: WAF и rate limit (Cloudflare), лимиты Edge и Auth, RLS. При лавине боты получают block/429 — приложение для своих работает. Снимок ниже — для справки; дежурить не нужно. Запасной сигнал: ", x.watchdogSchedule, " → issue в GitHub."]
+                children: [tr("Постоянная защита: WAF и rate limit (Cloudflare), лимиты Edge и Auth, RLS. При лавине боты получают block/429 — приложение для своих работает. Снимок ниже — для справки; дежурить не нужно. Запасной сигнал: "), x.watchdogSchedule, tr(" → issue в GitHub.")]
             }), x.alertReasons.length > 0 ? (0, r.jsx)("ul", {
                 className: "mt-2 text-xs opacity-90 list-disc list-inside space-y-1",
                 children: x.alertReasons.map((e, t) => (0, r.jsx)("li", {
@@ -4425,14 +4447,14 @@ function eN() {
                 }, t))
             }) : null, (0, r.jsxs)("p", {
                 className: "text-xs mt-2 opacity-70",
-                children: ["Один раз: ", x.docPath]
+                children: [tr("Один раз: "), x.docPath]
             })]
         }), (0, r.jsx)("p", {
             className: "text-gray-400 text-sm leading-relaxed",
-            children: "Сводка периметра: трафик и WAF (Cloudflare, если заданы CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID в секретах Worker), эвристики и ссылки в консоли. Полные сырые логи — в Cloudflare и Supabase."
+            children: tr("Сводка периметра: трафик и WAF (Cloudflare, если заданы CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID в секретах Worker), эвристики и ссылки в консоли. Полные сырые логи — в Cloudflare и Supabase.")
         }), (0, r.jsxs)("p", {
             className: "text-gray-500 text-xs",
-            children: ["Снимок: ", e.generatedAt]
+            children: [tr("Снимок: "), e.generatedAt]
         }), (0, r.jsxs)("section", {
             children: [(0, r.jsx)("h2", {
                 className: "text-base font-semibold text-white mb-2",
@@ -4441,7 +4463,7 @@ function eN() {
                 className: "space-y-2",
                 children: [(0, r.jsxs)("p", {
                     className: "text-gray-200 text-sm",
-                    children: ["Запросы (~24 ч): ", (0, r.jsx)("span", {
+                    children: [tr("Запросы (~24 ч): "), (0, r.jsx)("span", {
                         className: "font-mono text-indigo-300",
                         children: c
                     })]
@@ -4451,7 +4473,7 @@ function eN() {
                 })]
             }) : (0, r.jsx)("p", {
                 className: "text-gray-400 text-sm",
-                children: "API Cloudflare не настроен. В Secrets/переменных Worker задайте CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID (Analytics + Firewall Read) — появятся счётчик и события WAF. Опционально CLOUDFLARE_ACCOUNT_ID — для прямых ссылок в дашборд."
+                children: tr("API Cloudflare не настроен. В Secrets/переменных Worker задайте CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID (Analytics + Firewall Read) — появятся счётчик и события WAF. Опционально CLOUDFLARE_ACCOUNT_ID — для прямых ссылок в дашборд.")
             })]
         }), e.hint ? (0, r.jsx)("p", {
             className: "text-amber-200/90 text-sm border border-amber-800/50 rounded-lg p-3 bg-amber-950/20",
@@ -4459,7 +4481,7 @@ function eN() {
         }) : null, (0, r.jsxs)("section", {
             children: [(0, r.jsx)("h2", {
                 className: "text-base font-semibold text-white mb-3",
-                children: "Интерпретация"
+                children: tr("Интерпретация")
             }), (0, r.jsx)("ul", {
                 className: "space-y-3",
                 children: e.insights.map((e, t) => (0, r.jsxs)("li", {
@@ -4472,15 +4494,15 @@ function eN() {
                         children: function(e) {
                             switch (e.kind) {
                                 case "traffic_volume":
-                                    return "За ~24 ч около ".concat(e.requests24h.toLocaleString("ru-RU"), " HTTP-запросов к зоне. Сравните с обычным днём: резкий рост часто совпадает с ботами или парсингом.");
+                                    return tr("За ~24 ч около ").concat(e.requests24h.toLocaleString(localeTag), tr(" HTTP-запросов к зоне. Сравните с обычным днём: резкий рост часто совпадает с ботами или парсингом."));
                                 case "waf_activity":
-                                    return "Срабатывания WAF: блокировок ".concat(e.blocks, ", challenge ").concat(e.challenges, ". Возможны сканирование, перебор или нетипичный клиент — смотрите Security в Cloudflare.");
+                                    return tr("Срабатывания WAF: блокировок ").concat(e.blocks, ", challenge ").concat(e.challenges, tr(". Возможны сканирование, перебор или нетипичный клиент — смотрите Security в Cloudflare."));
                                 case "ip_noisy":
-                                    return "IP ".concat(e.ip, " даёт ").concat(e.events, " событий в выборке — проверьте rate limit / правило для IP (возможен парсинг или скрипт).");
+                                    return "IP ".concat(e.ip, tr(" даёт ")).concat(e.events, tr(" событий в выборке — проверьте rate limit / правило для IP (возможен парсинг или скрипт)."));
                                 case "probe_path":
-                                    return "В выборке есть запрос к подозрительному пути (".concat(e.pathSample, ") — похоже на сканирование уязвимостей.");
+                                    return tr("В выборке есть запрос к подозрительному пути (").concat(e.pathSample, tr(") — похоже на сканирование уязвимостей."));
                                 case "db_attack_note":
-                                    return "Прямой доступ к БД из интернета здесь обычно не виден: Postgres за закрытым API. Риски — через ключи и эндпоинты; полные логи Auth/Edge — в Supabase.";
+                                    return tr("Прямой доступ к БД из интернета здесь обычно не виден: Postgres за закрытым API. Риски — через ключи и эндпоинты; полные логи Auth/Edge — в Supabase.");
                                 default:
                                     return ""
                             }
@@ -4491,7 +4513,7 @@ function eN() {
         }), (0, r.jsxs)("section", {
             children: [(0, r.jsx)("h2", {
                 className: "text-base font-semibold text-white mb-2",
-                children: "События WAF (последние)"
+                children: tr("События WAF (последние)")
             }), d.configured && 0 !== d.firewallEvents.length ? (0, r.jsx)("div", {
                 className: "overflow-x-auto bg-gray-900 rounded-xl border border-gray-800",
                 children: (0, r.jsxs)("table", {
@@ -4501,16 +4523,16 @@ function eN() {
                             className: "border-b border-gray-800 text-gray-500 text-left",
                             children: [(0, r.jsx)("th", {
                                 className: "px-3 py-2",
-                                children: "Действие"
+                                children: tr("Действие")
                             }), (0, r.jsx)("th", {
                                 className: "px-3 py-2",
                                 children: "IP"
                             }), (0, r.jsx)("th", {
                                 className: "px-3 py-2",
-                                children: "Путь"
+                                children: tr("Путь")
                             }), (0, r.jsx)("th", {
                                 className: "px-3 py-2",
-                                children: "Время"
+                                children: tr("Время")
                             })]
                         })
                     }), (0, r.jsx)("tbody", {
@@ -4540,12 +4562,12 @@ function eN() {
                 })
             }) : (0, r.jsx)("p", {
                 className: "text-gray-500 text-sm",
-                children: d.configured ? "Нет событий в выборке или недоступно на тарифе/API." : "—"
+                children: d.configured ? tr("Нет событий в выборке или недоступно на тарифе/API.") : "—"
             })]
         }), (0, r.jsxs)("section", {
             children: [(0, r.jsx)("h2", {
                 className: "text-base font-semibold text-white mb-2",
-                children: "Полные логи"
+                children: tr("Полные логи")
             }), (0, r.jsxs)("ul", {
                 className: "space-y-2 text-sm",
                 children: [(0, r.jsx)("li", {
@@ -4586,24 +4608,26 @@ function eN() {
             type: "button",
             onClick: () => o(),
             className: "bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 rounded-lg text-sm",
-            children: "Обновить данные"
+            children: tr("Обновить данные")
         })]
     })
 }
 
 function ef() {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     var e, t;
     let [a, l] = (0, s.useState)(null), [n, i] = (0, s.useState)(!0), [o, d] = (0, s.useState)(null), c = (0, s.useCallback)(async () => {
         i(!0), d(null);
         let e = await fetch("/api/system-health"),
             t = await e.json();
-        e.ok ? l(t) : (d("string" == typeof(null == t ? void 0 : t.error) ? t.error : "Ошибка загрузки"), l(null)), i(!1)
+        e.ok ? l(t) : (d("string" == typeof(null == t ? void 0 : t.error) ? t.error : tr("Ошибка загрузки")), l(null)), i(!1)
     }, []);
     if ((0, s.useEffect)(() => {
             c()
         }, [c]), n) return (0, r.jsx)("div", {
         className: "p-12 text-center text-gray-500",
-        children: "Загрузка..."
+        children: tr("Загрузка...")
     });
     if (o) return (0, r.jsxs)("div", {
         className: "space-y-4",
@@ -4614,11 +4638,11 @@ function ef() {
             type: "button",
             onClick: () => c(),
             className: "bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium",
-            children: "Повторить"
+            children: tr("Повторить")
         })]
     });
     if (!a) return null;
-    let x = "number" == typeof a.cloudflare.requests24hApprox ? a.cloudflare.requests24hApprox.toLocaleString("ru-RU") : "—";
+    let x = "number" == typeof a.cloudflare.requests24hApprox ? a.cloudflare.requests24hApprox.toLocaleString(localeTag) : "—";
 
     function m(e, t) {
         return t ? e >= 1200 ? "text-amber-300" : "text-emerald-300" : "text-red-400"
@@ -4627,31 +4651,31 @@ function ef() {
         className: "space-y-6 max-w-4xl",
         children: [(0, r.jsx)("p", {
             className: "text-gray-400 text-sm leading-relaxed",
-            children: "Быстрые проверки из админки: доступность Supabase (Auth и API к БД) и объём HTTP-запросов к зоне сайта в Cloudflare за ~24 ч. Это не замена мониторингу в Supabase (CPU, квоты, логи Edge), но помогает заметить отказ или аномальный трафик до того, как \xabляжет\xbb приложение у пользователей."
+            children: tr("Быстрые проверки из админки: доступность Supabase (Auth и API к БД) и объём HTTP-запросов к зоне сайта в Cloudflare за ~24 ч. Это не замена мониторингу в Supabase (CPU, квоты, логи Edge), но помогает заметить отказ или аномальный трафик до того, как \xabляжет\xbb приложение у пользователей.")
         }), (0, r.jsxs)("div", {
             className: "flex flex-wrap items-center gap-3",
             children: [(0, r.jsx)("span", {
                 className: "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ".concat(a.ok ? "bg-emerald-950/60 text-emerald-200 border border-emerald-800/50" : "bg-red-950/60 text-red-200 border border-red-800/50"),
-                children: a.ok ? "Критичные проверки пройдены" : "Есть проблемы доступности"
+                children: a.ok ? tr("Критичные проверки пройдены") : tr("Есть проблемы доступности")
             }), (0, r.jsxs)("span", {
                 className: "text-gray-500 text-xs",
-                children: ["Снимок: ", a.generatedAt]
+                children: [tr("Снимок: "), a.generatedAt]
             })]
         }), (0, r.jsxs)("div", {
             className: "grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3",
             children: [(0, r.jsx)(eP, {
                 label: "Auth (GoTrue)",
-                value: a.authHealth ? "".concat(a.authHealth.latencyMs, " мс") : "—",
+                value: a.authHealth ? "".concat(a.authHealth.latencyMs, tr(" мс")) : "—",
                 dimmed: !(null === (e = a.authHealth) || void 0 === e ? void 0 : e.ok)
             }), (0, r.jsx)(eP, {
-                label: "API БД (PostgREST)",
-                value: a.restSmoke ? "".concat(a.restSmoke.latencyMs, " мс") : "—",
+                label: tr("API БД (PostgREST)"),
+                value: a.restSmoke ? "".concat(a.restSmoke.latencyMs, tr(" мс")) : "—",
                 dimmed: !(null === (t = a.restSmoke) || void 0 === t ? void 0 : t.ok)
             }), (0, r.jsx)(eP, {
-                label: "Заведений (оценка)",
+                label: tr("Заведений (оценка)"),
                 value: null != a.restRowEstimate ? a.restRowEstimate : "—"
             }), (0, r.jsx)(eP, {
-                label: "HTTP к зоне (~24 ч)",
+                label: tr("HTTP к зоне (~24 ч)"),
                 value: x
             })]
         }), (a.authHealth || a.restSmoke) && (0, r.jsxs)("div", {
@@ -4665,18 +4689,18 @@ function ef() {
             }) : null, a.supabaseUrlHost ? (0, r.jsxs)("p", {
                 className: "text-gray-600 truncate",
                 title: a.supabaseUrlHost,
-                children: ["Хост: ", a.supabaseUrlHost]
+                children: [tr("Хост: "), a.supabaseUrlHost]
             }) : null]
         }), !a.cloudflare.configured && (0, r.jsx)("p", {
             className: "text-amber-200/90 text-sm border border-amber-800/50 rounded-lg p-3 bg-amber-950/20",
-            children: "Трафик Cloudflare не подключён: добавьте CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID в секреты Worker — как для вкладки \xabБезопасность\xbb."
+            children: tr("Трафик Cloudflare не подключён: добавьте CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID в секреты Worker — как для вкладки \xabБезопасность\xbb.")
         }), a.cloudflare.configured && a.cloudflare.graphqlError && (0, r.jsx)("p", {
             className: "text-amber-300/90 text-xs",
             children: a.cloudflare.graphqlError
         }), a.hints.length > 0 && (0, r.jsxs)("section", {
             children: [(0, r.jsx)("h2", {
                 className: "text-base font-semibold text-white mb-2",
-                children: "Подсказки"
+                children: tr("Подсказки")
             }), (0, r.jsx)("ul", {
                 className: "space-y-2",
                 children: a.hints.map((e, t) => (0, r.jsx)("li", {
@@ -4687,7 +4711,7 @@ function ef() {
         }), (0, r.jsxs)("section", {
             children: [(0, r.jsx)("h2", {
                 className: "text-base font-semibold text-white mb-2",
-                children: "Где смотреть полные метрики"
+                children: tr("Где смотреть полные метрики")
             }), (0, r.jsxs)("ul", {
                 className: "space-y-2 text-sm",
                 children: [(0, r.jsx)("li", {
@@ -4696,7 +4720,7 @@ function ef() {
                         target: "_blank",
                         rel: "noopener noreferrer",
                         className: "text-indigo-400 hover:text-indigo-300 underline",
-                        children: "Supabase — проект (отчёты, логи, биллинг)"
+                        children: tr("Supabase — проект (отчёты, логи, биллинг)")
                     })
                 }), (0, r.jsx)("li", {
                     children: (0, r.jsx)("a", {
@@ -4704,7 +4728,7 @@ function ef() {
                         target: "_blank",
                         rel: "noopener noreferrer",
                         className: "text-indigo-400 hover:text-indigo-300 underline",
-                        children: "Supabase — Advisors (медленные запросы, индексы)"
+                        children: tr("Supabase — Advisors (медленные запросы, индексы)")
                     })
                 }), (0, r.jsx)("li", {
                     children: (0, r.jsx)("a", {
@@ -4712,7 +4736,7 @@ function ef() {
                         target: "_blank",
                         rel: "noopener noreferrer",
                         className: "text-indigo-400 hover:text-indigo-300 underline",
-                        children: "Cloudflare — аналитика трафика зоны"
+                        children: tr("Cloudflare — аналитика трафика зоны")
                     })
                 }), (0, r.jsx)("li", {
                     children: (0, r.jsx)("a", {
@@ -4720,7 +4744,7 @@ function ef() {
                         target: "_blank",
                         rel: "noopener noreferrer",
                         className: "text-indigo-400 hover:text-indigo-300 underline",
-                        children: "Cloudflare — Workers & Pages (в т.ч. эта админка)"
+                        children: tr("Cloudflare — Workers & Pages (в т.ч. эта админка)")
                     })
                 })]
             })]
@@ -4728,12 +4752,14 @@ function ef() {
             type: "button",
             onClick: () => c(),
             className: "bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 rounded-lg text-sm",
-            children: "Обновить проверки"
+            children: tr("Обновить проверки")
         })]
     })
 }
 
 function e_() {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     var e, t, a, l, n, i, o, d, c;
     let x = D(),
         [m, u] = (0, s.useState)(() => ed(-30)),
@@ -4750,15 +4776,15 @@ function e_() {
         },
         I = (0, s.useCallback)(async () => {
             if (!m || !p) {
-                P("Укажите даты \xabС\xbb и \xabПо\xbb");
+                P(tr("Укажите даты \xabС\xbb и \xabПо\xbb"));
                 return
             }
             if (m > p) {
-                P("Дата \xabС\xbb не может быть позже \xabПо\xbb");
+                P(tr("Дата \xabС\xbb не может быть позже \xabПо\xbb"));
                 return
             }
             if (m === p && h >= b && "23:59" !== b) {
-                P("Время \xabС\xbb должно быть раньше \xabПо\xbb");
+                P(tr("Время \xabС\xbb должно быть раньше \xabПо\xbb"));
                 return
             }
             L(!0), P(null);
@@ -4769,7 +4795,7 @@ function e_() {
                         cache: "no-store"
                     }),
                     a = await t.json();
-                t.ok ? C(a) : (P("string" == typeof(null == a ? void 0 : a.error) ? a.error : "Ошибка (".concat(t.status, ")")), C(null))
+                t.ok ? C(a) : (P("string" == typeof(null == a ? void 0 : a.error) ? a.error : tr("Ошибка (").concat(t.status, ")")), C(null))
             } finally {
                 L(!1)
             }
@@ -4780,7 +4806,7 @@ function e_() {
     let A = (null == k ? void 0 : k.summary.requests) ? Math.round(k.summary.successRequests / k.summary.requests * 1e3) / 10 : 0,
         R = (0, s.useMemo)(() => {
             var e, t, a, r, s;
-            if (!(null == k ? void 0 : null === (e = k.meta) || void 0 === e ? void 0 : e.rangeFrom) || !(null == k ? void 0 : null === (t = k.meta) || void 0 === t ? void 0 : t.rangeTo)) return (null == k ? void 0 : null === (a = k.meta) || void 0 === a ? void 0 : a.fromIso) ? "с ".concat(es(k.meta.fromIso)) : null;
+            if (!(null == k ? void 0 : null === (e = k.meta) || void 0 === e ? void 0 : e.rangeFrom) || !(null == k ? void 0 : null === (t = k.meta) || void 0 === t ? void 0 : t.rangeTo)) return (null == k ? void 0 : null === (a = k.meta) || void 0 === a ? void 0 : a.fromIso) ? tr("с ").concat(es(k.meta.fromIso)) : null;
             let l = null !== (r = k.meta.rangeFromTime) && void 0 !== r ? r : "00:00",
                 n = null !== (s = k.meta.rangeToTime) && void 0 !== s ? s : "23:59",
                 i = k.meta.rangeFrom === k.meta.rangeTo,
@@ -4797,7 +4823,7 @@ function e_() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "С"
+                        children: tr("С")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         value: m,
@@ -4808,7 +4834,7 @@ function e_() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "время"
+                        children: tr("время")
                     }), (0, r.jsx)("input", {
                         type: "time",
                         value: h,
@@ -4819,7 +4845,7 @@ function e_() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "По"
+                        children: tr("По")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         value: p,
@@ -4830,7 +4856,7 @@ function e_() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "время"
+                        children: tr("время")
                     }), (0, r.jsx)("input", {
                         type: "time",
                         value: b,
@@ -4842,7 +4868,7 @@ function e_() {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-500",
-                    children: "Быстрый период"
+                    children: tr("Быстрый период")
                 }), (0, r.jsxs)("select", {
                     defaultValue: "",
                     onChange: e => {
@@ -4852,36 +4878,36 @@ function e_() {
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm min-w-[10rem]",
                     children: [(0, r.jsx)("option", {
                         value: "",
-                        children: "выбрать…"
+                        children: tr("выбрать…")
                     }), (0, r.jsx)("option", {
                         value: 7,
-                        children: "последние 7 дней"
+                        children: tr("последние 7 дней")
                     }), (0, r.jsx)("option", {
                         value: 14,
-                        children: "последние 14 дней"
+                        children: tr("последние 14 дней")
                     }), (0, r.jsx)("option", {
                         value: 30,
-                        children: "последние 30 дней"
+                        children: tr("последние 30 дней")
                     }), (0, r.jsx)("option", {
                         value: 90,
-                        children: "последние 90 дней"
+                        children: tr("последние 90 дней")
                     }), (0, r.jsx)("option", {
                         value: 180,
-                        children: "последние 180 дней"
+                        children: tr("последние 180 дней")
                     })]
                 })]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-500",
-                    children: "Провайдер"
+                    children: tr("Провайдер")
                 }), (0, r.jsxs)("select", {
                     value: N,
                     onChange: e => f(e.target.value),
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm min-w-[10rem]",
                     children: [(0, r.jsx)("option", {
                         value: "",
-                        children: "все"
+                        children: tr("все")
                     }), (0, r.jsx)("option", {
                         value: "deepseek",
                         children: "deepseek"
@@ -4903,14 +4929,14 @@ function e_() {
                 className: "flex flex-col gap-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-500",
-                    children: "Контекст"
+                    children: tr("Контекст")
                 }), (0, r.jsxs)("select", {
                     value: _,
                     onChange: e => w(e.target.value),
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm min-w-[10rem]",
                     children: [(0, r.jsx)("option", {
                         value: "",
-                        children: "все"
+                        children: tr("все")
                     }), (0, r.jsx)("option", {
                         value: "translation",
                         children: "translation"
@@ -4933,16 +4959,16 @@ function e_() {
                 onClick: () => void I(),
                 className: "bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium",
                 disabled: S,
-                children: S ? "Обновление…" : "Обновить"
+                children: S ? tr("Обновление…") : tr("Обновить")
             }), (null == k ? void 0 : k.meta) ? (0, r.jsxs)("div", {
                 className: "text-xs text-gray-500 ml-auto max-w-xs text-right",
                 children: [R ? (0, r.jsx)("div", {
                     children: R
                 }) : null, k.meta.truncated ? (0, r.jsxs)("div", {
                     className: "text-amber-500/90",
-                    children: ["Учтено ", k.meta.aggregatedRows.toLocaleString("ru-RU"), " из ", k.meta.totalRows.toLocaleString("ru-RU")]
+                    children: [tr("Учтено "), k.meta.aggregatedRows.toLocaleString(localeTag), tr(" из "), k.meta.totalRows.toLocaleString(localeTag)]
                 }) : k.meta.totalRows > 0 ? (0, r.jsxs)("div", {
-                    children: ["Все ", k.meta.totalRows.toLocaleString("ru-RU"), " записей учтены"]
+                    children: [tr("Все "), k.meta.totalRows.toLocaleString(localeTag), tr(" записей учтены")]
                 }) : null]
             }) : null]
         }), T ? (0, r.jsx)("div", {
@@ -4952,7 +4978,7 @@ function e_() {
             className: "bg-gradient-to-br from-amber-950/50 to-gray-900 border border-amber-800/40 rounded-xl p-6",
             children: [(0, r.jsx)("div", {
                 className: "text-xs text-amber-200/70 uppercase tracking-wide",
-                children: "Затраты за период"
+                children: tr("Затраты за период")
             }), (0, r.jsx)("div", {
                 className: "text-4xl font-bold text-amber-300 mt-2",
                 children: eo(k.summary.estimatedCostUsd)
@@ -4961,31 +4987,31 @@ function e_() {
                 children: R
             }) : null, (0, r.jsxs)("div", {
                 className: "text-xs text-gray-500 mt-1",
-                children: ["часовой пояс: ", x]
+                children: [tr("часовой пояс: "), x]
             }), (0, r.jsxs)("div", {
                 className: "text-xs text-gray-500 mt-2",
-                children: [k.summary.requests.toLocaleString("ru-RU"), " вызовов \xb7", " ", k.summary.totalTokens.toLocaleString("ru-RU"), " токенов"]
+                children: [k.summary.requests.toLocaleString(localeTag), tr(" вызовов \xb7"), " ", k.summary.totalTokens.toLocaleString(localeTag), tr(" токенов")]
             })]
         }) : null, (0, r.jsxs)("div", {
             className: "grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3",
             children: [(0, r.jsx)(eP, {
-                label: "Запросов",
+                label: tr("Запросов"),
                 value: null !== (t = null == k ? void 0 : k.summary.requests) && void 0 !== t ? t : "—"
             }), (0, r.jsx)(eP, {
-                label: "Успешных",
+                label: tr("Успешных"),
                 value: null !== (a = null == k ? void 0 : k.summary.successRequests) && void 0 !== a ? a : "—"
             }), (0, r.jsx)(eP, {
-                label: "Ошибок",
+                label: tr("Ошибок"),
                 value: null !== (l = null == k ? void 0 : k.summary.failedRequests) && void 0 !== l ? l : "—",
                 dimmed: (null !== (n = null == k ? void 0 : k.summary.failedRequests) && void 0 !== n ? n : 0) === 0
             }), (0, r.jsx)(eP, {
-                label: "Токены (всего)",
-                value: null !== (i = null == k ? void 0 : null === (e = k.summary.totalTokens) || void 0 === e ? void 0 : e.toLocaleString("ru-RU")) && void 0 !== i ? i : "—"
+                label: tr("Токены (всего)"),
+                value: null !== (i = null == k ? void 0 : null === (e = k.summary.totalTokens) || void 0 === e ? void 0 : e.toLocaleString(localeTag)) && void 0 !== i ? i : "—"
             }), (0, r.jsx)(eP, {
-                label: "Успешность",
+                label: tr("Успешность"),
                 value: "".concat(A, "%")
             }), (0, r.jsx)(eP, {
-                label: "Оценка расходов",
+                label: tr("Оценка расходов"),
                 value: eo(null == k ? void 0 : k.summary.estimatedCostUsd)
             })]
         }), (0, r.jsxs)("div", {
@@ -4994,7 +5020,7 @@ function e_() {
                 className: "bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
                 children: [(0, r.jsx)("div", {
                     className: "px-4 py-3 border-b border-gray-800 text-sm text-gray-300",
-                    children: "По контекстам"
+                    children: tr("По контекстам")
                 }), (0, r.jsx)("div", {
                     className: "max-h-72 overflow-auto",
                     children: (0, r.jsxs)("table", {
@@ -5004,13 +5030,13 @@ function e_() {
                             children: (0, r.jsxs)("tr", {
                                 children: [(0, r.jsx)("th", {
                                     className: "text-left px-3 py-2 font-medium",
-                                    children: "Контекст"
+                                    children: tr("Контекст")
                                 }), (0, r.jsx)("th", {
                                     className: "text-right px-3 py-2 font-medium",
-                                    children: "Запросы"
+                                    children: tr("Запросы")
                                 }), (0, r.jsx)("th", {
                                     className: "text-right px-3 py-2 font-medium",
-                                    children: "Токены"
+                                    children: tr("Токены")
                                 }), (0, r.jsx)("th", {
                                     className: "text-right px-3 py-2 font-medium",
                                     children: "$"
@@ -5028,10 +5054,10 @@ function e_() {
                                     })]
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right",
-                                    children: e.requests.toLocaleString("ru-RU")
+                                    children: e.requests.toLocaleString(localeTag)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right",
-                                    children: e.totalTokens.toLocaleString("ru-RU")
+                                    children: e.totalTokens.toLocaleString(localeTag)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right text-emerald-300",
                                     children: eo(e.estimatedCostUsd)
@@ -5044,7 +5070,7 @@ function e_() {
                 className: "bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
                 children: [(0, r.jsx)("div", {
                     className: "px-4 py-3 border-b border-gray-800 text-sm text-gray-300",
-                    children: "По дням"
+                    children: tr("По дням")
                 }), (0, r.jsx)("div", {
                     className: "max-h-72 overflow-auto",
                     children: (0, r.jsxs)("table", {
@@ -5054,13 +5080,13 @@ function e_() {
                             children: (0, r.jsxs)("tr", {
                                 children: [(0, r.jsx)("th", {
                                     className: "text-left px-3 py-2 font-medium",
-                                    children: "Дата"
+                                    children: tr("Дата")
                                 }), (0, r.jsx)("th", {
                                     className: "text-right px-3 py-2 font-medium",
-                                    children: "Запросы"
+                                    children: tr("Запросы")
                                 }), (0, r.jsx)("th", {
                                     className: "text-right px-3 py-2 font-medium",
-                                    children: "Токены"
+                                    children: tr("Токены")
                                 }), (0, r.jsx)("th", {
                                     className: "text-right px-3 py-2 font-medium",
                                     children: "$"
@@ -5074,10 +5100,10 @@ function e_() {
                                     children: es(e.date)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right",
-                                    children: e.requests.toLocaleString("ru-RU")
+                                    children: e.requests.toLocaleString(localeTag)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right",
-                                    children: e.totalTokens.toLocaleString("ru-RU")
+                                    children: e.totalTokens.toLocaleString(localeTag)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right text-emerald-300",
                                     children: eo(e.estimatedCostUsd)
@@ -5091,7 +5117,7 @@ function e_() {
             className: "bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
             children: [(0, r.jsx)("div", {
                 className: "px-4 py-3 border-b border-gray-800 text-sm text-gray-300",
-                children: "Последние вызовы (до 200)"
+                children: tr("Последние вызовы (до 200)")
             }), (0, r.jsx)("div", {
                 className: "max-h-[420px] overflow-auto",
                 children: (0, r.jsxs)("table", {
@@ -5101,7 +5127,7 @@ function e_() {
                         children: (0, r.jsxs)("tr", {
                             children: [(0, r.jsx)("th", {
                                 className: "text-left px-3 py-2 font-medium",
-                                children: "Время"
+                                children: tr("Время")
                             }), (0, r.jsx)("th", {
                                 className: "text-left px-3 py-2 font-medium",
                                 children: "Provider"
@@ -5113,13 +5139,13 @@ function e_() {
                                 children: "Context"
                             }), (0, r.jsx)("th", {
                                 className: "text-right px-3 py-2 font-medium",
-                                children: "Токены"
+                                children: tr("Токены")
                             }), (0, r.jsx)("th", {
                                 className: "text-right px-3 py-2 font-medium",
                                 children: "$"
                             }), (0, r.jsx)("th", {
                                 className: "text-left px-3 py-2 font-medium",
-                                children: "Статус"
+                                children: tr("Статус")
                             })]
                         })
                     }), (0, r.jsx)("tbody", {
@@ -5129,7 +5155,7 @@ function e_() {
                                 className: "border-t border-gray-800/70",
                                 children: [(0, r.jsx)("td", {
                                     className: "px-3 py-2 text-gray-400 whitespace-nowrap",
-                                    children: new Date(e.created_at).toLocaleString("ru-RU")
+                                    children: new Date(e.created_at).toLocaleString(localeTag)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2",
                                     children: e.provider
@@ -5142,7 +5168,7 @@ function e_() {
                                     children: v(e.context)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right",
-                                    children: Number(null !== (l = e.total_tokens) && void 0 !== l ? l : 0).toLocaleString("ru-RU")
+                                    children: Number(null !== (l = e.total_tokens) && void 0 !== l ? l : 0).toLocaleString(localeTag)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right text-emerald-300",
                                     children: eo(null !== (n = e.estimated_cost_usd) && void 0 !== n ? n : 0)
@@ -5163,6 +5189,8 @@ let ew = "admin_marketing_exclude_ips",
     eC = "admin_demo_hide_checks";
 
 function eS() {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     var e, t, a, l;
     let [n, i] = (0, s.useState)(null), [o, d] = (0, s.useState)(!0), [c, x] = (0, s.useState)(!1), [m, u] = (0, s.useState)(null), [p, g] = (0, s.useState)(!0), [h, y] = (0, s.useState)(""), [b, v] = (0, s.useState)(null), j = (0, s.useCallback)(async e => {
         let t = (null == e ? void 0 : e.silent) === !0;
@@ -5238,10 +5266,10 @@ function eS() {
             children: [(0, r.jsxs)("div", {
                 children: [(0, r.jsx)("h2", {
                     className: "text-lg font-semibold",
-                    children: "Демо"
+                    children: tr("Демо")
                 }), (0, r.jsx)("p", {
                     className: "text-sm text-gray-500 mt-1 max-w-3xl",
-                    children: "Отдельный учёт песочниц: почта, с которой запросили демо, был ли вход по ссылке и зарегистрировали ли потом свой кабинет. В \xabВитрину\xbb эти заходы не попадают."
+                    children: tr("Отдельный учёт песочниц: почта, с которой запросили демо, был ли вход по ссылке и зарегистрировали ли потом свой кабинет. В \xabВитрину\xbb эти заходы не попадают.")
                 })]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col items-end gap-1",
@@ -5250,10 +5278,10 @@ function eS() {
                     onClick: () => void j(),
                     disabled: o || c,
                     className: "text-sm px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50",
-                    children: o || c ? "Обновление…" : "Обновить"
+                    children: o || c ? tr("Обновление…") : tr("Обновить")
                 }), b ? (0, r.jsxs)("span", {
                     className: "text-xs text-gray-500",
-                    children: ["Обновлено: ", b.toLocaleTimeString("ru-RU")]
+                    children: [tr("Обновлено: "), b.toLocaleTimeString(localeTag)]
                 }) : null]
             })]
         }), (0, r.jsxs)("div", {
@@ -5265,23 +5293,23 @@ function eS() {
                     checked: p,
                     onChange: e => g(e.target.checked),
                     className: "rounded border-gray-600"
-                }), "Скрыть проверки"]
+                }), tr("Скрыть проверки")]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col gap-1 min-w-[16rem] flex-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-500",
-                    children: "Ещё скрыть почты (ваши тесты)"
+                    children: tr("Ещё скрыть почты (ваши тесты)")
                 }), (0, r.jsx)("input", {
                     type: "text",
                     value: h,
                     onChange: e => y(e.target.value),
                     placeholder: "you@gmail.com, qa@…",
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono",
-                    title: "Через запятую. Клик \xabскрыть\xbb в таблице добавит почту сюда."
+                    title: tr("Через запятую. Клик \xabскрыть\xbb в таблице добавит почту сюда.")
                 })]
             }), w > 0 ? (0, r.jsxs)("p", {
                 className: "text-xs text-gray-500",
-                children: ["Скрыто проверок: ", w]
+                children: [tr("Скрыто проверок: "), w]
             }) : null]
         }), m && (0, r.jsx)("p", {
             className: "text-red-400 text-sm",
@@ -5289,24 +5317,24 @@ function eS() {
         }), (0, r.jsxs)("div", {
             className: "grid grid-cols-2 sm:grid-cols-5 gap-3",
             children: [(0, r.jsx)(eP, {
-                label: "Всего демо",
+                label: tr("Всего демо"),
                 value: n ? k.total : "—"
             }), (0, r.jsx)(eP, {
-                label: "Идут сейчас",
+                label: tr("Идут сейчас"),
                 value: n ? k.active : "—"
             }), (0, r.jsx)(eP, {
-                label: "Срок вышел",
+                label: tr("Срок вышел"),
                 value: n ? k.expired : "—"
             }), (0, r.jsx)(eP, {
-                label: "Потом зарегистрировались",
+                label: tr("Потом зарегистрировались"),
                 value: n ? k.converted : "—"
             }), (0, r.jsx)(eP, {
-                label: "Не зарегистрировались",
+                label: tr("Не зарегистрировались"),
                 value: n ? k.notConvertedExpired : "—"
             })]
         }), o && !n ? (0, r.jsx)("p", {
             className: "text-gray-500 text-sm",
-            children: "Загрузка…"
+            children: tr("Загрузка…")
         }) : (0, r.jsx)("div", {
             className: "overflow-x-auto border border-gray-800 rounded-lg",
             children: (0, r.jsxs)("table", {
@@ -5316,28 +5344,28 @@ function eS() {
                     children: (0, r.jsxs)("tr", {
                         children: [(0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Почта входа в демо"
+                            children: tr("Почта входа в демо")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Язык"
+                            children: tr("Язык")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Запросили"
+                            children: tr("Запросили")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Вход по ссылке"
+                            children: tr("Вход по ссылке")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "До"
+                            children: tr("До")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Период"
+                            children: tr("Период")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Тур"
+                            children: tr("Тур")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
-                            children: "Регистрация кабинета"
+                            children: tr("Регистрация кабинета")
                         })]
                     })
                 }), (0, r.jsxs)("tbody", {
@@ -5353,51 +5381,51 @@ function eS() {
                                     children: e.email
                                 }), s ? (0, r.jsx)("span", {
                                     className: "text-[10px] text-amber-400/90",
-                                    children: "проверка"
+                                    children: tr("проверка")
                                 }) : null, (0, r.jsx)("button", {
                                     type: "button",
                                     onClick: () => f(e.email),
                                     className: "block text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5",
-                                    children: "скрыть"
+                                    children: tr("скрыть")
                                 })]
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2",
                                 children: e.locale
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2 text-gray-400 whitespace-nowrap",
-                                children: new Date(e.created_at).toLocaleString("ru-RU")
+                                children: new Date(e.created_at).toLocaleString(localeTag)
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2 whitespace-nowrap",
                                 children: e.first_entered_at ? (0, r.jsx)("span", {
                                     className: "text-emerald-400",
-                                    children: new Date(e.first_entered_at).toLocaleString("ru-RU")
+                                    children: new Date(e.first_entered_at).toLocaleString(localeTag)
                                 }) : (0, r.jsx)("span", {
                                     className: "text-gray-500",
-                                    children: "ещё не заходили"
+                                    children: tr("ещё не заходили")
                                 })
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2 text-gray-400 whitespace-nowrap",
-                                children: new Date(e.expires_at).toLocaleString("ru-RU")
+                                children: new Date(e.expires_at).toLocaleString(localeTag)
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2",
                                 children: t ? (0, r.jsx)("span", {
                                     className: "text-amber-400",
-                                    children: "завершён"
+                                    children: tr("завершён")
                                 }) : (0, r.jsx)("span", {
                                     className: "text-emerald-400",
-                                    children: "идёт"
+                                    children: tr("идёт")
                                 })
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2 text-gray-400",
-                                children: e.tour_completed_at ? "готово" : "шаг ".concat(e.tour_step)
+                                children: e.tour_completed_at ? tr("готово") : tr("шаг ").concat(e.tour_step)
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2",
                                 children: a ? (0, r.jsxs)("span", {
                                     className: "text-emerald-400",
-                                    children: ["да", e.converted_at ? " \xb7 ".concat(new Date(e.converted_at).toLocaleString("ru-RU")) : ""]
+                                    children: [tr("да"), e.converted_at ? " \xb7 ".concat(new Date(e.converted_at).toLocaleString(localeTag)) : ""]
                                 }) : (0, r.jsx)("span", {
                                     className: "text-gray-500",
-                                    children: "нет"
+                                    children: tr("нет")
                                 })
                             })]
                         }, e.id)
@@ -5405,7 +5433,7 @@ function eS() {
                         children: (0, r.jsx)("td", {
                             colSpan: 8,
                             className: "px-3 py-6 text-center text-gray-500",
-                            children: (null !== (l = null == n ? void 0 : null === (t = n.rows) || void 0 === t ? void 0 : t.length) && void 0 !== l ? l : 0) === 0 ? "Пока никто не запрашивал демо" : "Сейчас видны только проверки. Снимите \xabСкрыть проверки\xbb, чтобы увидеть все строки."
+                            children: (null !== (l = null == n ? void 0 : null === (t = n.rows) || void 0 === t ? void 0 : t.length) && void 0 !== l ? l : 0) === 0 ? tr("Пока никто не запрашивал демо") : tr("Сейчас видны только проверки. Снимите \xabСкрыть проверки\xbb, чтобы увидеть все строки.")
                         })
                     })]
                 })]
@@ -5938,6 +5966,8 @@ function eL() {
 }
 
 function eT() {
+    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+
     let [e, t] = (0, s.useState)("all"), [a, l] = (0, s.useState)("all"), [n, o] = (0, s.useState)([]), [c, x] = (0, s.useState)(""), [m, u] = (0, s.useState)(""), [p, g] = (0, s.useState)(""), [h, y] = (0, s.useState)(""), [b, v] = (0, s.useState)(null), [j, N] = (0, s.useState)(!1), [f, _] = (0, s.useState)(!1), [w, k] = (0, s.useState)(null), [C, S] = (0, s.useState)(null);
     async function L() {
         N(!0), k(null), S(null);
@@ -5948,7 +5978,7 @@ function eT() {
                 })().toString())),
                 r = await t.json().catch(() => ({}));
             if (!t.ok) {
-                k("string" == typeof(null == r ? void 0 : r.error) ? r.error : "Ошибка (".concat(t.status, ")")), v(null);
+                k("string" == typeof(null == r ? void 0 : r.error) ? r.error : tr("Ошибка (").concat(t.status, ")")), v(null);
                 return
             }
             v("number" == typeof(null == r ? void 0 : r.count) ? r.count : null)
@@ -5960,16 +5990,16 @@ function eT() {
         let t = p.trim(),
             r = h.trim();
         if (0 === t.length || 0 === r.length) {
-            k("Укажите тему и текст письма");
+            k(tr("Укажите тему и текст письма"));
             return
         }
         if ("with_specific_subscriptions" === a && 0 === n.length) {
-            k("Выберите хотя бы один тип подписки");
+            k(tr("Выберите хотя бы один тип подписки"));
             return
         }
-        let s = "owners" === e ? "только собственники" : "line" === e ? "только линейный персонал" : "все пользователи",
-            l = "all" === a ? "все" : "without_subscription" === a ? "без подписки" : "with_any_subscription" === a ? "с любой подпиской" : "с выбранными: ".concat(n.map(e => d(e)).join(", "));
-        if (window.confirm("Отправить рассылку?\n\nПользователи: ".concat(s, "\nПодписка: ").concat(l, "\nРегистрация: ").concat(c || "любая", " — ").concat(m || "любая", "\nПолучателей (по последнему подсчёту): ").concat(null != b ? b : "—", "\nОт: info@restodocks.com (через Resend)"))) {
+        let s = "owners" === e ? tr("только собственники") : "line" === e ? tr("только линейный персонал") : tr("все пользователи"),
+            l = "all" === a ? tr("все") : "without_subscription" === a ? tr("без подписки") : "with_any_subscription" === a ? tr("с любой подпиской") : tr("с выбранными: ").concat(n.map(e => d(e)).join(", "));
+        if (window.confirm(tr("Отправить рассылку?\n\nПользователи: ").concat(s, tr("\nПодписка: ")).concat(l, tr("\nРегистрация: ")).concat(c || tr("любая"), " — ").concat(m || tr("любая"), tr("\nПолучателей (по последнему подсчёту): ")).concat(null != b ? b : "—", tr("\nОт: info@restodocks.com (через Resend)")))) {
             _(!0), k(null), S(null);
             try {
                 var i;
@@ -5990,14 +6020,14 @@ function eT() {
                     }),
                     l = await s.json().catch(() => ({}));
                 if (!s.ok) {
-                    k("string" == typeof(null == l ? void 0 : l.error) ? l.error : "Ошибка (".concat(s.status, ")"));
+                    k("string" == typeof(null == l ? void 0 : l.error) ? l.error : tr("Ошибка (").concat(s.status, ")"));
                     return
                 }
                 let o = "number" == typeof(null == l ? void 0 : l.sent) ? l.sent : 0,
                     d = "number" == typeof(null == l ? void 0 : l.failed) ? l.failed : 0,
                     x = "string" == typeof(null == l ? void 0 : l.message) ? l.message : null,
-                    u = Array.isArray(null == l ? void 0 : l.errors) && l.errors.length ? "\nДетали: ".concat(l.errors.map(e => String(e)).join("; ")) : "";
-                S((null != x ? x : "Отправлено: ".concat(o).concat(d > 0 ? ", не доставлено (ошибки API): ".concat(d) : "", ". В списке было: ").concat(null !== (i = null == l ? void 0 : l.recipientCount) && void 0 !== i ? i : o, ".")) + u)
+                    u = Array.isArray(null == l ? void 0 : l.errors) && l.errors.length ? tr("\nДетали: ").concat(l.errors.map(e => String(e)).join("; ")) : "";
+                S((null != x ? x : tr("Отправлено: ").concat(o).concat(d > 0 ? tr(", не доставлено (ошибки API): ").concat(d) : "", tr(". В списке было: ")).concat(null !== (i = null == l ? void 0 : l.recipientCount) && void 0 !== i ? i : o, ".")) + u)
             } finally {
                 _(!1)
             }
@@ -6015,21 +6045,21 @@ function eT() {
             className: "bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-4",
             children: [(0, r.jsx)("h2", {
                 className: "text-sm font-semibold text-white",
-                children: "Рассылка по email"
+                children: tr("Рассылка по email")
             }), (0, r.jsxs)("p", {
                 className: "text-xs text-gray-500 leading-relaxed",
-                children: ["Уходят через Resend с адреса по умолчанию", " ", (0, r.jsx)("span", {
+                children: [tr("Уходят через Resend с адреса по умолчанию"), " ", (0, r.jsx)("span", {
                     className: "text-gray-400",
                     children: "Restodocks <info@restodocks.com>"
-                }), " (или", " ", (0, r.jsx)("code", {
+                }), tr(" (или"), " ", (0, r.jsx)("code", {
                     className: "text-gray-500",
                     children: "RESEND_FROM_EMAIL"
-                }), " в окружении). Попадают только учётки с подтверждённым email в Auth и активной записью сотрудника. Очень большие списки могут упираться в таймаут Cloudflare Worker — при необходимости разбивайте рассылку по времени."]
+                }), tr(" в окружении). Попадают только учётки с подтверждённым email в Auth и активной записью сотрудника. Очень большие списки могут упираться в таймаут Cloudflare Worker — при необходимости разбивайте рассылку по времени.")]
             }), (0, r.jsxs)("div", {
                 className: "space-y-2",
                 children: [(0, r.jsx)("div", {
                     className: "text-xs text-gray-400",
-                    children: "Пользователи"
+                    children: tr("Пользователи")
                 }), (0, r.jsxs)("div", {
                     className: "flex flex-wrap gap-4 text-sm",
                     children: [(0, r.jsxs)("label", {
@@ -6041,7 +6071,7 @@ function eT() {
                             onChange: () => {
                                 t("all"), v(null)
                             }
-                        }), "Все пользователи"]
+                        }), tr("Все пользователи")]
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 cursor-pointer",
                         children: [(0, r.jsx)("input", {
@@ -6051,7 +6081,7 @@ function eT() {
                             onChange: () => {
                                 t("owners"), v(null)
                             }
-                        }), "Только собственники (роль owner)"]
+                        }), tr("Только собственники (роль owner)")]
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 cursor-pointer",
                         children: [(0, r.jsx)("input", {
@@ -6061,14 +6091,14 @@ function eT() {
                             onChange: () => {
                                 t("line"), v(null)
                             }
-                        }), "Только линейный персонал"]
+                        }), tr("Только линейный персонал")]
                     })]
                 })]
             }), (0, r.jsxs)("div", {
                 className: "space-y-2",
                 children: [(0, r.jsx)("div", {
                     className: "text-xs text-gray-400",
-                    children: "Подписка"
+                    children: tr("Подписка")
                 }), (0, r.jsxs)("div", {
                     className: "flex flex-wrap gap-4 text-sm",
                     children: [(0, r.jsxs)("label", {
@@ -6080,7 +6110,7 @@ function eT() {
                             onChange: () => {
                                 l("all"), v(null)
                             }
-                        }), "Все"]
+                        }), tr("Все")]
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 cursor-pointer",
                         children: [(0, r.jsx)("input", {
@@ -6090,7 +6120,7 @@ function eT() {
                             onChange: () => {
                                 l("with_any_subscription"), v(null)
                             }
-                        }), "С подпиской (любая)"]
+                        }), tr("С подпиской (любая)")]
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 cursor-pointer",
                         children: [(0, r.jsx)("input", {
@@ -6100,7 +6130,7 @@ function eT() {
                             onChange: () => {
                                 l("without_subscription"), v(null)
                             }
-                        }), "Без подписки"]
+                        }), tr("Без подписки")]
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 cursor-pointer",
                         children: [(0, r.jsx)("input", {
@@ -6110,7 +6140,7 @@ function eT() {
                             onChange: () => {
                                 l("with_specific_subscriptions"), v(null)
                             }
-                        }), "С конкретной подпиской"]
+                        }), tr("С конкретной подпиской")]
                     })]
                 }), "with_specific_subscriptions" === a && (0, r.jsx)("div", {
                     className: "grid sm:grid-cols-3 gap-2 text-sm",
@@ -6132,7 +6162,7 @@ function eT() {
                 className: "space-y-2",
                 children: [(0, r.jsx)("div", {
                     className: "text-xs text-gray-400",
-                    children: "Диапазон регистрации (дата создания аккаунта)"
+                    children: tr("Диапазон регистрации (дата создания аккаунта)")
                 }), (0, r.jsxs)("div", {
                     className: "grid sm:grid-cols-2 gap-2",
                     children: [(0, r.jsx)("input", {
@@ -6158,10 +6188,10 @@ function eT() {
                     onClick: () => void L(),
                     disabled: j,
                     className: "bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                    children: j ? "Подсчёт…" : "Подсчитать получателей"
+                    children: j ? tr("Подсчёт…") : tr("Подсчитать получателей")
                 }), null !== b && (0, r.jsxs)("span", {
                     className: "text-sm text-gray-400",
-                    children: ["В списке: ", (0, r.jsx)("span", {
+                    children: [tr("В списке: "), (0, r.jsx)("span", {
                         className: "text-white font-medium",
                         children: b
                     })]
@@ -6170,11 +6200,11 @@ function eT() {
                 className: "space-y-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-400",
-                    children: "Тема"
+                    children: tr("Тема")
                 }), (0, r.jsx)("input", {
                     value: p,
                     onChange: e => g(e.target.value),
-                    placeholder: "Тема письма",
+                    placeholder: tr("Тема письма"),
                     maxLength: 200,
                     className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
                 })]
@@ -6182,11 +6212,11 @@ function eT() {
                 className: "space-y-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-400",
-                    children: "Текст (простой текст, переносы строк сохраняются)"
+                    children: tr("Текст (простой текст, переносы строк сохраняются)")
                 }), (0, r.jsx)("textarea", {
                     value: h,
                     onChange: e => y(e.target.value),
-                    placeholder: "Текст рассылки…",
+                    placeholder: tr("Текст рассылки…"),
                     rows: 12,
                     className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono leading-relaxed"
                 })]
@@ -6195,7 +6225,7 @@ function eT() {
                 onClick: () => void T(),
                 disabled: f || 0 === p.trim().length || 0 === h.trim().length,
                 className: "bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                children: f ? "Отправка…" : "Отправить рассылку"
+                children: f ? tr("Отправка…") : tr("Отправить рассылку")
             })]
         })]
     })
