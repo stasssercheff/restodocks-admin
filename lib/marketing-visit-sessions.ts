@@ -143,12 +143,17 @@ export function formatDurationMs(ms: number | null | undefined, locale: string =
   return ru ? `${minutes} м ${seconds} с` : `${minutes}m ${seconds}s`
 }
 
-/** Heuristic pace label from total visit span (only when ≥2 events). */
+/**
+ * Heuristic pace from visit span (only when ≥2 events).
+ * `instant` = same-second / open-and-leave (0–2s) — not the same as “clicked through”.
+ * This is NOT a bot detector; visitor_kind is separate.
+ */
 export function visitPace(
   durationMs: number,
   eventCount: number,
-): 'quick' | 'normal' | 'slow' | null {
+): 'instant' | 'quick' | 'normal' | 'slow' | null {
   if (eventCount < 2) return null
+  if (durationMs < 2_000) return 'instant'
   if (durationMs < 45_000) return 'quick'
   if (durationMs >= 3 * 60_000) return 'slow'
   return 'normal'

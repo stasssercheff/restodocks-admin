@@ -47,6 +47,8 @@ type Tm = {
   visitDuration: string
   afterGap: string
   fromStart: string
+  paceInstant: string
+  paceInstantTitle: string
   paceQuick: string
   paceNormal: string
   paceSlow: string
@@ -164,19 +166,28 @@ function PaceBadge({
   tm,
 }: {
   session: VisitSession
-  tm: Pick<Tm, 'paceQuick' | 'paceNormal' | 'paceSlow'>
+  tm: Pick<Tm, 'paceInstant' | 'paceInstantTitle' | 'paceQuick' | 'paceNormal' | 'paceSlow'>
 }) {
   const pace = visitPace(session.durationMs, session.event_count)
   if (!pace) return null
-  const label = pace === 'quick' ? tm.paceQuick : pace === 'slow' ? tm.paceSlow : tm.paceNormal
+  const label =
+    pace === 'instant' ? tm.paceInstant
+      : pace === 'quick' ? tm.paceQuick
+        : pace === 'slow' ? tm.paceSlow
+          : tm.paceNormal
   const cls =
-    pace === 'quick'
-      ? 'border-amber-800/70 bg-amber-950/40 text-amber-200'
-      : pace === 'slow'
-        ? 'border-sky-800/70 bg-sky-950/40 text-sky-200'
-        : 'border-gray-700 bg-gray-800/60 text-gray-300'
+    pace === 'instant'
+      ? 'border-stone-700 bg-stone-900/50 text-stone-300'
+      : pace === 'quick'
+        ? 'border-amber-800/70 bg-amber-950/40 text-amber-200'
+        : pace === 'slow'
+          ? 'border-sky-800/70 bg-sky-950/40 text-sky-200'
+          : 'border-gray-700 bg-gray-800/60 text-gray-300'
   return (
-    <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] ${cls}`}>
+    <span
+      className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] ${cls}`}
+      title={pace === 'instant' ? tm.paceInstantTitle : undefined}
+    >
       {label}
     </span>
   )
