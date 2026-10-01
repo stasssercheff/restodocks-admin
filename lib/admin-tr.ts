@@ -449,6 +449,25 @@ export function translateAdmin(locale: Locale, text: string): string {
   return text
 }
 
+/** Non-hook translator for module-level maps and plain helpers (safe at import time). */
+export function readStoredAdminLocale(): Locale {
+  if (typeof window === 'undefined') return 'ru'
+  try {
+    const stored = window.localStorage.getItem('rd_admin_locale')
+    return stored === 'en' || stored === 'ru' ? stored : 'ru'
+  } catch {
+    return 'ru'
+  }
+}
+
+export function adminTr(text: string): string {
+  return translateAdmin(readStoredAdminLocale(), text)
+}
+
+export function adminLocaleTag(): string {
+  return readStoredAdminLocale() === 'en' ? 'en-GB' : 'ru-RU'
+}
+
 export function useAdminTr() {
   const { locale } = useI18n()
   return useCallback((text: string) => translateAdmin(locale, text), [locale])

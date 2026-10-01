@@ -30,10 +30,16 @@ import {
   saveMarketingVisitsPrefs,
 } from '@/lib/marketing-visits-prefs'
 import { completedRegistrationCount } from '@/lib/registration-stat'
-import { useAdminLocaleTag, useAdminTr } from '@/lib/admin-tr'
+import { adminLocaleTag, adminTr, useAdminLocaleTag, useAdminTr } from '@/lib/admin-tr'
 
 const r = { jsx, jsxs, Fragment }
 const l = { useRouter }
+
+// Module-level + helper fallback (hooks cannot run at import / outside components).
+// Tab components still shadow this with `const tr = useAdminTr()` for live locale updates.
+function tr(text) {
+  return adminTr(text)
+}
 
 const EST_FILTER_KEY = 'rd_admin_est_filters'
 
@@ -392,7 +398,7 @@ let visitTimeOpts = {
 
 function A(e, t) {
     try {
-        return new Date(e).toLocaleString(localeTag, {
+        return new Date(e).toLocaleString(adminLocaleTag(), {
             ...visitTimeOpts,
             timeZone: t
         })
@@ -412,13 +418,13 @@ function D() {
 
 function R(e, t) {
     var a;
-    return e ? null !== (a = A(e, (null != t ? t : "").trim() || "UTC")) && void 0 !== a ? a : new Date(e).toLocaleString(localeTag) : "—"
+    return e ? null !== (a = A(e, (null != t ? t : "").trim() || "UTC")) && void 0 !== a ? a : new Date(e).toLocaleString(adminLocaleTag()) : "—"
 }
 
 function U(e, t) {
     if (!e) return "—";
     let a = A(e, (null != t ? t : "").trim() || D());
-    return a ? "у вас: ".concat(a) : "у вас: ".concat(new Date(e).toLocaleString(localeTag))
+    return a ? "у вас: ".concat(a) : "у вас: ".concat(new Date(e).toLocaleString(adminLocaleTag()))
 }
 
 function O(e) {
@@ -626,7 +632,7 @@ function V() {
             className: "border border-gray-800 rounded-xl p-4 sm:p-6 bg-gray-900/60 space-y-4",
             children: [(0, r.jsx)("h3", {
                 className: "font-medium",
-                children: c ? [tr("Редактирование")]: tr("Новая кампания")
+                children: c ? tr("Редактирование") : tr("Новая кампания")
             }), (0, r.jsxs)("div", {
                 className: "grid sm:grid-cols-2 gap-3",
                 children: [(0, r.jsxs)("label", {
@@ -826,7 +832,7 @@ function V() {
                     }), tr("Требуется активное промо у заведения")]
                 })]
             }), ["contentRu", "contentEn"].map(e => {
-                let t = "contentRu" === e ? [tr("Тексты RU")]: tr("Тексты EN"),
+                let t = "contentRu" === e ? tr("Тексты RU") : tr("Тексты EN"),
                     a = m[e],
                     s = "promo_code" === m.ui_type ? [{
                         key: "title",
@@ -896,7 +902,7 @@ function V() {
                     disabled: n,
                     onClick: () => void b(),
                     className: "px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-sm disabled:opacity-50",
-                    children: n ? [tr("Сохранение…")]: tr("Сохранить")
+                    children: n ? tr("Сохранение…") : tr("Сохранить")
                 }), (0, r.jsx)("button", {
                     type: "button",
                     onClick: () => {
@@ -1001,7 +1007,7 @@ function V() {
                                 type: "button",
                                 className: "text-amber-400 hover:underline",
                                 onClick: () => void v(e),
-                                children: e.is_enabled ? [tr("Выкл")]: tr("Вкл")
+                                children: e.is_enabled ? tr("Выкл") : tr("Вкл")
                             }), (0, r.jsx)("button", {
                                 type: "button",
                                 className: "text-red-400 hover:underline",
@@ -1107,7 +1113,7 @@ function B() {
                     onClick: () => void f(),
                     disabled: c || m,
                     className: "text-sm px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50",
-                    children: c || m ? [tr("Обновление…")]: tr("Обновить")
+                    children: c || m ? tr("Обновление…") : tr("Обновить")
                 }), h ? (0, r.jsxs)("span", {
                     className: "text-xs text-gray-500",
                     children: [tr("Обновлено: "), h.toLocaleTimeString(localeTag)]
@@ -1199,7 +1205,7 @@ function B() {
                                     checked: !0 === e.show_on_promo,
                                     disabled: j === e.id || !0 !== e.allow_public_display && !0 !== e.show_on_promo,
                                     onChange: t => void _(e, t.target.checked),
-                                    title: !0 === e.allow_public_display ? [tr("Показать на промостранице")]: tr("Нет согласия на публикацию"),
+                                    title: !0 === e.allow_public_display ? tr("Показать на промостранице") : tr("Нет согласия на публикацию"),
                                     "aria-label": tr("Показать на промостранице")
                                 })
                             }), (0, r.jsx)("td", {
@@ -1260,7 +1266,7 @@ function B() {
                                     type: "button",
                                     onClick: () => v(a ? null : e.id),
                                     className: "text-[11px] text-indigo-400 hover:text-indigo-300 mt-1",
-                                    children: a ? [tr("Свернуть")]: tr("Показать полностью")
+                                    children: a ? tr("Свернуть") : tr("Показать полностью")
                                 }) : null]
                             })]
                         }, e.id)
@@ -1335,7 +1341,7 @@ function Q() {
                 })
             }),
             r = await a.json();
-        a.ok ? (v(r), b("arm" === e ? [tr("План обновлён. Отметьте черновики и нажмите \xabОдобрить план\xbb.")]: "regenerate_offers" === e ? [tr("Новые офферы по углам индустрии — только Ок/Нет.")]: "approve_plan" === e ? [tr("Агент вооружён. Автосписание в Meta пока выключено — крутите по плану вручную или дождитесь токена.")]: tr("Сохранено."))) : h("string" == typeof(null == r ? void 0 : r.error) ? r.error : tr("Ошибка сохранения")), p(!1)
+        a.ok ? (v(r), b("arm" === e ? tr("План обновлён. Отметьте черновики и нажмите \xabОдобрить план\xbb.") : "regenerate_offers" === e ? tr("Новые офферы по углам индустрии — только Ок/Нет.") : "approve_plan" === e ? tr("Агент вооружён. Автосписание в Meta пока выключено — крутите по плану вручную или дождитесь токена.") : tr("Сохранено."))) : h("string" == typeof(null == r ? void 0 : r.error) ? r.error : tr("Ошибка сохранения")), p(!1)
     }
 
     function f(e, t) {
@@ -1850,15 +1856,15 @@ async function er(e) {
                 [tr("Родительское заведение")]: null !== (t = e.parent_establishment_name) && void 0 !== t ? t : "",
                 Владелец: "—" === e.owner_name ? "" : e.owner_name,
                 Email: "—" === e.owner_email ? "" : e.owner_email,
-                [tr("Email (ожидает confirm)")]: e.owner_pending_confirmation ? [tr("да")]: "",
+                [tr("Email (ожидает confirm)")]: e.owner_pending_confirmation ? tr("да") : "",
                 Людей: e.employee_count,
                 [tr("Статус подписки")]: null !== (a = null == x ? void 0 : x.statusLabel) && void 0 !== a ? a : "",
                 Оплата: null !== (r = null == x ? void 0 : x.paymentLabel) && void 0 !== r ? r : "",
                 Промокод: null !== (s = null == x ? void 0 : x.promoCode) && void 0 !== s ? s : "",
                 [tr("Уровень реферала")]: e.referral_level ?? "",
-                [tr("С подпиской")]: e.effective_pro ? [tr("да")]: tr("нет"),
+                [tr("С подпиской")]: e.effective_pro ? tr("да") : tr("нет"),
                 [tr("Детали подписки")]: null !== (l = null == x ? void 0 : x.detail) && void 0 !== l ? l : "",
-                Регистрация: e.created_at ? new Date(e.created_at).toLocaleString(localeTag, {
+                Регистрация: e.created_at ? new Date(e.created_at).toLocaleString(adminLocaleTag(), {
                     day: "2-digit",
                     month: "2-digit",
                     year: "numeric",
@@ -1929,7 +1935,7 @@ function el(e) {
             },
             className: "shrink-0 px-1.5 py-0.5 rounded border border-gray-700 bg-gray-950 text-[10px] text-indigo-300 hover:text-white hover:border-indigo-500",
             title: t,
-            children: a ? [tr("Скопировано")]: tr("Копировать")
+            children: a ? tr("Скопировано") : tr("Копировать")
         })]
     })
 }
@@ -1974,7 +1980,7 @@ function ed(e) {
 }
 
 function ec(e) {
-    return e ? new Date(e).toLocaleString(localeTag, {
+    return e ? new Date(e).toLocaleString(adminLocaleTag(), {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
@@ -2339,7 +2345,7 @@ function ey() {
             className: "text-gray-600 text-xs",
             children: "—"
         });
-        let l = "App Store (In-App Purchase)" === s.paymentLabel ? [tr("Подписка через App Store (In-App Purchase). Дата окончания в БД обычно уже учитывает отсрочку оплаты (grace period), если она пришла в чеке из App Store Connect.")]: void 0;
+        let l = "App Store (In-App Purchase)" === s.paymentLabel ? tr("Подписка через App Store (In-App Purchase). Дата окончания в БД обычно уже учитывает отсрочку оплаты (grace period), если она пришла в чеке из App Store Connect.") : void 0;
         return (0, r.jsxs)("div", {
             className: "space-y-0.5 max-w-full min-w-0",
             children: [(0, r.jsx)("div", {
@@ -2532,7 +2538,7 @@ function ey() {
         }), (0, r.jsxs)("div", {
             className: "grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 sm:gap-3 sm:mb-8",
             children: [(0, r.jsx)(eP, {
-                label: dateFilterActive ? [tr("Заведений за период")]: tr("Заведений"),
+                label: dateFilterActive ? tr("Заведений за период") : tr("Заведений"),
                 value: W
             }), (0, r.jsx)(eP, {
                 label: tr("Людей (влад.+сотр.)"),
@@ -2699,7 +2705,7 @@ function ey() {
                 onClick: O,
                 disabled: T || i || 0 === U.length,
                 className: "shrink-0 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed",
-                children: T ? [tr("Формируем файл…")]: tr("Скачать Excel (.xlsx)")
+                children: T ? tr("Формируем файл…") : tr("Скачать Excel (.xlsx)")
             })]
         }), (0, r.jsxs)("form", {
             className: "mb-3 flex flex-wrap gap-2 items-end",
@@ -3578,7 +3584,7 @@ function ej() {
                     children: tr("Дата окончания / срок ввода")
                 }), (0, r.jsx)("p", {
                     className: "text-gray-400 text-sm mb-3 leading-relaxed",
-                    children: (null !== (e = B.activation_duration_days) && void 0 !== e ? e : 0) > 0 ? [tr("Последний день, когда код ещё можно ввести. Без даты — нет ограничения по календарю.")]: tr("Действует до (классический промокод без режима \xabдней с активации\xbb). Без даты — без ограничения.")
+                    children: (null !== (e = B.activation_duration_days) && void 0 !== e ? e : 0) > 0 ? tr("Последний день, когда код ещё можно ввести. Без даты — нет ограничения по календарю.") : tr("Действует до (классический промокод без режима \xabдней с активации\xbb). Без даты — без ограничения.")
                 }), (0, r.jsx)("p", {
                     className: "text-gray-500 text-xs font-mono mb-3",
                     children: B.code
@@ -3751,7 +3757,7 @@ function ej() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "legacy" === C ? [tr("Действует с")]: tr("Ввод кода с")
+                        children: "legacy" === C ? tr("Действует с") : tr("Ввод кода с")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         value: j,
@@ -3762,7 +3768,7 @@ function ej() {
                     className: "flex flex-col gap-1",
                     children: [(0, r.jsx)("label", {
                         className: "text-xs text-gray-500",
-                        children: "legacy" === C ? [tr("Действует до")]: tr("Ввод кода до")
+                        children: "legacy" === C ? tr("Действует до") : tr("Ввод кода до")
                     }), (0, r.jsx)("input", {
                         type: "date",
                         value: f,
@@ -3843,7 +3849,7 @@ function ej() {
                         className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28",
                         children: t.map(e => (0, r.jsx)("option", {
                             value: e,
-                            children: 0 === e ? [tr("нет")]: "+".concat(e)
+                            children: 0 === e ? tr("нет") : "+".concat(e)
                         }, e))
                     })]
                 }), (0, r.jsxs)("div", {
@@ -3857,7 +3863,7 @@ function ej() {
                         className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28",
                         children: a.map(e => (0, r.jsx)("option", {
                             value: e,
-                            children: 0 === e ? [tr("нет")]: "+".concat(e)
+                            children: 0 === e ? tr("нет") : "+".concat(e)
                         }, e))
                     })]
                 }), (0, r.jsxs)("label", {
@@ -3891,7 +3897,7 @@ function ej() {
                         children: tr("Промокод при погашении: ")
                     }), (0, r.jsx)("span", {
                         className: "text-gray-400",
-                        children: F ? [tr("только расширения (тариф по коду не меняется)")]: tr("тариф ").concat(d(L), tr("; даты, макс. сотр. и макс. фил. — как в полях выше"))
+                        children: F ? tr("только расширения (тариф по коду не меняется)") : tr("тариф ").concat(d(L), tr("; даты, макс. сотр. и макс. фил. — как в полях выше"))
                     })]
                 }), (() => {
                     let e = "" === D.trim() ? 0 : parseInt(D.trim(), 10),
@@ -3906,7 +3912,7 @@ function ej() {
                                 children: tr("Пакет сотрудников: ")
                             }), (0, r.jsx)("span", {
                                 className: "text-gray-400",
-                                children: 0 === e ? [tr("не включен")]: "+".concat(e)
+                                children: 0 === e ? tr("не включен") : "+".concat(e)
                             })]
                         }), (0, r.jsxs)("div", {
                             children: [(0, r.jsx)("span", {
@@ -3914,7 +3920,7 @@ function ej() {
                                 children: tr("Пакет заведений: ")
                             }), (0, r.jsx)("span", {
                                 className: "text-gray-400",
-                                children: 0 === s ? [tr("не включен")]: "+".concat(s)
+                                children: 0 === s ? tr("не включен") : "+".concat(s)
                             })]
                         })]
                     })
@@ -4046,7 +4052,7 @@ function ej() {
                                                 children: e.code
                                             }), (0, r.jsx)("span", {
                                                 className: "text-[10px] text-gray-600 font-normal tracking-normal",
-                                                children: p ? [tr("тип: с активации")]: tr("тип: классика")
+                                                children: p ? tr("тип: с активации") : tr("тип: классика")
                                             }), (0, r.jsx)("span", {
                                                 className: "text-[10px] text-gray-500",
                                                 children: tr("тариф")
@@ -4151,7 +4157,7 @@ function ej() {
                                             className: "bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200",
                                             children: t.map(e => (0, r.jsx)("option", {
                                                 value: e,
-                                                children: 0 === e ? [tr("нет")]: "+".concat(e)
+                                                children: 0 === e ? tr("нет") : "+".concat(e)
                                             }, e))
                                         })
                                     }), (0, r.jsx)("td", {
@@ -4163,7 +4169,7 @@ function ej() {
                                             className: "bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200",
                                             children: a.map(e => (0, r.jsx)("option", {
                                                 value: e,
-                                                children: 0 === e ? [tr("нет")]: "+".concat(e)
+                                                children: 0 === e ? tr("нет") : "+".concat(e)
                                             }, e))
                                         })
                                     }), (0, r.jsx)("td", {
@@ -4173,7 +4179,7 @@ function ej() {
                                             title: tr("Только подписки расширения, без смены тарифа"),
                                             onClick: () => eh(e),
                                             className: "text-[10px] px-2 py-0.5 rounded border transition ".concat(e.grants_additive_only ? "border-amber-600/60 text-amber-200 bg-amber-950/40" : "border-gray-700 text-gray-600 hover:border-gray-500"),
-                                            children: e.grants_additive_only ? [tr("да")]: tr("нет")
+                                            children: e.grants_additive_only ? tr("да") : tr("нет")
                                         })
                                     }), (0, r.jsx)("td", {
                                         className: "px-4 py-3 text-center",
@@ -4197,7 +4203,7 @@ function ej() {
                                             className: "flex gap-2 justify-end flex-wrap",
                                             children: [(0, r.jsx)("button", {
                                                 type: "button",
-                                                title: e.is_disabled ? [tr("Включить промокод")]: tr("Отключить промокод"),
+                                                title: e.is_disabled ? tr("Включить промокод") : tr("Отключить промокод"),
                                                 onClick: () => ej(e),
                                                 disabled: m,
                                                 className: "text-xs px-2 py-1 rounded border transition ".concat(e.is_disabled ? "border-amber-700 text-amber-300 hover:bg-amber-900/30" : "border-gray-700 text-gray-500 hover:text-amber-200 hover:border-amber-800"),
@@ -4277,7 +4283,7 @@ function ej() {
                         }), (0, r.jsxs)("div", {
                             className: "text-[10px] text-gray-600 mb-1 space-y-1",
                             children: [(0, r.jsx)("div", {
-                                children: (null !== (i = e.activation_duration_days) && void 0 !== i ? i : 0) > 0 ? [tr("тип: с активации")]: tr("тип: классика")
+                                children: (null !== (i = e.activation_duration_days) && void 0 !== i ? i : 0) > 0 ? tr("тип: с активации") : tr("тип: классика")
                             }), (0, r.jsxs)("div", {
                                 className: "flex flex-col gap-0.5",
                                 children: [(0, r.jsx)("span", {
@@ -4303,7 +4309,7 @@ function ej() {
                                 children: [e.activation_duration_days, tr(" дн. с активации")]
                             }), e.expires_at && (0, r.jsxs)("span", {
                                 className: ex(e.expires_at) ? "text-red-400" : "",
-                                children: [(null !== (o = e.activation_duration_days) && void 0 !== o ? o : 0) > 0 ? [tr("ввести до ")]: tr("до "), es(e.expires_at)]
+                                children: [(null !== (o = e.activation_duration_days) && void 0 !== o ? o : 0) > 0 ? tr("ввести до ") : tr("до "), es(e.expires_at)]
                             }), null != e.max_employees && (0, r.jsxs)("span", {
                                 className: "text-indigo-300",
                                 children: ["≤", e.max_employees, tr(" сотр.")]
@@ -4315,7 +4321,7 @@ function ej() {
                                 children: [tr("Пакет сотрудников: "), (null !== (d = e.grants_employee_slot_packs) && void 0 !== d ? d : 0) > 0 ? "+".concat(e.grants_employee_slot_packs) : tr("нет")]
                             }), (0, r.jsxs)("span", {
                                 className: "text-gray-600 block",
-                                children: [tr("Пакет заведений: "), (null !== (c = e.grants_branch_slot_packs) && void 0 !== c ? c : 0) > 0 ? "+".concat(e.grants_branch_slot_packs) : tr("нет"), e.grants_additive_only ? [tr(" \xb7 только расширения")]: ""]
+                                children: [tr("Пакет заведений: "), (null !== (c = e.grants_branch_slot_packs) && void 0 !== c ? c : 0) > 0 ? "+".concat(e.grants_branch_slot_packs) : tr("нет"), e.grants_additive_only ? tr(" \xb7 только расширения") : ""]
                             }), (0, r.jsxs)("label", {
                                 className: "flex items-center gap-2 text-xs text-gray-500 cursor-pointer",
                                 children: [(0, r.jsx)("input", {
@@ -4334,12 +4340,12 @@ function ej() {
                                 onClick: () => ej(e),
                                 disabled: m,
                                 className: "px-3 py-2 rounded-lg border text-sm ".concat(e.is_disabled ? "border-amber-700 text-amber-300" : "border-gray-700 text-gray-400 hover:text-amber-200"),
-                                title: e.is_disabled ? [tr("Включить")]: tr("Отключить"),
+                                title: e.is_disabled ? tr("Включить") : tr("Отключить"),
                                 children: "⏻"
                             }), (0, r.jsx)("button", {
                                 onClick: () => et(e),
                                 className: "flex-1 min-w-[8rem] text-center text-gray-400 hover:text-white active:text-white transition text-sm py-2 rounded-lg border border-gray-700 active:border-gray-500",
-                                children: e.is_used ? [tr("↩ Сбросить")]: tr("✓ Отметить исп.")
+                                children: e.is_used ? tr("↩ Сбросить") : tr("✓ Отметить исп.")
                             }), (0, r.jsx)("button", {
                                 onClick: () => ea(e),
                                 className: "px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white active:text-white text-sm",
@@ -4362,7 +4368,7 @@ function ej() {
                                 title: tr("Пакет сотрудников"),
                                 children: t.map(e => (0, r.jsx)("option", {
                                     value: e,
-                                    children: 0 === e ? [tr("Сотр.: нет")]: tr("Сотр.: +").concat(e)
+                                    children: 0 === e ? tr("Сотр.: нет") : tr("Сотр.: +").concat(e)
                                 }, e))
                             }), (0, r.jsx)("select", {
                                 value: String(null !== (u = e.grants_branch_slot_packs) && void 0 !== u ? u : 0),
@@ -4371,7 +4377,7 @@ function ej() {
                                 title: tr("Пакет заведений"),
                                 children: a.map(e => (0, r.jsx)("option", {
                                     value: e,
-                                    children: 0 === e ? [tr("Филиалы: нет")]: tr("Филиалы: +").concat(e)
+                                    children: 0 === e ? tr("Филиалы: нет") : tr("Филиалы: +").concat(e)
                                 }, e))
                             }), (0, r.jsx)("button", {
                                 type: "button",
@@ -4556,7 +4562,7 @@ function eN() {
                 })
             }) : (0, r.jsx)("p", {
                 className: "text-gray-500 text-sm",
-                children: d.configured ? [tr("Нет событий в выборке или недоступно на тарифе/API.")]: "—"
+                children: d.configured ? tr("Нет событий в выборке или недоступно на тарифе/API.") : "—"
             })]
         }), (0, r.jsxs)("section", {
             children: [(0, r.jsx)("h2", {
@@ -4650,7 +4656,7 @@ function ef() {
             className: "flex flex-wrap items-center gap-3",
             children: [(0, r.jsx)("span", {
                 className: "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ".concat(a.ok ? "bg-emerald-950/60 text-emerald-200 border border-emerald-800/50" : "bg-red-950/60 text-red-200 border border-red-800/50"),
-                children: a.ok ? [tr("Критичные проверки пройдены")]: tr("Есть проблемы доступности")
+                children: a.ok ? tr("Критичные проверки пройдены") : tr("Есть проблемы доступности")
             }), (0, r.jsxs)("span", {
                 className: "text-gray-500 text-xs",
                 children: [tr("Снимок: "), a.generatedAt]
@@ -4953,7 +4959,7 @@ function e_() {
                 onClick: () => void I(),
                 className: "bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium",
                 disabled: S,
-                children: S ? [tr("Обновление…")]: tr("Обновить")
+                children: S ? tr("Обновление…") : tr("Обновить")
             }), (null == k ? void 0 : k.meta) ? (0, r.jsxs)("div", {
                 className: "text-xs text-gray-500 ml-auto max-w-xs text-right",
                 children: [R ? (0, r.jsx)("div", {
@@ -5272,7 +5278,7 @@ function eS() {
                     onClick: () => void j(),
                     disabled: o || c,
                     className: "text-sm px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50",
-                    children: o || c ? [tr("Обновление…")]: tr("Обновить")
+                    children: o || c ? tr("Обновление…") : tr("Обновить")
                 }), b ? (0, r.jsxs)("span", {
                     className: "text-xs text-gray-500",
                     children: [tr("Обновлено: "), b.toLocaleTimeString(localeTag)]
@@ -5411,7 +5417,7 @@ function eS() {
                                 })
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2 text-gray-400",
-                                children: e.tour_completed_at ? [tr("готово")]: tr("шаг ").concat(e.tour_step)
+                                children: e.tour_completed_at ? tr("готово") : tr("шаг ").concat(e.tour_step)
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2",
                                 children: a ? (0, r.jsxs)("span", {
@@ -5427,7 +5433,7 @@ function eS() {
                         children: (0, r.jsx)("td", {
                             colSpan: 8,
                             className: "px-3 py-6 text-center text-gray-500",
-                            children: (null !== (l = null == n ? void 0 : null === (t = n.rows) || void 0 === t ? void 0 : t.length) && void 0 !== l ? l : 0) === 0 ? [tr("Пока никто не запрашивал демо")]: tr("Сейчас видны только проверки. Снимите \xabСкрыть проверки\xbb, чтобы увидеть все строки.")
+                            children: (null !== (l = null == n ? void 0 : null === (t = n.rows) || void 0 === t ? void 0 : t.length) && void 0 !== l ? l : 0) === 0 ? tr("Пока никто не запрашивал демо") : tr("Сейчас видны только проверки. Снимите \xabСкрыть проверки\xbb, чтобы увидеть все строки.")
                         })
                     })]
                 })]
@@ -5991,8 +5997,8 @@ function eT() {
             k(tr("Выберите хотя бы один тип подписки"));
             return
         }
-        let s = "owners" === e ? [tr("только собственники")]: "line" === e ? [tr("только линейный персонал")]: tr("все пользователи"),
-            l = "all" === a ? [tr("все")]: "without_subscription" === a ? [tr("без подписки")]: "with_any_subscription" === a ? [tr("с любой подпиской")]: tr("с выбранными: ").concat(n.map(e => d(e)).join(", "));
+        let s = "owners" === e ? tr("только собственники") : "line" === e ? tr("только линейный персонал") : tr("все пользователи"),
+            l = "all" === a ? tr("все") : "without_subscription" === a ? tr("без подписки") : "with_any_subscription" === a ? tr("с любой подпиской") : tr("с выбранными: ").concat(n.map(e => d(e)).join(", "));
         if (window.confirm(tr("Отправить рассылку?\n\nПользователи: ").concat(s, tr("\nПодписка: ")).concat(l, tr("\nРегистрация: ")).concat(c || tr("любая"), " — ").concat(m || tr("любая"), tr("\nПолучателей (по последнему подсчёту): ")).concat(null != b ? b : "—", tr("\nОт: info@restodocks.com (через Resend)")))) {
             _(!0), k(null), S(null);
             try {
@@ -6182,7 +6188,7 @@ function eT() {
                     onClick: () => void L(),
                     disabled: j,
                     className: "bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                    children: j ? [tr("Подсчёт…")]: tr("Подсчитать получателей")
+                    children: j ? tr("Подсчёт…") : tr("Подсчитать получателей")
                 }), null !== b && (0, r.jsxs)("span", {
                     className: "text-sm text-gray-400",
                     children: [tr("В списке: "), (0, r.jsx)("span", {
@@ -6219,7 +6225,7 @@ function eT() {
                 onClick: () => void T(),
                 disabled: f || 0 === p.trim().length || 0 === h.trim().length,
                 className: "bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                children: f ? [tr("Отправка…")]: tr("Отправить рассылку")
+                children: f ? tr("Отправка…") : tr("Отправить рассылку")
             })]
         })]
     })
