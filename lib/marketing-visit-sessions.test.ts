@@ -130,6 +130,8 @@ test('formatDurationMs and visitPace', () => {
   assert.equal(formatDurationMs(12_000, 'en'), '12s')
   assert.equal(formatDurationMs(200_000, 'ru'), '3 м 20 с')
   assert.equal(formatDurationMs(3_600_000 + 120_000, 'en'), '1h 2m')
+  assert.equal(visitPace(0, 2), 'instant')
+  assert.equal(visitPace(1_500, 2), 'instant')
   assert.equal(visitPace(20_000, 3), 'quick')
   assert.equal(visitPace(90_000, 3), 'normal')
   assert.equal(visitPace(200_000, 3), 'slow')

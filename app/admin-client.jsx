@@ -278,6 +278,7 @@ function v(e) {
 let j = {
         "/login": "Вход",
         "/promo": "Промо",
+        "/promo/locale": "Выбор языка",
         "/register-company": "Регистрация компании",
         "/register-owner": "Регистрация владельца",
         "/register": "Регистрация сотрудника",
@@ -5601,7 +5602,6 @@ function eL() {
                 return next.has(key) ? next.delete(key) : next.add(key), next
             })
         },
-        journeyLabel = types => (types || []).map(labelEvent).filter(Boolean).join(" → ") || "—",
         en = e => {
             j(ed(-e)), k(ed(0))
         },
@@ -5959,8 +5959,7 @@ function eL() {
             onHideIp: er,
             sampleSize: el.length,
             limit: null !== (g = null == K ? void 0 : null === (i = K.meta) || void 0 === i ? void 0 : i.limit) && void 0 !== g ? g : 0,
-            rangeLabel: eo,
-            journeyLabel: journeyLabel
+            rangeLabel: eo
         })]
     })
 }
