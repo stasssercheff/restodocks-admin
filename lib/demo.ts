@@ -42,6 +42,7 @@ export type ResetDemoResult =
       deletedSandboxIds: string[]
       deletedAuthUserIds: string[]
       deletedEstablishmentIds: string[]
+      establishmentWarnings?: string[]
     }
   | { error: string; code?: string }
 
@@ -198,18 +199,8 @@ export async function resetDemoByEmail(emailRaw: string): Promise<ResetDemoResul
     for (const id of verified) authIds.add(id)
   }
 
-  const deletedEstablishmentIds: string[] = []
-  for (const establishmentId of establishmentIds) {
-    const removed = await deleteDemoEstablishment(establishmentId)
-    if (removed && 'error' in removed) {
-      return {
-        error: `Не удалось удалить демо-кухню ${establishmentId}: ${removed.error}`,
-        code: removed.code,
-      }
-    }
-    if (removed && 'id' in removed) deletedEstablishmentIds.push(removed.id)
-  }
-
+  // Order matters for re-test: create-demo-sandbox checks sandbox/auth first.
+  // Demo kitchens can fail on FK (pos_order_lines) — that must not block auth cleanup.
   const deletedSandboxIds: string[] = []
   if (sandboxes.length > 0) {
     const ids = sandboxes.map(row => row.id)
@@ -229,6 +220,17 @@ export async function resetDemoByEmail(emailRaw: string): Promise<ResetDemoResul
     }
   }
 
+  const deletedEstablishmentIds: string[] = []
+  const establishmentWarnings: string[] = []
+  for (const establishmentId of establishmentIds) {
+    const removed = await deleteDemoEstablishment(establishmentId)
+    if (removed && 'error' in removed) {
+      establishmentWarnings.push(`${establishmentId}: ${removed.error}`)
+      continue
+    }
+    if (removed && 'id' in removed) deletedEstablishmentIds.push(removed.id)
+  }
+
   if (
     deletedSandboxIds.length === 0
     && authDelete.deleted.length === 0
@@ -245,6 +247,7 @@ export async function resetDemoByEmail(emailRaw: string): Promise<ResetDemoResul
     deletedSandboxIds,
     deletedAuthUserIds: authDelete.deleted,
     deletedEstablishmentIds,
+    ...(establishmentWarnings.length > 0 ? { establishmentWarnings } : {}),
   }
 }
 
