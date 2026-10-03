@@ -35,17 +35,6 @@ function summarize(rows: (DemoRow & { registered: boolean })[]) {
   }
 }
 
-async function allowDemoReset(req: NextRequest) {
-  const resetToken = process.env.DEMO_RESET_TOKEN?.trim()
-  const provided = req.headers.get('x-demo-reset-token')?.trim()
-  if (resetToken && provided && resetToken === provided) {
-    return { ok: true as const }
-  }
-  const auth = await requireAdminRequest(req, 'demo_sandboxes')
-  if ('response' in auth) return auth
-  return { ok: true as const }
-}
-
 export async function GET(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'demo_sandboxes')
   if ('response' in auth) return auth.response
@@ -68,8 +57,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const gate = await allowDemoReset(req)
-  if ('response' in gate) return gate.response
+  const auth = await requireAdminRequest(req, 'demo_sandboxes')
+  if ('response' in auth) return auth.response
 
   const body = await req.json().catch(() => ({})) as { action?: unknown; email?: unknown }
   if (body.action !== 'reset_email') {
