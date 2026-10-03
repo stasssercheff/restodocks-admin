@@ -35,41 +35,20 @@ function summarize(rows: (DemoRow & { registered: boolean })[]) {
   }
 }
 
-/** Local-only in-memory rows when DEMO_FIXTURE=1 (never set in production). */
-let fixtureRows: (DemoRow & { registered: boolean })[] | null = null
-
-function getFixtureRows() {
-  if (!fixtureRows) {
-    fixtureRows = [
-      {
-        id: 'fixture-demo-1',
-        email: 'retest@example.com',
-        locale: 'ru',
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 86400000).toISOString(),
-        first_entered_at: null,
-        tour_step: 0,
-        tour_completed_at: null,
-        converted_at: null,
-        status: 'active',
-        last_promo_email_at: null,
-        establishment_id: null,
-        auth_user_id: 'fixture-auth-1',
-        registered: false,
-      },
-    ]
+async function allowDemoReset(req: NextRequest) {
+  const resetToken = process.env.DEMO_RESET_TOKEN?.trim()
+  const provided = req.headers.get('x-demo-reset-token')?.trim()
+  if (resetToken && provided && resetToken === provided) {
+    return { ok: true as const }
   }
-  return fixtureRows
+  const auth = await requireAdminRequest(req, 'demo_sandboxes')
+  if ('response' in auth) return auth
+  return { ok: true as const }
 }
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'demo_sandboxes')
   if ('response' in auth) return auth.response
-
-  if (process.env.DEMO_FIXTURE === '1') {
-    const rows = getFixtureRows().map(r => ({ ...r }))
-    return NextResponse.json({ summary: summarize(rows), rows })
-  }
 
   const supabase = createServiceClient()
   if ('error' in supabase) return NextResponse.json({ error: supabase.error }, { status: 500 })
@@ -88,17 +67,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ summary: summarize(rows), rows })
 }
 
-async function allowDemoReset(req: NextRequest) {
-  const resetToken = process.env.DEMO_RESET_TOKEN?.trim()
-  const provided = req.headers.get('x-demo-reset-token')?.trim()
-  if (resetToken && provided && resetToken === provided) {
-    return { ok: true as const }
-  }
-  const auth = await requireAdminRequest(req, 'demo_sandboxes')
-  if ('response' in auth) return auth
-  return { ok: true as const }
-}
-
 export async function POST(req: NextRequest) {
   const gate = await allowDemoReset(req)
   if ('response' in gate) return gate.response
@@ -110,21 +78,6 @@ export async function POST(req: NextRequest) {
   const email = normalizeDemoEmail(body.email)
   if (!email) {
     return NextResponse.json({ error: 'Укажите корректную почту' }, { status: 400 })
-  }
-
-  if (process.env.DEMO_FIXTURE === '1') {
-    const rows = getFixtureRows()
-    const before = rows.length
-    for (let i = rows.length - 1; i >= 0; i -= 1) {
-      if ((rows[i].email || '').toLowerCase() === email) rows.splice(i, 1)
-    }
-    return NextResponse.json({
-      ok: true,
-      email,
-      deletedSandboxIds: before === rows.length ? [] : ['fixture-demo-1'],
-      deletedAuthUserIds: before === rows.length ? [] : ['fixture-auth-1'],
-      deletedEstablishmentIds: [],
-    })
   }
 
   const result = await resetDemoByEmail(email)
@@ -142,41 +95,6 @@ export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as { id?: unknown; email?: unknown }
   const id = normalizeDemoSandboxId(body.id)
   const email = normalizeDemoEmail(body.email)
-
-  if (process.env.DEMO_FIXTURE === '1') {
-    const rows = getFixtureRows()
-    if (email) {
-      const before = rows.length
-      for (let i = rows.length - 1; i >= 0; i -= 1) {
-        if ((rows[i].email || '').toLowerCase() === email) rows.splice(i, 1)
-      }
-      if (before === rows.length) {
-        return NextResponse.json({ error: 'Песочница не найдена' }, { status: 404 })
-      }
-      return NextResponse.json({
-        ok: true,
-        email,
-        deletedSandboxIds: ['fixture-demo-1'],
-        deletedAuthUserIds: ['fixture-auth-1'],
-        deletedEstablishmentIds: [],
-      })
-    }
-    if (!id) {
-      return NextResponse.json({ error: 'id обязателен' }, { status: 400 })
-    }
-    const idx = rows.findIndex(r => r.id === id)
-    if (idx < 0) {
-      return NextResponse.json({ error: 'Песочница не найдена' }, { status: 404 })
-    }
-    const [removed] = rows.splice(idx, 1)
-    return NextResponse.json({
-      ok: true,
-      email: removed.email,
-      deletedSandboxIds: [removed.id],
-      deletedAuthUserIds: removed.auth_user_id ? [removed.auth_user_id] : [],
-      deletedEstablishmentIds: [],
-    })
-  }
 
   if (email && !id) {
     const result = await resetDemoByEmail(email)
