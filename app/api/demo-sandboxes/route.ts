@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRequest } from '@/lib/admin-auth'
+import { deleteDemoSandbox, resetDemoByEmail } from '@/lib/demo'
+import { normalizeDemoEmail, normalizeDemoSandboxId } from '@/lib/demo-id'
 import { createServiceClient } from '@/lib/supabase-server'
 
 type DemoRow = {
@@ -15,6 +17,7 @@ type DemoRow = {
   status: string | null
   last_promo_email_at: string | null
   establishment_id: string | null
+  auth_user_id?: string | null
 }
 
 function summarize(rows: (DemoRow & { registered: boolean })[]) {
@@ -41,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('demo_sandboxes')
-    .select('id, email, locale, created_at, expires_at, first_entered_at, tour_step, tour_completed_at, converted_at, status, last_promo_email_at, establishment_id')
+    .select('id, email, locale, created_at, expires_at, first_entered_at, tour_step, tour_completed_at, converted_at, status, last_promo_email_at, establishment_id, auth_user_id')
     .order('created_at', { ascending: false })
     .limit(500)
 
@@ -51,4 +54,54 @@ export async function GET(req: NextRequest) {
     registered: !!row.converted_at,
   }))
   return NextResponse.json({ summary: summarize(rows), rows })
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requireAdminRequest(req, 'demo_sandboxes')
+  if ('response' in auth) return auth.response
+
+  const body = await req.json().catch(() => ({})) as { action?: unknown; email?: unknown }
+  if (body.action !== 'reset_email') {
+    return NextResponse.json({ error: 'Неизвестное действие' }, { status: 400 })
+  }
+  const email = normalizeDemoEmail(body.email)
+  if (!email) {
+    return NextResponse.json({ error: 'Укажите корректную почту' }, { status: 400 })
+  }
+
+  const result = await resetDemoByEmail(email)
+  if ('error' in result) {
+    const status = /не найдено/i.test(result.error) ? 404 : 500
+    return NextResponse.json({ error: result.error, code: result.code }, { status })
+  }
+  return NextResponse.json(result)
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = await requireAdminRequest(req, 'demo_sandboxes')
+  if ('response' in auth) return auth.response
+
+  const body = await req.json().catch(() => ({})) as { id?: unknown; email?: unknown }
+  const id = normalizeDemoSandboxId(body.id)
+  const email = normalizeDemoEmail(body.email)
+
+  if (email && !id) {
+    const result = await resetDemoByEmail(email)
+    if ('error' in result) {
+      const status = /не найдено/i.test(result.error) ? 404 : 500
+      return NextResponse.json({ error: result.error, code: result.code }, { status })
+    }
+    return NextResponse.json(result)
+  }
+
+  if (!id) {
+    return NextResponse.json({ error: 'id обязателен' }, { status: 400 })
+  }
+
+  const result = await deleteDemoSandbox(id)
+  if ('error' in result) {
+    const status = result.error === 'Песочница не найдена' ? 404 : 500
+    return NextResponse.json({ error: result.error, code: result.code }, { status })
+  }
+  return NextResponse.json(result)
 }
