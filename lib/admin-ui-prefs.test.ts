@@ -3,9 +3,11 @@ import test from 'node:test'
 import {
   defaultAdminUiPrefs,
   firstVisibleNavTab,
+  initialNavTab,
   moveTab,
   moveTabAmong,
   sanitizeAdminUiPrefs,
+  saveActiveNavTab,
   setTabVisible,
   touchAdminUiPrefs,
   visibleNavTabs,
@@ -87,6 +89,32 @@ test('firstVisibleNavTab falls back to settings', () => {
     tabs: ALL_HIDDEN_EXCEPT_SETTINGS(),
   })
   assert.equal(firstVisibleNavTab(staff, prefs), 'settings')
+})
+
+test('initialNavTab prefers saved active tab when still visible', () => {
+  const store = new Map<string, string>()
+  const fakeStorage = {
+    getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+    setItem: (key: string, value: string) => { store.set(key, String(value)) },
+    removeItem: (key: string) => { store.delete(key) },
+    clear: () => { store.clear() },
+    key: () => null,
+    get length() { return store.size },
+  }
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: fakeStorage,
+    configurable: true,
+  })
+
+  const owner = { isOwner: true, pages: [] as string[] }
+  const prefs = defaultAdminUiPrefs()
+  saveActiveNavTab('demo_sandboxes')
+  assert.equal(initialNavTab(owner, prefs), 'demo_sandboxes')
+  // Hidden/unavailable saved tab falls back.
+  const hiddenDemo = sanitizeAdminUiPrefs({
+    tabs: prefs.tabs.map(item => item.key === 'demo_sandboxes' ? { ...item, visible: false } : item),
+  })
+  assert.notEqual(initialNavTab(owner, hiddenDemo), 'demo_sandboxes')
 })
 
 test('LAYOUT_PAGE_KEYS stays aligned with ADMIN_PAGES registry', async () => {
