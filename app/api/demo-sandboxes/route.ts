@@ -34,9 +34,40 @@ function summarize(rows: (DemoRow & { registered: boolean })[]) {
   }
 }
 
+/** Local-only in-memory rows when DEMO_FIXTURE=1 (never set in production). */
+let fixtureRows: (DemoRow & { registered: boolean })[] | null = null
+
+function getFixtureRows() {
+  if (!fixtureRows) {
+    fixtureRows = [
+      {
+        id: 'fixture-demo-1',
+        email: 'retest@example.com',
+        locale: 'ru',
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 86400000).toISOString(),
+        first_entered_at: null,
+        tour_step: 0,
+        tour_completed_at: null,
+        converted_at: null,
+        status: 'active',
+        last_promo_email_at: null,
+        establishment_id: null,
+        registered: false,
+      },
+    ]
+  }
+  return fixtureRows
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'demo_sandboxes')
   if ('response' in auth) return auth.response
+
+  if (process.env.DEMO_FIXTURE === '1') {
+    const rows = getFixtureRows().map(r => ({ ...r }))
+    return NextResponse.json({ summary: summarize(rows), rows })
+  }
 
   const supabase = createServiceClient()
   if ('error' in supabase) return NextResponse.json({ error: supabase.error }, { status: 500 })
@@ -63,6 +94,16 @@ export async function DELETE(req: NextRequest) {
   const id = normalizeDemoSandboxId(body.id)
   if (!id) {
     return NextResponse.json({ error: 'id обязателен' }, { status: 400 })
+  }
+
+  if (process.env.DEMO_FIXTURE === '1') {
+    const rows = getFixtureRows()
+    const idx = rows.findIndex(r => r.id === id)
+    if (idx < 0) {
+      return NextResponse.json({ error: 'Песочница не найдена' }, { status: 404 })
+    }
+    const [removed] = rows.splice(idx, 1)
+    return NextResponse.json({ ok: true, email: removed.email, deletedEstablishmentId: null })
   }
 
   const result = await deleteDemoSandbox(id)
