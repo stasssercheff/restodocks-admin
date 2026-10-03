@@ -283,3 +283,51 @@ export function firstVisibleNavTab(user: AccessUser, prefs: AdminUiPrefs): NavTa
   const keys = visibleNavTabs(user, prefs)
   return keys[0] ?? 'settings'
 }
+
+const ACTIVE_TAB_KEY = 'rd_admin_active_tab'
+
+function browserLocalStorage(): Storage | null {
+  try {
+    const storage = (globalThis as { localStorage?: Storage }).localStorage
+    if (!storage) return null
+    // Touch once so private-mode / broken stubs fail here, not later.
+    const probe = '__rd_ls_probe__'
+    storage.setItem(probe, '1')
+    storage.removeItem(probe)
+    return storage
+  } catch {
+    return null
+  }
+}
+
+/** Last opened shell tab (F5 should stay here if still visible/allowed). */
+export function loadActiveNavTab(): NavTabKey | null {
+  const storage = browserLocalStorage()
+  if (!storage) return null
+  try {
+    const raw = storage.getItem(ACTIVE_TAB_KEY)
+    if (!raw) return null
+    if ((DEFAULT_NAV_TAB_KEYS as string[]).includes(raw)) return raw as NavTabKey
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+export function saveActiveNavTab(key: NavTabKey): void {
+  const storage = browserLocalStorage()
+  if (!storage) return
+  try {
+    storage.setItem(ACTIVE_TAB_KEY, key)
+  } catch {
+    // ignore
+  }
+}
+
+/** Prefer saved tab on reload; fall back to first visible. */
+export function initialNavTab(user: AccessUser, prefs: AdminUiPrefs): NavTabKey {
+  const keys = visibleNavTabs(user, prefs)
+  const saved = loadActiveNavTab()
+  if (saved && keys.includes(saved)) return saved
+  return keys[0] ?? 'settings'
+}
