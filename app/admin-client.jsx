@@ -5116,7 +5116,7 @@ let ew = "admin_marketing_exclude_ips",
 
 function eS() {
     var e, t, a, l;
-    let [n, i] = (0, s.useState)(null), [o, d] = (0, s.useState)(!0), [c, x] = (0, s.useState)(!1), [m, u] = (0, s.useState)(null), [p, g] = (0, s.useState)(!0), [h, y] = (0, s.useState)(""), [b, v] = (0, s.useState)(null), j = (0, s.useCallback)(async e => {
+    let [n, i] = (0, s.useState)(null), [o, d] = (0, s.useState)(!0), [c, x] = (0, s.useState)(!1), [m, u] = (0, s.useState)(null), [p, g] = (0, s.useState)(!0), [h, y] = (0, s.useState)(""), [b, v] = (0, s.useState)(null), [deletingId, setDeletingId] = (0, s.useState)(null), j = (0, s.useCallback)(async e => {
         let t = (null == e ? void 0 : e.silent) === !0;
         u(null), t ? x(!0) : d(!0);
         try {
@@ -5167,6 +5167,33 @@ function eS() {
                 return a.includes(t) ? e : [...a, t].join(", ")
             }), g(!0))
         }, []),
+        removeSandbox = (0, s.useCallback)(async e => {
+            if (!e?.id || deletingId) return;
+            let t = e.email || e.id;
+            if (!confirm("Удалить демо для «".concat(t, "»?\n\nСтрока песочницы будет удалена из БД — эту почту можно снова запросить на /demo. Если была демо-кухня (is_demo), она тоже удалится. Действие необратимо."))) return;
+            setDeletingId(e.id), u(null);
+            try {
+                let a = await fetch("/api/demo-sandboxes", {
+                        method: "DELETE",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            id: e.id
+                        })
+                    }),
+                    r = await a.json().catch(() => ({}));
+                if (!a.ok) throw Error("string" == typeof(null == r ? void 0 : r.error) ? r.error : "Ошибка удаления (".concat(a.status, ")"));
+                await j({
+                    silent: !0
+                }), alert("Демо «".concat(t, "» удалено. Можно снова запросить на /demo."))
+            } catch (e) {
+                let t = e instanceof Error ? e.message : "Ошибка удаления";
+                u(t), alert("Не удалось удалить демо.\n\n".concat(t))
+            } finally {
+                setDeletingId(null)
+            }
+        }, [deletingId, j]),
         _ = (0, s.useMemo)(() => {
             var e;
             let t = null !== (e = null == n ? void 0 : n.rows) && void 0 !== e ? e : [];
@@ -5193,7 +5220,7 @@ function eS() {
                     children: "Демо"
                 }), (0, r.jsx)("p", {
                     className: "text-sm text-gray-500 mt-1 max-w-3xl",
-                    children: "Отдельный учёт песочниц: почта, с которой запросили демо, был ли вход по ссылке и зарегистрировали ли потом свой кабинет. В \xabВитрину\xbb эти заходы не попадают."
+                    children: "Отдельный учёт песочниц: почта, с которой запросили демо, был ли вход по ссылке и зарегистрировали ли потом свой кабинет. В \xabВитрину\xbb эти заходы не попадают. «Удалить» снимает запись, чтобы можно было снова пройти /demo с той же почтой."
                 })]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-col items-end gap-1",
@@ -5296,7 +5323,8 @@ function eS() {
                     children: [_.map(e => {
                         let t = "expired" === e.status || new Date(e.expires_at).getTime() <= Date.now(),
                             a = !0 === e.registered || null != e.converted_at,
-                            s = q(e.email, N);
+                            s = q(e.email, N),
+                            busy = deletingId === e.id;
                         return (0, r.jsxs)("tr", {
                             className: "border-t border-gray-800",
                             children: [(0, r.jsxs)("td", {
@@ -5306,11 +5334,20 @@ function eS() {
                                 }), s ? (0, r.jsx)("span", {
                                     className: "text-[10px] text-amber-400/90",
                                     children: "проверка"
-                                }) : null, (0, r.jsx)("button", {
-                                    type: "button",
-                                    onClick: () => f(e.email),
-                                    className: "block text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5",
-                                    children: "скрыть"
+                                }) : null, (0, r.jsxs)("div", {
+                                    className: "flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5",
+                                    children: [(0, r.jsx)("button", {
+                                        type: "button",
+                                        onClick: () => f(e.email),
+                                        className: "text-[10px] text-indigo-400 hover:text-indigo-300",
+                                        children: "скрыть"
+                                    }), (0, r.jsx)("button", {
+                                        type: "button",
+                                        onClick: () => void removeSandbox(e),
+                                        disabled: !!deletingId,
+                                        className: "text-[10px] text-rose-400 hover:text-rose-300 disabled:opacity-50",
+                                        children: busy ? "удаление…" : "удалить"
+                                    })]
                                 })]
                             }), (0, r.jsx)("td", {
                                 className: "px-3 py-2",

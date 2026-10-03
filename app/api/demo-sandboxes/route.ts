@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRequest } from '@/lib/admin-auth'
+import { deleteDemoSandbox } from '@/lib/demo'
+import { normalizeDemoSandboxId } from '@/lib/demo-id'
 import { createServiceClient } from '@/lib/supabase-server'
 
 type DemoRow = {
@@ -51,4 +53,22 @@ export async function GET(req: NextRequest) {
     registered: !!row.converted_at,
   }))
   return NextResponse.json({ summary: summarize(rows), rows })
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = await requireAdminRequest(req, 'demo_sandboxes')
+  if ('response' in auth) return auth.response
+
+  const body = await req.json().catch(() => ({})) as { id?: unknown }
+  const id = normalizeDemoSandboxId(body.id)
+  if (!id) {
+    return NextResponse.json({ error: 'id обязателен' }, { status: 400 })
+  }
+
+  const result = await deleteDemoSandbox(id)
+  if ('error' in result) {
+    const status = result.error === 'Песочница не найдена' ? 404 : 500
+    return NextResponse.json({ error: result.error, code: result.code }, { status })
+  }
+  return NextResponse.json(result)
 }
