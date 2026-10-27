@@ -1,1 +1,15 @@
 @import "tailwindcss";
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+  background-color: #030712; /* gray-950 — avoid white strip when a child overflows */
+}
+
+/* Long migration filenames / UUIDs must wrap on narrow phones */
+code,
+.break-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

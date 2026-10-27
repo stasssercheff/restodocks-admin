@@ -2079,13 +2079,13 @@ function ep({
         },
         navKeys = visibleNavTabs(user, uiPrefs);
     return (0, r.jsxs)("div", {
-        className: "min-h-screen bg-gray-950 text-white",
+        className: "min-h-screen bg-gray-950 text-white overflow-x-hidden",
         children: [(0, r.jsxs)("header", {
-            className: "px-4 py-3 flex items-center justify-between sticky top-0 z-10 border-b transition-colors ".concat(n ? "border-purple-500/70 bg-purple-950/95 shadow-[0_0_24px_rgba(147,51,234,0.25)]" : "border-amber-900/40 bg-gray-950"),
+            className: "px-3 sm:px-4 py-3 flex items-center justify-between gap-2 sticky top-0 z-10 border-b transition-colors min-w-0 ".concat(n ? "border-purple-500/70 bg-purple-950/95 shadow-[0_0_24px_rgba(147,51,234,0.25)]" : "border-amber-900/40 bg-gray-950"),
             children: [(0, r.jsxs)("div", {
-                className: "flex items-center gap-2",
+                className: "flex items-center gap-2 min-w-0",
                 children: [(0, r.jsx)("span", {
-                    className: "font-bold text-base",
+                    className: "font-bold text-base shrink-0",
                     children: "Restodocks"
                 }), (0, r.jsx)("span", {
                     className: "text-gray-500 text-sm hidden sm:inline",
@@ -2095,13 +2095,13 @@ function ep({
                     children: i18n.header.supportSession
                 }) : null]
             }), (0, r.jsxs)("div", {
-                className: "flex items-center gap-3",
+                className: "flex items-center gap-2 sm:gap-3 shrink-0",
                 children: [(0, r.jsx)(LanguageSwitcher, {}), user?.email ? (0, r.jsx)("span", {
                     className: "text-sm text-gray-500 hidden sm:inline",
                     children: user.email
                 }) : null, (0, r.jsx)("button", {
                     onClick: o,
-                    className: "text-sm text-gray-500 hover:text-white transition",
+                    className: "text-sm text-gray-500 hover:text-white transition shrink-0",
                     children: i18n.header.logout
                 })]
             })]
@@ -2117,8 +2117,9 @@ function ep({
                 }, key))
             })
         }), (0, r.jsxs)("main", {
-            className: "max-w-[min(1600px,calc(100vw-1.5rem))] mx-auto px-3 py-4 sm:px-6 sm:py-8",
+            className: "w-full max-w-[1600px] mx-auto px-3 py-4 sm:px-6 sm:py-8 min-w-0 overflow-x-hidden",
                 children: [(0, r.jsx)("div", {
+                className: "min-w-0 max-w-full",
                 style: {
                     display: "establishments" === t && canAccessPage(user, "establishments") ? "block" : "none"
                 },
@@ -2521,22 +2522,23 @@ function ey() {
             C(null)
         }
     }
-    return (0, r.jsxs)(r.Fragment, {
+    return (0, r.jsxs)("div", {
+        className: "min-w-0 max-w-full overflow-x-hidden",
         children: [_ && (0, r.jsxs)("div", {
-            className: "mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm",
+            className: "mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm break-words",
             children: [_, (0, r.jsxs)("span", {
-                className: "block mt-2 text-gray-500 text-xs",
+                className: "block mt-2 text-gray-500 text-xs break-words",
                 children: [tr("Нет колонки или схема старая — открой Supabase → SQL Editor и выполни миграции:"), " ", (0, r.jsx)("code", {
-                    className: "text-gray-400",
+                    className: "text-gray-400 break-all",
                     children: "supabase/migrations/20260502120000_pro_paid_until_and_status_rpc.sql"
                 }), " ", tr("(колонка "), (0, r.jsx)("code", {
-                    className: "text-gray-500",
+                    className: "text-gray-500 break-all",
                     children: "pro_paid_until"
                 }), tr("). Ошибка входа/401 — проверь Secrets в Cloudflare ("), (0, r.jsx)("code", {
-                    className: "text-gray-500",
+                    className: "text-gray-500 break-all",
                     children: "SUPABASE_URL"
                 }), ",", " ", (0, r.jsx)("code", {
-                    className: "text-gray-500",
+                    className: "text-gray-500 break-all",
                     children: "SERVICE_ROLE_KEY"
                 }), tr(") и перелогинься в админке.")]
             })]
@@ -2556,9 +2558,9 @@ function ey() {
                 value: G
             })]
         }), "hide" === demoFilter && hiddenDemoCount > 0 ? (0, r.jsxs)("div", {
-            className: "mb-4 px-4 py-3 rounded-xl border border-gray-800 bg-gray-900/60 text-sm text-gray-400",
+            className: "mb-4 px-3 sm:px-4 py-3 rounded-xl border border-gray-800 bg-gray-900/60 text-sm text-gray-400 min-w-0 break-words",
             children: [tr("Системные демо-кухни ("), hiddenDemoCount, tr(") скрыты — это не удаления, они в БД с флагом "), (0, r.jsx)("code", {
-                className: "text-gray-500 text-xs",
+                className: "text-gray-500 text-xs break-all",
                 children: "is_demo"
             }), tr(". Показать: фильтр «Демо» ниже.")]
         }) : null, dateFilterActive ? (0, r.jsxs)("div", {
@@ -2574,7 +2576,7 @@ function ey() {
             className: "mb-4 px-4 py-3 rounded-xl border border-amber-900/50 bg-amber-950/30 text-sm text-amber-100",
             children: tr("Даты изменены, но ещё не применены — нажми «Применить».")
         }) : null, (0, r.jsxs)("div", {
-            className: "mb-4 p-4 bg-gray-900/80 border border-gray-800 rounded-xl text-gray-400 text-sm leading-relaxed",
+            className: "mb-4 p-3 sm:p-4 bg-gray-900/80 border border-gray-800 rounded-xl text-gray-400 text-sm leading-relaxed min-w-0 max-w-full overflow-hidden break-words",
             children: [(0, r.jsx)("p", {
                 className: "font-medium text-gray-300 mb-1",
                 children: tr("Регистрация и пробный Pro")
@@ -2583,7 +2585,7 @@ function ey() {
                     className: "text-gray-500",
                     children: tr("записи заведения")
                 }), tr(" в базе ("), (0, r.jsx)("code", {
-                    className: "text-gray-500 text-xs",
+                    className: "text-gray-500 text-xs break-all",
                     children: "establishments.created_at"
                 }), tr("). Для входа"), " ", (0, r.jsx)("span", {
                     className: "text-gray-300",
@@ -2592,28 +2594,28 @@ function ey() {
                     className: "text-gray-300",
                     children: tr("72 часа полного Pro")
                 }), tr(" с этого момента (в БД — поле"), " ", (0, r.jsx)("code", {
-                    className: "text-gray-500 text-xs",
+                    className: "text-gray-500 text-xs break-all",
                     children: "pro_trial_ends_at"
                 }), tr("). С промокодом триал обычно не заполняется — тариф даёт промо.")]
             }), (0, r.jsxs)("p", {
-                className: "mt-2 text-xs text-gray-600",
+                className: "mt-2 text-xs text-gray-600 break-words",
                 children: [tr("Если у старых аккаунтов без промо пропала дата окончания триала, выполни в Supabase миграцию"), " ", (0, r.jsx)("code", {
-                    className: "text-gray-500",
+                    className: "text-gray-500 break-all",
                     children: "20260621120000_backfill_pro_trial_ends_at_no_promo_main.sql"
                 }), "."]
             }), (0, r.jsxs)("p", {
-                className: "mt-2 text-xs text-gray-500",
+                className: "mt-2 text-xs text-gray-500 break-words",
                 children: [(0, r.jsx)("span", {
                     className: "text-gray-400",
                     children: tr("Владелец / Email:")
                 }), tr(" из "), (0, r.jsx)("code", {
-                    className: "text-gray-500",
+                    className: "text-gray-500 break-all",
                     children: "employees"
                 }), tr(" (роль owner или "), (0, r.jsx)("code", {
-                    className: "text-gray-500",
+                    className: "text-gray-500 break-all",
                     children: "establishments.owner_id"
                 }), tr("). До confirm — из"), " ", (0, r.jsx)("code", {
-                    className: "text-gray-500",
+                    className: "text-gray-500 break-all",
                     children: "pending_owner_registrations"
                 }), " (", (0, r.jsx)("span", {
                     className: "text-amber-400/90",
@@ -2626,18 +2628,18 @@ function ey() {
                     children: tr("активные")
                 }), tr(" сотрудники этого заведения (собственник + шеф в одной строке = 1; неактивные не считаются).")]
             }), (0, r.jsxs)("p", {
-                className: "mt-3 text-xs text-gray-500 leading-relaxed border-t border-gray-800 pt-3",
+                className: "mt-3 text-xs text-gray-500 leading-relaxed border-t border-gray-800 pt-3 break-words",
                 children: [(0, r.jsx)("span", {
                     className: "text-gray-400",
                     children: tr("Заведения и филиалы")
                 }), tr(" создаются только в приложении (регистрация, экран \xabМои заведения\xbb / добавление филиала). В этой админке нет кнопки \xabсоздать заведение\xbb — здесь только список из БД, удаление и гео. Если строка \xabвидна в админке, но не в приложении\xbb, это всё равно записи в Supabase; после успешного удаления появится подтверждение; при ошибке — текст в алерте и в красном блоке выше.")]
             })]
         }), (0, r.jsxs)("div", {
-            className: "flex flex-wrap gap-2 mb-3 md:hidden",
+            className: "grid grid-cols-2 gap-2 mb-3 md:hidden",
             children: [(0, r.jsxs)("select", {
                 value: x,
                 onChange: e => m(e.target.value),
-                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[6rem]",
+                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs w-full min-w-0 max-w-full",
                 children: [(0, r.jsx)("option", {
                     value: "all",
                     children: tr("Тип: все")
@@ -2654,7 +2656,7 @@ function ey() {
             }), (0, r.jsx)("select", {
                 value: u,
                 onChange: e => b(e.target.value),
-                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[8rem]",
+                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs w-full min-w-0 max-w-full",
                 children: p.map(e => {
                     var t;
                     return (0, r.jsxs)("option", {
@@ -2665,7 +2667,7 @@ function ey() {
             }), (0, r.jsx)("select", {
                 value: v,
                 onChange: e => j(e.target.value),
-                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[7rem]",
+                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs w-full min-w-0 max-w-full",
                 children: g.map(e => {
                     var t;
                     return (0, r.jsxs)("option", {
@@ -2676,7 +2678,7 @@ function ey() {
             }), (0, r.jsxs)("select", {
                 value: N,
                 onChange: e => f(e.target.value),
-                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[6rem]",
+                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs w-full min-w-0 max-w-full",
                 children: [(0, r.jsx)("option", {
                     value: "all",
                     children: tr("Сотр.: все")
@@ -2709,17 +2711,17 @@ function ey() {
                 type: "button",
                 onClick: O,
                 disabled: T || i || 0 === U.length,
-                className: "shrink-0 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed",
+                className: "w-full sm:w-auto sm:shrink-0 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed",
                 children: T ? tr("Формируем файл…") : tr("Скачать Excel (.xlsx)")
             })]
         }), (0, r.jsxs)("form", {
-            className: "mb-3 flex flex-wrap gap-2 items-end",
+            className: "mb-3 grid grid-cols-2 sm:flex sm:flex-wrap gap-2 items-end min-w-0",
             onSubmit: e => {
                 e.preventDefault()
                 applyDateFilter()
             },
             children: [(0, r.jsxs)("div", {
-                className: "flex flex-col gap-1",
+                className: "flex flex-col gap-1 min-w-0",
                 children: [(0, r.jsx)("label", {
                     className: "text-[11px] text-gray-500 uppercase tracking-wide",
                     children: tr("Создано с")
@@ -2727,10 +2729,10 @@ function ey() {
                     type: "date",
                     value: dateFrom,
                     onChange: e => setDateFrom(e.target.value),
-                    className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm"
+                    className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm w-full min-w-0 max-w-full"
                 })]
             }), (0, r.jsxs)("div", {
-                className: "flex flex-col gap-1",
+                className: "flex flex-col gap-1 min-w-0",
                 children: [(0, r.jsx)("label", {
                     className: "text-[11px] text-gray-500 uppercase tracking-wide",
                     children: tr("по")
@@ -2738,17 +2740,17 @@ function ey() {
                     type: "date",
                     value: dateTo,
                     onChange: e => setDateTo(e.target.value),
-                    className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm"
+                    className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm w-full min-w-0 max-w-full"
                 })]
             }), (0, r.jsxs)("div", {
-                className: "flex flex-col gap-1",
+                className: "flex flex-col gap-1 col-span-2 sm:col-span-1 min-w-0",
                 children: [(0, r.jsx)("label", {
                     className: "text-[11px] text-gray-500 uppercase tracking-wide",
                     children: tr("Демо")
                 }), (0, r.jsxs)("select", {
                     value: demoFilter,
                     onChange: e => setDemoFilter(e.target.value),
-                    className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm",
+                    className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-sm w-full min-w-0 max-w-full",
                     children: [(0, r.jsxs)("option", {
                         value: "hide",
                         children: [tr("Скрыть системные ("), hiddenDemoCount, ")"]
@@ -2762,26 +2764,26 @@ function ey() {
                 })]
             }), (0, r.jsx)("button", {
                 type: "submit",
-                className: "text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium ".concat(datesDirty ? "ring-2 ring-amber-400/70" : ""),
+                className: "text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium w-full sm:w-auto ".concat(datesDirty ? "ring-2 ring-amber-400/70" : ""),
                 children: tr("Применить")
             }), dateFilterActive || "hide" !== demoFilter || datesDirty ? (0, r.jsx)("button", {
                 type: "button",
                 onClick: clearDateDemoFilters,
-                className: "text-xs px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500",
+                className: "text-xs px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 w-full sm:w-auto",
                 children: tr("Сбросить")
             }) : null]
         }), (0, r.jsxs)("div", {
-            className: "flex gap-2 mb-4 flex-wrap",
+            className: "flex gap-2 mb-4 flex-wrap min-w-0",
             children: [(0, r.jsx)("input", {
                 type: "text",
                 value: d,
                 onChange: e => c(e.target.value),
                 placeholder: tr("Поиск (название, email, ID)..."),
-                className: "bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-0 text-sm"
+                className: "bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 basis-full sm:basis-0 min-w-0 text-sm"
             }), canMutate ? (0, r.jsx)("button", {
                 onClick: K,
                 disabled: S,
-                className: "text-gray-500 hover:text-white transition px-3 py-2 rounded-lg border border-gray-800 text-sm shrink-0 disabled:opacity-50",
+                className: "text-gray-500 hover:text-white transition px-3 py-2 rounded-lg border border-gray-800 text-sm shrink min-w-0 max-w-full disabled:opacity-50",
                 title: tr("Догнать registration_ip из last_login (владелец по owner_id, любой сотрудник) и город/страну по IP"),
                 children: S ? "…" : tr("\uD83C\uDF10 IP и гео регистрации")
             }) : null, (0, r.jsx)("button", {
@@ -3048,19 +3050,19 @@ function ey() {
                     })]
                 })
             }), (0, r.jsx)("div", {
-                className: "md:hidden space-y-2",
+                className: "md:hidden space-y-2 min-w-0",
                 children: U.map(l => {
                     var n, i;
                     return (0, r.jsxs)(s.Fragment, {
                         children: [l.isOwnerGroupStart && (null !== (n = l.ownerGroupSize) && void 0 !== n ? n : 0) > 1 ? (0, r.jsxs)("div", {
-                            className: "px-3 py-2 rounded-lg bg-indigo-950/40 border border-indigo-900/50 text-xs text-indigo-200/90",
+                            className: "px-3 py-2 rounded-lg bg-indigo-950/40 border border-indigo-900/50 text-xs text-indigo-200/90 break-words min-w-0",
                             children: [tr("Связанные заведения \xb7 "), "—" !== l.owner_email ? l.owner_email : l.owner_name, " (", l.ownerGroupSize, tr(" шт.)")]
                         }) : null, (0, r.jsxs)("div", {
-                            className: "bg-gray-900 rounded-xl border border-gray-800 p-4 ".concat(l.isOwnerGroupStart ? "mt-3 first:mt-0 ring-1 ring-gray-700/40" : "", " ").concat((null !== (i = l.ownerGroupSize) && void 0 !== i ? i : 0) > 1 ? "border-indigo-900/30" : ""),
+                            className: "bg-gray-900 rounded-xl border border-gray-800 p-4 min-w-0 overflow-hidden ".concat(l.isOwnerGroupStart ? "mt-3 first:mt-0 ring-1 ring-gray-700/40" : "", " ").concat((null !== (i = l.ownerGroupSize) && void 0 !== i ? i : 0) > 1 ? "border-indigo-900/30" : ""),
                             children: [(0, r.jsxs)("div", {
-                                className: "flex items-start justify-between gap-2 mb-2",
+                                className: "flex items-start justify-between gap-2 mb-2 min-w-0",
                                 children: [(0, r.jsxs)("span", {
-                                    className: "font-medium text-white text-sm",
+                                    className: "font-medium text-white text-sm min-w-0 break-words",
                                     style: {
                                         paddingLeft: l.indentLevel ? "".concat(.75 * Math.min(l.indentLevel, 3), "rem") : void 0
                                     },
@@ -6333,13 +6335,13 @@ function eP(e) {
         title: titleAttr
     } = e;
     return (0, r.jsxs)("div", {
-        className: "bg-gray-900 rounded-xl p-3 sm:p-4 border border-gray-800",
+        className: "bg-gray-900 rounded-xl p-3 sm:p-4 border border-gray-800 min-w-0 overflow-hidden",
         title: titleAttr || void 0,
         children: [(0, r.jsx)("div", {
             className: "text-xl sm:text-2xl font-bold ".concat(s ? "text-gray-600" : "text-white"),
             children: a
         }), (0, r.jsx)("div", {
-            className: "text-gray-500 text-xs sm:text-sm mt-1",
+            className: "text-gray-500 text-[11px] sm:text-sm mt-1 break-words leading-snug",
             children: t
         })]
     })
