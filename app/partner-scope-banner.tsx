@@ -34,30 +34,30 @@ export default function PartnerScopeBanner({ user }: { user: PublicAdminUser }) 
   const depth = user.referralDepth ?? 1
 
   return (
-    <div className="mb-6 space-y-3">
-      <div className="rounded-xl border border-amber-900/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-100">
+    <div className="mb-6 space-y-3 min-w-0 max-w-full">
+      <div className="rounded-xl border border-amber-900/50 bg-amber-950/30 px-3 sm:px-4 py-3 text-sm text-amber-100 break-words min-w-0">
         {t.scope.bannerPromo}
         {' '}
-        <span className="font-mono text-white">{codes.length ? codes.join(', ') : '—'}</span>
+        <span className="font-mono text-white break-all">{codes.length ? codes.join(', ') : '—'}</span>
         {' '}
         {depth > 1
           ? t.scope.bannerDepth.replace('{depth}', String(depth))
           : t.scope.bannerNoReferral}
       </div>
       {error && (
-        <div className="rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">{error}</div>
+        <div className="rounded-lg border border-red-900/60 bg-red-950/40 px-3 sm:px-4 py-3 text-sm text-red-300 break-words">{error}</div>
       )}
       {stats && (
         <>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 min-w-0">
             <Stat label={t.scope.total} value={stats.total} />
             <Stat label={t.scope.withSub} value={stats.withSubscription} />
             <Stat label={t.scope.withoutSub} value={stats.withoutSubscription} />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 min-w-0">
             {stats.byLevel.map(row => (
-              <div key={row.level} className="rounded-lg border border-gray-800 bg-gray-900/50 px-3 py-2">
-                <div className="text-[11px] uppercase tracking-wide text-gray-500">
+              <div key={row.level} className="rounded-lg border border-gray-800 bg-gray-900/50 px-3 py-2 min-w-0 overflow-hidden">
+                <div className="text-[11px] uppercase tracking-wide text-gray-500 break-words">
                   {t.scope.level.replace('{n}', String(row.level))}
                 </div>
                 <div className="text-lg font-semibold text-white">{row.total}</div>
@@ -77,9 +77,9 @@ export default function PartnerScopeBanner({ user }: { user: PublicAdminUser }) 
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-      <div className="text-2xl font-bold text-white">{value}</div>
-      <div className="text-gray-500 text-sm mt-1">{label}</div>
+    <div className="bg-gray-900 rounded-xl p-3 sm:p-4 border border-gray-800 min-w-0 overflow-hidden">
+      <div className="text-xl sm:text-2xl font-bold text-white">{value}</div>
+      <div className="text-gray-500 text-[11px] sm:text-sm mt-1 break-words leading-snug">{label}</div>
     </div>
   )
 }
