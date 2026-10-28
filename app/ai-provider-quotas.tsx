@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useAdminLocaleTag, useAdminTr } from '@/lib/admin-tr'
 import {
   formatMoneyBalance,
@@ -8,6 +8,9 @@ import {
   type DayAgg,
   type ProviderQuotasPayload,
 } from '@/lib/provider-quotas'
+
+/** DeepL/DeepSeek have no push — poll while the AI tab is visible. */
+const LIVE_POLL_MS = 20_000
 
 function fmtInt(n: number, locale: string) {
   return n.toLocaleString(locale)
@@ -61,31 +64,58 @@ export default function AiProviderQuotas({
   const [data, setData] = useState<ProviderQuotasPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const inFlight = useRef(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const load = useCallback(async (mode: 'initial' | 'poll' | 'manual' = 'initial') => {
+    if (inFlight.current && mode === 'poll') return
+    inFlight.current = true
+    if (mode === 'initial') setLoading(true)
+    else setRefreshing(true)
+    if (mode !== 'poll') setError(null)
     try {
       const q = new URLSearchParams({ from, to, tz })
       const res = await fetch(`/api/ai-provider-quotas?${q}`, { cache: 'no-store' })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(typeof json.error === 'string' ? json.error : tr('Ошибка загрузки лимитов'))
-        setData(null)
+        const msg = typeof json.error === 'string' ? json.error : tr('Ошибка загрузки лимитов')
+        setError(msg)
+        if (mode === 'initial') setData(null)
         return
       }
       setData(json as ProviderQuotasPayload)
+      setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : tr('Ошибка загрузки лимитов'))
-      setData(null)
+      const msg = e instanceof Error ? e.message : tr('Ошибка загрузки лимитов')
+      setError(msg)
+      if (mode === 'initial') setData(null)
     } finally {
+      inFlight.current = false
       setLoading(false)
+      setRefreshing(false)
     }
   }, [from, to, tz, tr])
 
+  const onPollTick = useEffectEvent(() => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    void load('poll')
+  })
+
   useEffect(() => {
-    void load()
+    void load('initial')
   }, [load])
+
+  useEffect(() => {
+    const id = window.setInterval(() => onPollTick(), LIVE_POLL_MS)
+    const onVis = () => {
+      if (document.visibilityState === 'visible') onPollTick()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [from, to, tz])
 
   const deeplPct = useMemo(() => {
     const live = data?.deepl.live
@@ -98,22 +128,24 @@ export default function AiProviderQuotas({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold text-white">{tr('Лимиты провайдеров')}</h2>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 mt-0.5 break-words">
             {tr('DeepL — остаток символов; DeepSeek — баланс и расходы из логов.')}
+            {` · ${tr('авто каждые')} ${LIVE_POLL_MS / 1000} ${tr('сек.')}`}
             {data?.meta.liveFetchedAt
               ? ` · ${tr('обновлено')} ${new Date(data.meta.liveFetchedAt).toLocaleString(locale)}`
               : null}
+            {refreshing ? ` · ${tr('синхронизация…')}` : null}
           </p>
         </div>
         <button
           type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="text-sm px-3 py-2 rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-50"
+          onClick={() => void load('manual')}
+          disabled={loading || refreshing}
+          className="text-sm px-3 py-2 rounded-lg border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 disabled:opacity-50 shrink-0"
         >
-          {loading ? tr('Обновление…') : tr('Обновить лимиты')}
+          {loading || refreshing ? tr('Обновление…') : tr('Обновить лимиты')}
         </button>
       </div>
 
