@@ -10,7 +10,7 @@ import {
 } from '@/lib/provider-quotas'
 
 /** DeepL/DeepSeek have no push — poll while the AI tab is visible. */
-const LIVE_POLL_MS = 20_000
+const LIVE_POLL_MS = 5_000
 
 function fmtInt(n: number, locale: string) {
   return n.toLocaleString(locale)
