@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAdminLocaleTag, useAdminTr } from '@/lib/admin-tr'
 import {
   formatMoneyBalance,
@@ -96,19 +96,21 @@ export default function AiProviderQuotas({
     }
   }, [from, to, tz, tr])
 
-  const onPollTick = useEffectEvent(() => {
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
-    void load('poll')
-  })
+  const loadRef = useRef(load)
+  loadRef.current = load
 
   useEffect(() => {
     void load('initial')
   }, [load])
 
   useEffect(() => {
-    const id = window.setInterval(() => onPollTick(), LIVE_POLL_MS)
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      void loadRef.current('poll')
+    }
+    const id = window.setInterval(tick, LIVE_POLL_MS)
     const onVis = () => {
-      if (document.visibilityState === 'visible') onPollTick()
+      if (document.visibilityState === 'visible') tick()
     }
     document.addEventListener('visibilitychange', onVis)
     return () => {
