@@ -11,6 +11,7 @@ import StaffTab from './staff-tab'
 import PartnerScopeBanner from './partner-scope-banner'
 import SettingsTab from './settings-tab'
 import MarketingVisitsRecent from './marketing-visits-recent'
+import AiProviderQuotas from './ai-provider-quotas'
 import { LanguageSwitcher, useI18n } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
 import { matchesCreatedAt, normalizeDateInput } from '@/lib/created-at-filter'
@@ -4822,7 +4823,11 @@ function e_() {
         }, [null == k ? void 0 : k.meta]);
     return (0, r.jsxs)("div", {
         className: "space-y-6",
-        children: [(0, r.jsxs)("div", {
+        children: [(0, r.jsx)(AiProviderQuotas, {
+            from: m,
+            to: p,
+            tz: x
+        }), (0, r.jsxs)("div", {
             className: "bg-gray-900 rounded-xl p-4 border border-gray-800 flex flex-wrap items-end gap-3",
             children: [(0, r.jsxs)("div", {
                 className: "flex items-end gap-2",
@@ -4918,6 +4923,9 @@ function e_() {
                     }), (0, r.jsx)("option", {
                         value: "deepseek",
                         children: "deepseek"
+                    }), (0, r.jsx)("option", {
+                        value: "deepl",
+                        children: "deepl"
                     }), (0, r.jsx)("option", {
                         value: "openai",
                         children: "openai"
