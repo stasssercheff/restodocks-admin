@@ -11,6 +11,7 @@ import StaffTab from './staff-tab'
 import PartnerScopeBanner from './partner-scope-banner'
 import SettingsTab from './settings-tab'
 import MarketingVisitsRecent from './marketing-visits-recent'
+import AiProviderQuotas from './ai-provider-quotas'
 import { LanguageSwitcher, useI18n } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
 import { matchesCreatedAt, normalizeDateInput } from '@/lib/created-at-filter'
@@ -4822,7 +4823,11 @@ function e_() {
         }, [null == k ? void 0 : k.meta]);
     return (0, r.jsxs)("div", {
         className: "space-y-6",
-        children: [(0, r.jsxs)("div", {
+        children: [(0, r.jsx)(AiProviderQuotas, {
+            from: m,
+            to: p,
+            tz: x
+        }), (0, r.jsxs)("div", {
             className: "bg-gray-900 rounded-xl p-4 border border-gray-800 flex flex-wrap items-end gap-3",
             children: [(0, r.jsxs)("div", {
                 className: "flex items-end gap-2",
@@ -4919,6 +4924,9 @@ function e_() {
                         value: "deepseek",
                         children: "deepseek"
                     }), (0, r.jsx)("option", {
+                        value: "deepl",
+                        children: "deepl"
+                    }), (0, r.jsx)("option", {
                         value: "openai",
                         children: "openai"
                     }), (0, r.jsx)("option", {
@@ -4985,7 +4993,7 @@ function e_() {
             className: "bg-gradient-to-br from-amber-950/50 to-gray-900 border border-amber-800/40 rounded-xl p-6",
             children: [(0, r.jsx)("div", {
                 className: "text-xs text-amber-200/70 uppercase tracking-wide",
-                children: tr("Затраты за период")
+                children: tr("Затраты за период (оценка по логам)")
             }), (0, r.jsx)("div", {
                 className: "text-4xl font-bold text-amber-300 mt-2",
                 children: eo(k.summary.estimatedCostUsd)
@@ -4998,6 +5006,9 @@ function e_() {
             }), (0, r.jsxs)("div", {
                 className: "text-xs text-gray-500 mt-2",
                 children: [k.summary.requests.toLocaleString(localeTag), tr(" вызовов \xb7"), " ", k.summary.totalTokens.toLocaleString(localeTag), tr(" токенов")]
+            }), (0, r.jsx)("div", {
+                className: "text-[11px] text-gray-600 mt-2 max-w-xl",
+                children: tr("Сумма estimated_cost_usd из ai_usage_logs за весь период (без потолка 5000 строк). Может отличаться от кабинета DeepSeek, если часть вызовов не залогирована или тариф в логах грубее.")
             })]
         }) : null, (0, r.jsxs)("div", {
             className: "grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3",
