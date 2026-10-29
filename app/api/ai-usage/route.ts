@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRequest } from '@/lib/admin-auth'
-import { createServiceClient, fetchAllRows } from '@/lib/supabase-server'
+import { createServiceClient } from '@/lib/supabase-server'
 import { addDaysYmd, parseHm, parseYmd, todayYmd, zonedDateTime } from '@/lib/query-range'
 
-type UsageRow = {
-  created_at: string
-  provider: string | null
-  model: string | null
-  context: string | null
-  function_name: string | null
-  input_tokens: number | null
-  output_tokens: number | null
-  total_tokens: number | null
-  estimated_cost_usd: number | null
-  status: string | null
-}
-
-const AGG_CAP = 5000
-
-function num(value: number | null | undefined): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+type AggPayload = {
+  summary?: {
+    requests?: number
+    successRequests?: number
+    failedRequests?: number
+    inputTokens?: number
+    outputTokens?: number
+    totalTokens?: number
+    estimatedCostUsd?: number
+  }
+  byProvider?: Array<{ provider: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
+  byContext?: Array<{ context: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
+  byDay?: Array<{ date: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
+  recent?: unknown[]
 }
 
 export async function GET(req: NextRequest) {
@@ -41,61 +38,23 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   if ('error' in supabase) return NextResponse.json({ error: supabase.error }, { status: 500 })
 
-  const fetched = await fetchAllRows<UsageRow>((from, to) => {
-    let query = supabase
-      .from('ai_usage_logs')
-      .select('created_at, provider, model, context, function_name, input_tokens, output_tokens, total_tokens, estimated_cost_usd, status')
-      .gte('created_at', fromIso)
-      .lte('created_at', toIso)
-      .order('created_at', { ascending: false })
-    if (provider) query = query.eq('provider', provider)
-    if (context) query = query.eq('context', context)
-    return query.range(from, to)
-  }, 1000, AGG_CAP + 1)
-  if ('error' in fetched) return NextResponse.json({ error: fetched.error }, { status: 500 })
+  const { data, error } = await supabase.rpc('admin_ai_usage_stats', {
+    p_from: fromIso,
+    p_to: toIso,
+    p_provider: provider,
+    p_context: context,
+    p_tz: tz,
+    p_recent_limit: recentLimit,
+  })
 
-  const truncated = fetched.data.length > AGG_CAP
-  const rows = fetched.data.slice(0, AGG_CAP)
-  const byProvider = new Map<string, { requests: number; totalTokens: number; estimatedCostUsd: number }>()
-  const byContext = new Map<string, { requests: number; totalTokens: number; estimatedCostUsd: number }>()
-  const byDay = new Map<string, { requests: number; totalTokens: number; estimatedCostUsd: number }>()
-  let requests = 0
-  let successRequests = 0
-  let failedRequests = 0
-  let inputTokens = 0
-  let outputTokens = 0
-  let totalTokens = 0
-  let estimatedCostUsd = 0
-
-  for (const row of rows) {
-    requests += 1
-    const status = String(row.status ?? 'ok').toLowerCase()
-    if (status === 'ok' || status === 'success') successRequests += 1
-    else failedRequests += 1
-    inputTokens += num(row.input_tokens)
-    outputTokens += num(row.output_tokens)
-    totalTokens += num(row.total_tokens)
-    estimatedCostUsd += num(row.estimated_cost_usd)
-
-    const p = row.provider || '(empty)'
-    const c = row.context || '(empty)'
-    const day = row.created_at.slice(0, 10)
-    const add = (map: Map<string, { requests: number; totalTokens: number; estimatedCostUsd: number }>, key: string) => {
-      const current = map.get(key) ?? { requests: 0, totalTokens: 0, estimatedCostUsd: 0 }
-      current.requests += 1
-      current.totalTokens += num(row.total_tokens)
-      current.estimatedCostUsd += num(row.estimated_cost_usd)
-      map.set(key, current)
-    }
-    add(byProvider, p)
-    add(byContext, c)
-    add(byDay, day)
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const sortAgg = (map: Map<string, { requests: number; totalTokens: number; estimatedCostUsd: number }>, keyName: string) =>
-    [...map.entries()]
-      .sort((a, b) => b[1].requests - a[1].requests)
-      .map(([key, value]) => ({ [keyName]: key, ...value }))
+  const payload = (data ?? {}) as AggPayload
+  const summary = payload.summary ?? {}
+  const requests = Number(summary.requests) || 0
+  const recent = Array.isArray(payload.recent) ? payload.recent : []
 
   return NextResponse.json({
     meta: {
@@ -110,26 +69,25 @@ export async function GET(req: NextRequest) {
       rangeFromTime: fromTime,
       rangeToTime: toTime,
       timeZone: tz,
-      totalRows: truncated ? AGG_CAP + 1 : rows.length,
-      aggregatedRows: rows.length,
-      truncated,
-      sampleSize: Math.min(recentLimit, rows.length),
+      totalRows: requests,
+      aggregatedRows: requests,
+      truncated: false,
+      sampleSize: recent.length,
       limit: recentLimit,
+      source: 'ai_usage_logs_sql',
     },
     summary: {
       requests,
-      successRequests,
-      failedRequests,
-      inputTokens,
-      outputTokens,
-      totalTokens,
-      estimatedCostUsd: Math.round(estimatedCostUsd * 1e6) / 1e6,
+      successRequests: Number(summary.successRequests) || 0,
+      failedRequests: Number(summary.failedRequests) || 0,
+      inputTokens: Number(summary.inputTokens) || 0,
+      outputTokens: Number(summary.outputTokens) || 0,
+      totalTokens: Number(summary.totalTokens) || 0,
+      estimatedCostUsd: Number(summary.estimatedCostUsd) || 0,
     },
-    byProvider: sortAgg(byProvider, 'provider'),
-    byContext: sortAgg(byContext, 'context'),
-    byDay: [...byDay.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, value]) => ({ date, ...value })),
-    recent: rows.slice(0, recentLimit),
+    byProvider: Array.isArray(payload.byProvider) ? payload.byProvider : [],
+    byContext: Array.isArray(payload.byContext) ? payload.byContext : [],
+    byDay: Array.isArray(payload.byDay) ? payload.byDay : [],
+    recent,
   })
 }

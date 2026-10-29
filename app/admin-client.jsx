@@ -4993,7 +4993,7 @@ function e_() {
             className: "bg-gradient-to-br from-amber-950/50 to-gray-900 border border-amber-800/40 rounded-xl p-6",
             children: [(0, r.jsx)("div", {
                 className: "text-xs text-amber-200/70 uppercase tracking-wide",
-                children: tr("Затраты за период")
+                children: tr("Затраты за период (оценка по логам)")
             }), (0, r.jsx)("div", {
                 className: "text-4xl font-bold text-amber-300 mt-2",
                 children: eo(k.summary.estimatedCostUsd)
@@ -5006,6 +5006,9 @@ function e_() {
             }), (0, r.jsxs)("div", {
                 className: "text-xs text-gray-500 mt-2",
                 children: [k.summary.requests.toLocaleString(localeTag), tr(" вызовов \xb7"), " ", k.summary.totalTokens.toLocaleString(localeTag), tr(" токенов")]
+            }), (0, r.jsx)("div", {
+                className: "text-[11px] text-gray-600 mt-2 max-w-xl",
+                children: tr("Сумма estimated_cost_usd из ai_usage_logs за весь период (без потолка 5000 строк). Может отличаться от кабинета DeepSeek, если часть вызовов не залогирована или тариф в логах грубее.")
             })]
         }) : null, (0, r.jsxs)("div", {
             className: "grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3",

@@ -1,6 +1,7 @@
-import { createServiceClient, fetchAllRows, readEnv } from '@/lib/supabase-server'
+import { createServiceClient, readEnv } from '@/lib/supabase-server'
 import { addDaysYmd, parseYmd, todayYmd, zonedDateTime } from '@/lib/query-range'
 import type { DeepseekBalanceRow } from '@/lib/provider-quota-format'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type { DeepseekBalanceRow }
 export { formatMoneyBalance, pickPreferredBalance } from '@/lib/provider-quota-format'
@@ -49,44 +50,35 @@ export type ProviderQuotasPayload = {
   }
 }
 
-type UsageRow = {
-  created_at: string
-  provider: string | null
-  total_tokens: number | null
-  estimated_cost_usd: number | null
-}
-
-function num(value: number | null | undefined): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
-}
-
 function emptyPeriod(): ProviderPeriod {
   return { requests: 0, totalTokens: 0, estimatedCostUsd: 0, byDay: [] }
 }
 
-function aggregateProvider(rows: UsageRow[], provider: string): ProviderPeriod {
-  const byDay = new Map<string, DayAgg>()
-  let requests = 0
-  let totalTokens = 0
-  let estimatedCostUsd = 0
-  const needle = provider.toLowerCase()
-  for (const row of rows) {
-    if (String(row.provider ?? '').toLowerCase() !== needle) continue
-    requests += 1
-    totalTokens += num(row.total_tokens)
-    estimatedCostUsd += num(row.estimated_cost_usd)
-    const date = row.created_at.slice(0, 10)
-    const cur = byDay.get(date) ?? { date, requests: 0, totalTokens: 0, estimatedCostUsd: 0 }
-    cur.requests += 1
-    cur.totalTokens += num(row.total_tokens)
-    cur.estimatedCostUsd += num(row.estimated_cost_usd)
-    byDay.set(date, cur)
-  }
+async function periodFromRpc(
+  supabase: SupabaseClient,
+  provider: string,
+  fromIso: string,
+  toIso: string,
+  tz: string,
+): Promise<ProviderPeriod | { error: string }> {
+  const { data, error } = await supabase.rpc('admin_ai_usage_stats', {
+    p_from: fromIso,
+    p_to: toIso,
+    p_provider: provider,
+    p_context: null,
+    p_tz: tz,
+    p_recent_limit: 1,
+  })
+  if (error) return { error: error.message }
+  const summary = (data as { summary?: Record<string, number> } | null)?.summary ?? {}
+  const byDay = Array.isArray((data as { byDay?: DayAgg[] } | null)?.byDay)
+    ? ((data as { byDay: DayAgg[] }).byDay)
+    : []
   return {
-    requests,
-    totalTokens,
-    estimatedCostUsd: Math.round(estimatedCostUsd * 1e6) / 1e6,
-    byDay: [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    requests: Number(summary.requests) || 0,
+    totalTokens: Number(summary.totalTokens) || 0,
+    estimatedCostUsd: Number(summary.estimatedCostUsd) || 0,
+    byDay,
   }
 }
 
@@ -179,21 +171,14 @@ export async function buildProviderQuotas(opts: {
   const supabase = createServiceClient()
   if ('error' in supabase) return { error: supabase.error }
 
-  const [live, fetched] = await Promise.all([
+  const [live, deeplPeriod, deepseekPeriod] = await Promise.all([
     fetchLiveQuotas(),
-    fetchAllRows<UsageRow>((from, to) =>
-      supabase
-        .from('ai_usage_logs')
-        .select('created_at, provider, total_tokens, estimated_cost_usd')
-        .in('provider', ['deepl', 'deepseek'])
-        .gte('created_at', fromIso)
-        .lte('created_at', toIso)
-        .order('created_at', { ascending: false })
-        .range(from, to)
-    , 1000, 20000),
+    periodFromRpc(supabase, 'deepl', fromIso, toIso, tz),
+    periodFromRpc(supabase, 'deepseek', fromIso, toIso, tz),
   ])
 
-  if ('error' in fetched) return { error: fetched.error }
+  if ('error' in deeplPeriod) return { error: deeplPeriod.error }
+  if ('error' in deepseekPeriod) return { error: deepseekPeriod.error }
 
   return {
     meta: {
@@ -207,12 +192,12 @@ export async function buildProviderQuotas(opts: {
     deepl: {
       live: live.deepl.live,
       liveError: live.deepl.liveError,
-      period: aggregateProvider(fetched.data, 'deepl'),
+      period: deeplPeriod,
     },
     deepseek: {
       live: live.deepseek.live,
       liveError: live.deepseek.liveError,
-      period: aggregateProvider(fetched.data, 'deepseek') || emptyPeriod(),
+      period: deepseekPeriod ?? emptyPeriod(),
     },
   }
 }

@@ -283,7 +283,7 @@ export default function AiProviderQuotas({
 
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-3">
-              <div className="text-[11px] text-gray-500">{tr('Расход (логи)')}</div>
+              <div className="text-[11px] text-gray-500">{tr('Расход по логам')}</div>
               <div className="text-xl font-bold text-orange-300 mt-1">
                 {fmtUsd(data?.deepseek.period.estimatedCostUsd ?? 0)}
               </div>
