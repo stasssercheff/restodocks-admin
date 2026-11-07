@@ -269,48 +269,106 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
     if (establishments.length === 0) return { data: [], stats: null }
 
     const ids = establishments.map(item => item.id)
+    const idSet = new Set(ids)
     const ownerIds = [...new Set(establishments.map(item => item.owner_id).filter(Boolean))] as string[]
+    const ownerIdSet = new Set(ownerIds)
 
-    const [employeesRes, redemptionsRes, pendingRes, billingRes, appleRes] = await Promise.all([
+    /*
+     * Avoid `.in(id, thousands)` — PostgREST puts filters in the URL (400) and
+     * chunking blows Cloudflare Worker subrequest limits. Paginate whole related
+     * tables (few round-trips), then keep rows for our establishment/owner set.
+     */
+    const [employeesAll, redemptionsAll, pendingAll, billingAll, appleAll] = await Promise.all([
       fetchAllRows<EmployeeRecord>((from, to) =>
         supabase
           .from('employees')
           .select('id, full_name, email, roles, establishment_id, last_login_at, last_login_ip')
-          .in('establishment_id', ids)
+          .order('id', { ascending: true })
           .range(from, to),
       ),
       fetchAllRows<RedemptionRow>((from, to) =>
         supabase
           .from('promo_code_redemptions')
           .select('promo_code_id, establishment_id, redeemed_at')
-          .in('establishment_id', ids)
+          .order('redeemed_at', { ascending: false })
           .range(from, to),
       ),
-      supabase
-        .from('pending_owner_registrations')
-        .select('establishment_id, email, full_name')
-        .in('establishment_id', ids),
-      ownerIds.length
-        ? supabase.from('owner_billing').select('owner_id, tier, paid_until, ls_status, tier_locked_channel').in('owner_id', ownerIds)
-        : Promise.resolve({ data: [] as { owner_id: string; tier: string | null; paid_until: string | null; ls_status: string | null; tier_locked_channel: string | null }[], error: null }),
-      ownerIds.length
-        ? supabase.from('apple_iap_subscription_claims').select('owner_id').in('owner_id', ownerIds)
-        : Promise.resolve({ data: [] as { owner_id: string }[], error: null }),
+      fetchAllRows<{ establishment_id: string; email: string | null; full_name: string | null }>((from, to) =>
+        supabase
+          .from('pending_owner_registrations')
+          .select('establishment_id, email, full_name')
+          .order('establishment_id', { ascending: true })
+          .range(from, to),
+      ),
+      fetchAllRows<{
+        owner_id: string
+        tier: string | null
+        paid_until: string | null
+        ls_status: string | null
+        tier_locked_channel: string | null
+      }>((from, to) =>
+        supabase
+          .from('owner_billing')
+          .select('owner_id, tier, paid_until, ls_status, tier_locked_channel')
+          .order('owner_id', { ascending: true })
+          .range(from, to),
+      ),
+      fetchAllRows<{ owner_id: string }>((from, to) =>
+        supabase
+          .from('apple_iap_subscription_claims')
+          .select('owner_id')
+          .order('owner_id', { ascending: true })
+          .range(from, to),
+      ),
     ])
 
-    if ('error' in employeesRes) return employeesRes
-    if ('error' in redemptionsRes) return redemptionsRes
+    if ('error' in employeesAll) return employeesAll
+    if ('error' in redemptionsAll) return redemptionsAll
+    if ('error' in pendingAll) return pendingAll
+    if ('error' in billingAll) return billingAll
+    if ('error' in appleAll) return appleAll
+
+    const employeesRes = {
+      data: employeesAll.data.filter(row => idSet.has(row.establishment_id)),
+    }
+    const redemptionsRes = {
+      data: redemptionsAll.data.filter(row => idSet.has(row.establishment_id)),
+    }
+    const pendingRes = {
+      data: pendingAll.data.filter(row => idSet.has(row.establishment_id)),
+    }
+    const billingRes = {
+      data: billingAll.data.filter(row => ownerIdSet.has(row.owner_id)),
+    }
+    const appleRes = {
+      data: appleAll.data.filter(row => ownerIdSet.has(row.owner_id)),
+    }
 
     const redeemedPromoIds = [...new Set(redemptionsRes.data.map(item => item.promo_code_id))]
-    const promosRes = redeemedPromoIds.length
-      ? await supabase
+    let promoRows: PromoCodeRow[] = []
+    if (redeemedPromoIds.length > 0) {
+      if (redeemedPromoIds.length <= 100) {
+        const { data, error } = await supabase
           .from('promo_codes')
           .select('id, code, grants_subscription_type, grants_employee_slot_packs, grants_branch_slot_packs, grants_additive_only, activation_duration_days, expires_at, grant_until, grant_days')
           .in('id', redeemedPromoIds)
-      : { data: [] as PromoCodeRow[], error: null }
-    if (promosRes.error) return { error: promosRes.error.message }
+        if (error) return { error: error.message }
+        promoRows = (data ?? []) as PromoCodeRow[]
+      } else {
+        const promosAll = await fetchAllRows<PromoCodeRow>((from, to) =>
+          supabase
+            .from('promo_codes')
+            .select('id, code, grants_subscription_type, grants_employee_slot_packs, grants_branch_slot_packs, grants_additive_only, activation_duration_days, expires_at, grant_until, grant_days')
+            .order('id', { ascending: true })
+            .range(from, to),
+        )
+        if ('error' in promosAll) return promosAll
+        const want = new Set(redeemedPromoIds)
+        promoRows = promosAll.data.filter(row => want.has(row.id))
+      }
+    }
 
-    const promoById = new Map((promosRes.data ?? []).map(item => [item.id, item as PromoCodeRow]))
+    const promoById = new Map(promoRows.map(item => [item.id, item]))
     const redemptionByEst = new Map<string, { promo: PromoCodeRow; redeemedAt: string }>()
     for (const row of redemptionsRes.data) {
       const promo = promoById.get(row.promo_code_id)
@@ -322,14 +380,12 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
     }
 
     const pendingByEst = new Map(
-      ((pendingRes.data ?? []) as { establishment_id: string; email: string | null; full_name: string | null }[])
-        .map(item => [item.establishment_id, item]),
+      pendingRes.data.map(item => [item.establishment_id, item]),
     )
     const billingByOwner = new Map(
-      ((billingRes.data ?? []) as { owner_id: string; paid_until: string | null; ls_status: string | null; tier_locked_channel: string | null }[])
-        .map(item => [item.owner_id, item]),
+      billingRes.data.map(item => [item.owner_id, item]),
     )
-    const appleOwners = new Set(((appleRes.data ?? []) as { owner_id: string }[]).map(item => item.owner_id))
+    const appleOwners = new Set(appleRes.data.map(item => item.owner_id))
 
     const employeesByEst = new Map<string, EmployeeRecord[]>()
     for (const employee of employeesRes.data) {
