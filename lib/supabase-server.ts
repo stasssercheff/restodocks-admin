@@ -53,3 +53,48 @@ export async function fetchAllRows<T>(
   }
   return { data: out }
 }
+
+/** PostgREST puts `.in(...)` in the URL — too many UUIDs → HTTP 400 Bad Request. */
+export function chunkIds<T>(items: T[], size = 120): T[][] {
+  if (items.length === 0) return []
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
+export async function fetchAllRowsByIdChunks<T>(
+  ids: string[],
+  run: (
+    idChunk: string[],
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  idChunkSize = 120,
+  pageSize = 1000,
+  hardCap = 50000,
+): Promise<{ data: T[] } | { error: string }> {
+  if (ids.length === 0) return { data: [] }
+  const out: T[] = []
+  for (const idChunk of chunkIds(ids, idChunkSize)) {
+    const part = await fetchAllRows<T>((from, to) => run(idChunk, from, to), pageSize, hardCap)
+    if ('error' in part) return part
+    out.push(...part.data)
+    if (out.length >= hardCap) break
+  }
+  return { data: out }
+}
+
+export async function selectByIdChunks<T, Id extends string | number = string>(
+  ids: Id[],
+  run: (idChunk: Id[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  idChunkSize = 120,
+): Promise<{ data: T[] } | { error: string }> {
+  if (ids.length === 0) return { data: [] }
+  const out: T[] = []
+  for (const idChunk of chunkIds(ids, idChunkSize)) {
+    const { data, error } = await run(idChunk)
+    if (error) return { error: error.message }
+    out.push(...(data ?? []))
+  }
+  return { data: out }
+}
