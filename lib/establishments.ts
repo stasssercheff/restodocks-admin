@@ -1,4 +1,4 @@
-import { createServiceClient, fetchAllRows, fetchAllRowsByIdChunks, selectByIdChunks } from '@/lib/supabase-server'
+import { createServiceClient, fetchAllRows } from '@/lib/supabase-server'
 import { buildReferralLevels, type DataScope, summarizeScopedRows, type ScopeStats } from '@/lib/admin-scope'
 
 export type SubscriptionSummary = {
@@ -269,65 +269,106 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
     if (establishments.length === 0) return { data: [], stats: null }
 
     const ids = establishments.map(item => item.id)
+    const idSet = new Set(ids)
     const ownerIds = [...new Set(establishments.map(item => item.owner_id).filter(Boolean))] as string[]
+    const ownerIdSet = new Set(ownerIds)
 
-    const [employeesRes, redemptionsRes, pendingRes, billingRes, appleRes] = await Promise.all([
-      fetchAllRowsByIdChunks<EmployeeRecord>(ids, (idChunk, from, to) =>
+    /*
+     * Avoid `.in(id, thousands)` — PostgREST puts filters in the URL (400) and
+     * chunking blows Cloudflare Worker subrequest limits. Paginate whole related
+     * tables (few round-trips), then keep rows for our establishment/owner set.
+     */
+    const [employeesAll, redemptionsAll, pendingAll, billingAll, appleAll] = await Promise.all([
+      fetchAllRows<EmployeeRecord>((from, to) =>
         supabase
           .from('employees')
           .select('id, full_name, email, roles, establishment_id, last_login_at, last_login_ip')
-          .in('establishment_id', idChunk)
+          .order('id', { ascending: true })
           .range(from, to),
       ),
-      fetchAllRowsByIdChunks<RedemptionRow>(ids, (idChunk, from, to) =>
+      fetchAllRows<RedemptionRow>((from, to) =>
         supabase
           .from('promo_code_redemptions')
           .select('promo_code_id, establishment_id, redeemed_at')
-          .in('establishment_id', idChunk)
+          .order('redeemed_at', { ascending: false })
           .range(from, to),
       ),
-      selectByIdChunks<{ establishment_id: string; email: string | null; full_name: string | null }>(
-        ids,
-        idChunk =>
-          supabase
-            .from('pending_owner_registrations')
-            .select('establishment_id, email, full_name')
-            .in('establishment_id', idChunk),
+      fetchAllRows<{ establishment_id: string; email: string | null; full_name: string | null }>((from, to) =>
+        supabase
+          .from('pending_owner_registrations')
+          .select('establishment_id, email, full_name')
+          .order('establishment_id', { ascending: true })
+          .range(from, to),
       ),
-      selectByIdChunks<{
+      fetchAllRows<{
         owner_id: string
         tier: string | null
         paid_until: string | null
         ls_status: string | null
         tier_locked_channel: string | null
-      }>(ownerIds, idChunk =>
+      }>((from, to) =>
         supabase
           .from('owner_billing')
           .select('owner_id, tier, paid_until, ls_status, tier_locked_channel')
-          .in('owner_id', idChunk),
+          .order('owner_id', { ascending: true })
+          .range(from, to),
       ),
-      selectByIdChunks<{ owner_id: string }>(ownerIds, idChunk =>
-        supabase.from('apple_iap_subscription_claims').select('owner_id').in('owner_id', idChunk),
+      fetchAllRows<{ owner_id: string }>((from, to) =>
+        supabase
+          .from('apple_iap_subscription_claims')
+          .select('owner_id')
+          .order('owner_id', { ascending: true })
+          .range(from, to),
       ),
     ])
 
-    if ('error' in employeesRes) return employeesRes
-    if ('error' in redemptionsRes) return redemptionsRes
-    if ('error' in pendingRes) return pendingRes
-    if ('error' in billingRes) return billingRes
-    if ('error' in appleRes) return appleRes
+    if ('error' in employeesAll) return employeesAll
+    if ('error' in redemptionsAll) return redemptionsAll
+    if ('error' in pendingAll) return pendingAll
+    if ('error' in billingAll) return billingAll
+    if ('error' in appleAll) return appleAll
+
+    const employeesRes = {
+      data: employeesAll.data.filter(row => idSet.has(row.establishment_id)),
+    }
+    const redemptionsRes = {
+      data: redemptionsAll.data.filter(row => idSet.has(row.establishment_id)),
+    }
+    const pendingRes = {
+      data: pendingAll.data.filter(row => idSet.has(row.establishment_id)),
+    }
+    const billingRes = {
+      data: billingAll.data.filter(row => ownerIdSet.has(row.owner_id)),
+    }
+    const appleRes = {
+      data: appleAll.data.filter(row => ownerIdSet.has(row.owner_id)),
+    }
 
     const redeemedPromoIds = [...new Set(redemptionsRes.data.map(item => item.promo_code_id))]
-    const promosChunked = await selectByIdChunks<PromoCodeRow, number>(redeemedPromoIds, idChunk =>
-      supabase
-        .from('promo_codes')
-        .select('id, code, grants_subscription_type, grants_employee_slot_packs, grants_branch_slot_packs, grants_additive_only, activation_duration_days, expires_at, grant_until, grant_days')
-        .in('id', idChunk),
-    )
-    if ('error' in promosChunked) return promosChunked
-    const promosRes = { data: promosChunked.data, error: null }
+    let promoRows: PromoCodeRow[] = []
+    if (redeemedPromoIds.length > 0) {
+      if (redeemedPromoIds.length <= 100) {
+        const { data, error } = await supabase
+          .from('promo_codes')
+          .select('id, code, grants_subscription_type, grants_employee_slot_packs, grants_branch_slot_packs, grants_additive_only, activation_duration_days, expires_at, grant_until, grant_days')
+          .in('id', redeemedPromoIds)
+        if (error) return { error: error.message }
+        promoRows = (data ?? []) as PromoCodeRow[]
+      } else {
+        const promosAll = await fetchAllRows<PromoCodeRow>((from, to) =>
+          supabase
+            .from('promo_codes')
+            .select('id, code, grants_subscription_type, grants_employee_slot_packs, grants_branch_slot_packs, grants_additive_only, activation_duration_days, expires_at, grant_until, grant_days')
+            .order('id', { ascending: true })
+            .range(from, to),
+        )
+        if ('error' in promosAll) return promosAll
+        const want = new Set(redeemedPromoIds)
+        promoRows = promosAll.data.filter(row => want.has(row.id))
+      }
+    }
 
-    const promoById = new Map((promosRes.data ?? []).map(item => [item.id, item as PromoCodeRow]))
+    const promoById = new Map(promoRows.map(item => [item.id, item]))
     const redemptionByEst = new Map<string, { promo: PromoCodeRow; redeemedAt: string }>()
     for (const row of redemptionsRes.data) {
       const promo = promoById.get(row.promo_code_id)
