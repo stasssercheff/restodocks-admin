@@ -26,12 +26,12 @@ import {
   syncAdminUiPrefs,
   visibleNavTabs,
 } from '@/lib/admin-ui-prefs'
-import { looksLikeDatacenterVisit } from '@/lib/datacenter-ip'
 import { groupVisitSessions } from '@/lib/marketing-visit-sessions'
 import {
   loadMarketingVisitsPrefs,
   saveMarketingVisitsPrefs,
 } from '@/lib/marketing-visits-prefs'
+import { isNoiseVisit, matchesAudience } from '@/lib/visitor-noise'
 import { completedRegistrationCount } from '@/lib/registration-stat'
 import { adminLocaleTag, adminTr, useAdminLocaleTag, useAdminTr } from '@/lib/admin-tr'
 
@@ -5581,7 +5581,7 @@ function eL() {
         } = useI18n(),
         tm = i18n.marketing,
         savedVisitsPrefs = (0, s.useMemo)(() => loadMarketingVisitsPrefs(), []),
-        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)(() => savedVisitsPrefs.host || "all"), [F, M] = (0, s.useState)(() => !!savedVisitsPrefs.excludeBots), [excludeDatacenter, setExcludeDatacenter] = (0, s.useState)(() => !!savedVisitsPrefs.excludeDatacenter), [q, H] = (0, s.useState)(() => !!savedVisitsPrefs.excludeEnabled), [W, J] = (0, s.useState)(() => savedVisitsPrefs.excludeIps || ""), [clickedHideIps, setClickedHideIps] = (0, s.useState)(() => savedVisitsPrefs.clickedHideIps || []), [z, G] = (0, s.useState)(() => savedVisitsPrefs.sort || "time_desc"), [viewMode, setViewMode] = (0, s.useState)("sessions"), [expandedSessions, setExpandedSessions] = (0, s.useState)(() => new Set), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
+        [v, j] = (0, s.useState)(() => ed(-30)), [f, k] = (0, s.useState)(() => ed(0)), [L, T] = (0, s.useState)(""), [I, A] = (0, s.useState)(() => savedVisitsPrefs.host || "all"), [audience, setAudience] = (0, s.useState)(() => savedVisitsPrefs.audience || "real"), [q, H] = (0, s.useState)(() => !!savedVisitsPrefs.excludeEnabled), [W, J] = (0, s.useState)(() => savedVisitsPrefs.excludeIps || ""), [clickedHideIps, setClickedHideIps] = (0, s.useState)(() => savedVisitsPrefs.clickedHideIps || []), [z, G] = (0, s.useState)(() => savedVisitsPrefs.sort || "time_desc"), [viewMode, setViewMode] = (0, s.useState)(() => savedVisitsPrefs.viewMode || "sessions"), [expandedSessions, setExpandedSessions] = (0, s.useState)(() => new Set), [K, V] = (0, s.useState)(null), [B, Z] = (0, s.useState)(!0), [$, Y] = (0, s.useState)(!1), [Q, X] = (0, s.useState)(null), [ee, et] = (0, s.useState)(null), ea = D();
     const hostOptions = (0, s.useMemo)(() => [{
             value: "all",
             label: tm.hostsAll
@@ -5628,17 +5628,19 @@ function eL() {
     (0, s.useEffect)(() => {
         try {
             saveMarketingVisitsPrefs({
-                version: 1,
+                version: 2,
                 excludeIps: W,
                 excludeEnabled: q,
                 clickedHideIps,
-                excludeBots: F,
-                excludeDatacenter: excludeDatacenter,
+                excludeBots: "real" === audience,
+                excludeDatacenter: "real" === audience,
+                audience,
                 host: I,
-                sort: z
+                sort: z,
+                viewMode
             })
         } catch (e) {}
-    }, [W, q, clickedHideIps, F, excludeDatacenter, I, z]);
+    }, [W, q, clickedHideIps, audience, I, z, viewMode]);
     let er = (0, s.useCallback)(e => {
             let t = normalizeExcludeIp(e);
             if (!t) return;
@@ -5667,20 +5669,27 @@ function eL() {
             clickedIps: clickedHideIps
         }),
         activeExcludeRaw = activeExcludeList.join(","),
-        el = (0, s.useMemo)(() => {
+        rowsAfterIpExclude = (0, s.useMemo)(() => {
             var e;
             let t = [...null !== (e = null == K ? void 0 : K.recent) && void 0 !== e ? e : []];
             if (activeExcludeList.length) {
                 let excluded = new Set(activeExcludeList);
                 t = t.filter(row => !rowIpIsExcluded(row.ip, excluded))
             }
-            if (excludeDatacenter) {
-                t = t.filter(row => !looksLikeDatacenterVisit(row))
+            return t
+        }, [null == K ? void 0 : K.recent, activeExcludeRaw]),
+        audienceCounts = (0, s.useMemo)(() => {
+            let real = 0,
+                noise = 0;
+            for (let row of rowsAfterIpExclude) isNoiseVisit(row) ? noise += 1 : real += 1;
+            return {
+                real,
+                noise,
+                total: rowsAfterIpExclude.length
             }
-            // «не люди»: keep only visitor_kind=human (API excludeBots drops bots; this also drops uncertain)
-            if (F) {
-                t = t.filter(row => "human" === (null != row.visitor_kind ? row.visitor_kind : "").trim().toLowerCase())
-            }
+        }, [rowsAfterIpExclude]),
+        el = (0, s.useMemo)(() => {
+            let t = rowsAfterIpExclude.filter(row => matchesAudience(row, audience));
             return t.sort((e, t) => {
                 switch (z) {
                     case "time_asc":
@@ -5696,7 +5705,7 @@ function eL() {
                         return t.created_at.localeCompare(e.created_at)
                 }
             }), t
-        }, [null == K ? void 0 : K.recent, z, activeExcludeRaw, excludeDatacenter, F, labelEvent, i18nLocale]),
+        }, [rowsAfterIpExclude, z, audience, labelEvent, i18nLocale]),
         visitSessions = (0, s.useMemo)(() => {
             // Always regroup on the client so dedupe/merge stays in sync with filters
             // (never trust a pre-built API `sessions` snapshot that can lag the bundle).
@@ -5752,7 +5761,7 @@ function eL() {
                         savedField: W,
                         clickedIps: clickedHideIps
                     });
-                e.set("from", v), e.set("to", a), L.trim() && e.set("path", L.trim()), e.set("host", I.trim() || "all"), F && e.set("excludeBots", "1"), excludeList.length && e.set("excludeIps", excludeList.join(",")), e.set("limit", "2000");
+                e.set("from", v), e.set("to", a), L.trim() && e.set("path", L.trim()), e.set("host", I.trim() || "all"), excludeList.length && e.set("excludeIps", excludeList.join(",")), e.set("limit", "2000");
                 let t = await fetch("/api/marketing-visits?".concat(e.toString()), {
                         cache: "no-store"
                     }),
@@ -5761,7 +5770,7 @@ function eL() {
             } finally {
                 r ? Y(!1) : Z(!1)
             }
-        }, [v, f, L, I, F, q, W, clickedHideIps, tm.needDates, tm.error]);
+        }, [v, f, L, I, q, W, clickedHideIps, tm.needDates, tm.error]);
     (0, s.useEffect)(() => {
         ei()
     }, [ei]), (0, s.useEffect)(() => {
@@ -5845,24 +5854,28 @@ function eL() {
         }), (0, r.jsxs)("div", {
             className: "bg-gray-900 rounded-xl p-4 border border-gray-800 space-y-3",
             children: [(0, r.jsxs)("div", {
-                className: "w-full",
-                children: [(0, r.jsx)("div", {
-                    className: "text-xs text-gray-500 mb-2",
-                    children: tm.hideSection
+                className: "w-full space-y-3",
+                children: [(0, r.jsxs)("div", {
+                    children: [(0, r.jsx)("div", {
+                        className: "text-xs text-gray-500 mb-2",
+                        children: tm.audienceSection
+                    }), (0, r.jsxs)("div", {
+                        className: "grid grid-cols-3 gap-2",
+                        children: [["real", tm.audienceReal, tm.audienceRealTitle], ["all", tm.audienceAll, tm.audienceAllTitle], ["noise", tm.audienceNoise, tm.audienceNoiseTitle]].map(([mode, label, title]) => (0, r.jsx)("button", {
+                            type: "button",
+                            title: title,
+                            onClick: () => setAudience(mode),
+                            className: "min-h-[44px] px-3 rounded-lg border text-sm font-medium transition-colors ".concat(audience === mode ? "border-emerald-600 bg-emerald-950/50 text-emerald-100" : "border-gray-800 bg-gray-950/50 text-gray-300 hover:border-gray-600"),
+                            children: label
+                        }, mode))
+                    }), (0, r.jsxs)("p", {
+                        className: "mt-2 text-[11px] text-gray-500",
+                        children: [audienceCounts.real.toLocaleString(localeTag), " ", tm.audienceCounts, " · ", audienceCounts.noise.toLocaleString(localeTag), " ", tm.audienceCountsNoise, " · ", audienceCounts.total.toLocaleString(localeTag), " ", tm.records.toLowerCase()]
+                    })]
                 }), (0, r.jsxs)("div", {
-                    className: "grid grid-cols-2 gap-2",
-                    children: [(0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-gray-800 bg-gray-950/50 text-sm text-gray-200 active:bg-gray-800",
-                        title: tm.hideNonPeopleTitle,
-                        children: [(0, r.jsx)("input", {
-                            type: "checkbox",
-                            checked: !!(F && excludeDatacenter),
-                            onChange: e => {
-                                let on = e.target.checked;
-                                M(on), setExcludeDatacenter(on)
-                            },
-                            className: "rounded border-gray-600 h-4 w-4"
-                        }), tm.hideNonPeople]
+                    children: [(0, r.jsx)("div", {
+                        className: "text-xs text-gray-500 mb-2",
+                        children: tm.hideSection
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 min-h-[44px] px-3 rounded-lg border border-gray-800 bg-gray-950/50 text-sm text-gray-200 active:bg-gray-800",
                         children: [(0, r.jsx)("input", {
@@ -5873,19 +5886,16 @@ function eL() {
                             },
                             className: "rounded border-gray-600 h-4 w-4"
                         }), tm.hideMyIps]
-                    })]
-                }), q ? (0, r.jsx)("input", {
-                    type: "text",
-                    value: W,
-                    onChange: e => {
-                        setClickedHideIps([]), J(e.target.value)
-                    },
-                    placeholder: "1.2.3.4, 5.6.7.8",
-                    className: "mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono",
-                    title: tm.hideIpTitle
-                }) : null, (0, r.jsx)("p", {
-                    className: "mt-2 text-[11px] text-gray-600",
-                    children: tm.filterSoon
+                    }), q ? (0, r.jsx)("input", {
+                        type: "text",
+                        value: W,
+                        onChange: e => {
+                            setClickedHideIps([]), J(e.target.value)
+                        },
+                        placeholder: "1.2.3.4, 5.6.7.8",
+                        className: "mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono",
+                        title: tm.hideIpTitle
+                    }) : null]
                 })]
             }), (0, r.jsxs)("div", {
                 className: "flex flex-wrap items-end gap-3",

@@ -2,6 +2,7 @@
 
 import { Fragment, type ReactNode } from 'react'
 import { looksLikeDatacenterVisit } from '@/lib/datacenter-ip'
+import { isAiTestUserAgent, isLinuxChromeDesktopUa, isNoiseVisit } from '@/lib/visitor-noise'
 import {
   formatDurationMs,
   visitPace,
@@ -74,6 +75,8 @@ type Tm = {
   peopleShort?: string
   datacenterIp: string
   datacenterIpTitle: string
+  aiTestBadge: string
+  aiTestBadgeTitle: string
   langVisitorTitle: string
 }
 
@@ -158,6 +161,52 @@ function DatacenterBadge({
     >
       {label}
     </span>
+  )
+}
+
+function AiTestBadge({
+  row,
+  label,
+  title,
+}: {
+  row: { user_agent?: string | null; visitor_kind?: string | null }
+  label: string
+  title: string
+}) {
+  const ua = row.user_agent
+  if (!isAiTestUserAgent(ua) && !isLinuxChromeDesktopUa(ua)) return null
+  return (
+    <span
+      className="inline-flex rounded border border-violet-800/70 bg-violet-950/40 px-1.5 py-0.5 text-[10px] text-violet-200"
+      title={title}
+    >
+      {label}
+    </span>
+  )
+}
+
+function NoiseBadges({
+  row,
+  tm,
+}: {
+  row: {
+    ip?: string | null
+    city?: string | null
+    region?: string | null
+    country_code?: string | null
+    user_agent?: string | null
+    visitor_kind?: string | null
+  }
+  tm: Pick<Tm, 'datacenterIp' | 'datacenterIpTitle' | 'aiTestBadge' | 'aiTestBadgeTitle'>
+}) {
+  if (!isNoiseVisit(row) && !looksLikeDatacenterVisit(row) && !isAiTestUserAgent(row.user_agent) && !isLinuxChromeDesktopUa(row.user_agent)) {
+    return null
+  }
+  return (
+    <>
+      <AiTestBadge row={row} label={tm.aiTestBadge} title={tm.aiTestBadgeTitle} />
+      <DatacenterBadge row={row} label={tm.datacenterIp} title={tm.datacenterIpTitle} />
+    </>
   )
 }
 
@@ -411,7 +460,7 @@ export default function MarketingVisitsRecent({
                 <div className="text-gray-400 leading-snug" title={labelPlace(session)}>
                   {labelPlace(session)}
                   <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                    <DatacenterBadge row={session} label={tm.datacenterIp} title={tm.datacenterIpTitle} />
+                    <NoiseBadges row={session} tm={tm} />
                     <HideIpButton
                       ip={session.ip}
                       label={tm.hideIp}
@@ -473,7 +522,7 @@ export default function MarketingVisitsRecent({
               <div className="text-gray-400 leading-snug" title={labelPlace(e)}>
                 {labelPlace(e)}
                 <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                  <DatacenterBadge row={e} label={tm.datacenterIp} title={tm.datacenterIpTitle} />
+                  <NoiseBadges row={e} tm={tm} />
                   <HideIpButton
                     ip={e.ip}
                     label={tm.hideIp}
@@ -556,7 +605,7 @@ export default function MarketingVisitsRecent({
                         <td className="px-3 py-2 text-gray-400 min-w-[9rem] max-w-[14rem]" title={labelPlace(session)}>
                           <div className="break-words leading-snug">{labelPlace(session)}</div>
                           <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                            <DatacenterBadge row={session} label={tm.datacenterIp} title={tm.datacenterIpTitle} />
+                            <NoiseBadges row={session} tm={tm} />
                             <HideIpButton
                               ip={session.ip}
                               label={tm.hideIp}
@@ -622,7 +671,7 @@ export default function MarketingVisitsRecent({
                     <td className="px-3 py-2 text-gray-400 min-w-[9rem] max-w-[14rem]" title={labelPlace(e)}>
                       <div className="break-words leading-snug">{labelPlace(e)}</div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                        <DatacenterBadge row={e} label={tm.datacenterIp} title={tm.datacenterIpTitle} />
+                        <NoiseBadges row={e} tm={tm} />
                         <HideIpButton
                           ip={e.ip}
                           label={tm.hideIp}
