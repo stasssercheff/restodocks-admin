@@ -5232,7 +5232,7 @@ function eS() {
     const tr = useAdminTr(), localeTag = useAdminLocaleTag();
 
     var e, t, a, l;
-    let [n, i] = (0, s.useState)(null), [o, d] = (0, s.useState)(!0), [c, x] = (0, s.useState)(!1), [m, u] = (0, s.useState)(null), [p, g] = (0, s.useState)(!0), [h, y] = (0, s.useState)(""), [b, v] = (0, s.useState)(null), [deletingId, setDeletingId] = (0, s.useState)(null), [resetEmail, setResetEmail] = (0, s.useState)(""), [resetting, setResetting] = (0, s.useState)(!1), j = (0, s.useCallback)(async e => {
+    let [n, i] = (0, s.useState)(null), [o, d] = (0, s.useState)(!0), [c, x] = (0, s.useState)(!1), [m, u] = (0, s.useState)(null), [p, g] = (0, s.useState)(!0), [h, y] = (0, s.useState)(""), [b, v] = (0, s.useState)(null), [deletingId, setDeletingId] = (0, s.useState)(null), [bulkProgress, setBulkProgress] = (0, s.useState)(null), [selectedIds, setSelectedIds] = (0, s.useState)(() => new Set), [sortBy, setSortBy] = (0, s.useState)("created_at"), [sortDir, setSortDir] = (0, s.useState)("desc"), [resetEmail, setResetEmail] = (0, s.useState)(""), [resetting, setResetting] = (0, s.useState)(!1), busyDelete = !!deletingId || !!bulkProgress || resetting, j = (0, s.useCallback)(async e => {
         let t = (null == e ? void 0 : e.silent) === !0;
         u(null), t ? x(!0) : d(!0);
         try {
@@ -5283,25 +5283,31 @@ function eS() {
                 return a.includes(t) ? e : [...a, t].join(", ")
             }), g(!0))
         }, []),
+        deleteOneSandbox = (0, s.useCallback)(async e => {
+            let a = await fetch("/api/demo-sandboxes", {
+                    method: "DELETE",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        id: e.id,
+                        email: e.email
+                    })
+                }),
+                r = await a.json().catch(() => ({}));
+            if (!a.ok) throw Error("string" == typeof(null == r ? void 0 : r.error) ? r.error : tr("Ошибка удаления (").concat(a.status, ")"));
+            return r
+        }, [tr]),
         removeSandbox = (0, s.useCallback)(async e => {
-            if (!e?.id || deletingId || resetting) return;
+            if (!e?.id || busyDelete) return;
             let t = e.email || e.id;
             if (!confirm(tr("Удалить демо для «").concat(t, tr("»?\n\nУдалится строка песочницы, демо-кухня (is_demo) и demo auth-пользователь — иначе /demo отвечает 410 demo_period_expired. Действие необратимо.")))) return;
             setDeletingId(e.id), u(null);
             try {
-                let a = await fetch("/api/demo-sandboxes", {
-                        method: "DELETE",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            id: e.id,
-                            email: e.email
-                        })
-                    }),
-                    r = await a.json().catch(() => ({}));
-                if (!a.ok) throw Error("string" == typeof(null == r ? void 0 : r.error) ? r.error : tr("Ошибка удаления (").concat(a.status, ")"));
-                await j({
+                await deleteOneSandbox(e), setSelectedIds(prev => {
+                    let next = new Set(prev);
+                    return next.delete(e.id), next
+                }), await j({
                     silent: !0
                 }), alert(tr("Демо «").concat(t, tr("» сброшено (песочница + auth). Можно снова запросить на /demo.")))
             } catch (e) {
@@ -5310,10 +5316,42 @@ function eS() {
             } finally {
                 setDeletingId(null)
             }
-        }, [deletingId, resetting, j, tr]),
+        }, [busyDelete, deleteOneSandbox, j, tr]),
+        removeSelected = (0, s.useCallback)(async () => {
+            if (busyDelete || selectedIds.size === 0) return;
+            let rows = (null == n ? void 0 : n.rows) || [],
+                targets = rows.filter(row => selectedIds.has(row.id));
+            if (!targets.length) return;
+            if (!confirm(tr("Удалить выбранные демо: ").concat(targets.length, tr(" шт.?\n\nПесочницы, демо-кухни и demo auth будут сброшены. Действие необратимо.")))) return;
+            setBulkProgress({
+                done: 0,
+                total: targets.length,
+                failed: 0
+            }), u(null);
+            let failed = 0,
+                errors = [];
+            for (let idx = 0; idx < targets.length; idx++) {
+                let row = targets[idx];
+                try {
+                    await deleteOneSandbox(row)
+                } catch (err) {
+                    failed += 1, errors.push((row.email || row.id) + ": " + (err instanceof Error ? err.message : String(err)))
+                }
+                setBulkProgress({
+                    done: idx + 1,
+                    total: targets.length,
+                    failed
+                })
+            }
+            setSelectedIds(new Set), await j({
+                silent: !0
+            }), setBulkProgress(null);
+            let ok = targets.length - failed;
+            alert(tr("Готово. Удалено: ").concat(ok, tr(" из "), String(targets.length), failed ? tr(". Ошибки:\n") + errors.slice(0, 8).join("\n") + (errors.length > 8 ? "\n…" : "") : "."))
+        }, [busyDelete, selectedIds, n, deleteOneSandbox, j, tr]),
         resetByEmail = (0, s.useCallback)(async () => {
             let e = resetEmail.trim().toLowerCase();
-            if (!e.includes("@") || deletingId || resetting) return;
+            if (!e.includes("@") || busyDelete) return;
             if (!confirm(tr("Сбросить демо для «").concat(e, tr("»?\n\nНужно, если список пустой, а /demo всё равно пишет demo_period_expired. Удалим песочницу (если есть) и demo auth-пользователя этой почты.")))) return;
             setResetting(!0), u(null);
             try {
@@ -5338,14 +5376,74 @@ function eS() {
             } finally {
                 setResetting(!1)
             }
-        }, [resetEmail, deletingId, resetting, j, tr]),
-        _ = (0, s.useMemo)(() => {
+        }, [resetEmail, busyDelete, j, tr]),
+        filteredRows = (0, s.useMemo)(() => {
             var e;
             let t = null !== (e = null == n ? void 0 : n.rows) && void 0 !== e ? e : [];
             return p ? t.filter(e => !q(e.email, N)) : t
         }, [null == n ? void 0 : n.rows, p, N]),
+        _ = (0, s.useMemo)(() => {
+            let rows = [...filteredRows],
+                dir = "asc" === sortDir ? 1 : -1,
+                cmp = (a, b) => {
+                    if ("email" === sortBy) return (a.email || "").localeCompare(b.email || "", undefined, {
+                        sensitivity: "base"
+                    }) * dir;
+                    if ("expires_at" === sortBy) return ((a.expires_at || "").localeCompare(b.expires_at || "")) * dir;
+                    if ("status" === sortBy) {
+                        let now = Date.now(),
+                            rank = row => {
+                                let expired = "expired" === row.status || !row.expires_at || new Date(row.expires_at).getTime() <= now,
+                                    converted = !0 === row.registered || null != row.converted_at;
+                                return converted ? 2 : expired ? 1 : 0
+                            };
+                        return (rank(a) - rank(b) || (a.created_at || "").localeCompare(b.created_at || "")) * dir
+                    }
+                    return ((a.created_at || "").localeCompare(b.created_at || "")) * dir
+                };
+            return rows.sort(cmp), rows
+        }, [filteredRows, sortBy, sortDir]),
         allRowsCount = null !== (a = null == n ? void 0 : null === (e = n.rows) || void 0 === e ? void 0 : e.length) && void 0 !== a ? a : 0,
-        w = allRowsCount - _.length,
+        w = allRowsCount - filteredRows.length,
+        visibleIds = (0, s.useMemo)(() => _.map(row => row.id), [_]),
+        selectedVisibleCount = (0, s.useMemo)(() => visibleIds.filter(id => selectedIds.has(id)).length, [visibleIds, selectedIds]),
+        allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length,
+        toggleSort = col => {
+            if (sortBy === col) setSortDir(d => "asc" === d ? "desc" : "asc");
+            else setSortBy(col), setSortDir("email" === col ? "asc" : "desc")
+        },
+        sortMark = col => sortBy === col ? ("asc" === sortDir ? " ↑" : " ↓") : "",
+        toggleSelect = id => {
+            setSelectedIds(prev => {
+                let next = new Set(prev);
+                return next.has(id) ? next.delete(id) : next.add(id), next
+            })
+        },
+        toggleSelectAllVisible = () => {
+            setSelectedIds(prev => {
+                if (allVisibleSelected) {
+                    let next = new Set(prev);
+                    for (let id of visibleIds) next.delete(id);
+                    return next
+                }
+                let next = new Set(prev);
+                for (let id of visibleIds) next.add(id);
+                return next
+            })
+        },
+        selectVisibleChecks = () => {
+            let source = null == n || !n.rows ? [] : n.rows,
+                ids = source.filter(row => q(row.email, N)).map(row => row.id);
+            if (!ids.length) {
+                alert(tr("Проверок в выборке нет."));
+                return
+            }
+            setSelectedIds(prev => {
+                let next = new Set(prev);
+                for (let id of ids) next.add(id);
+                return next
+            })
+        },
         k = function(e) {
             let t = Date.now();
             return {
@@ -5356,6 +5454,14 @@ function eS() {
                 notConvertedExpired: e.filter(e => !0 !== e.registered && null == e.converted_at && ("expired" === e.status || new Date(e.expires_at).getTime() <= t)).length
             }
         }(_);
+    (0, s.useEffect)(() => {
+        let known = new Set((null == n || !n.rows ? [] : n.rows).map(row => row.id));
+        setSelectedIds(prev => {
+            let next = new Set;
+            for (let id of prev) known.has(id) && next.add(id);
+            return next.size === prev.size ? prev : next
+        })
+    }, [null == n ? void 0 : n.rows]);
     return (0, r.jsxs)("div", {
         className: "space-y-6",
         children: [(0, r.jsxs)("div", {
@@ -5404,10 +5510,75 @@ function eS() {
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono",
                     title: tr("Через запятую. Клик \xabскрыть\xbb в таблице добавит почту сюда.")
                 })]
+            }), (0, r.jsxs)("div", {
+                className: "flex flex-col gap-1",
+                children: [(0, r.jsx)("label", {
+                    className: "text-xs text-gray-500",
+                    children: tr("Сортировка")
+                }), (0, r.jsxs)("select", {
+                    value: "".concat(sortBy, ":").concat(sortDir),
+                    onChange: e => {
+                        let [col, dir] = e.target.value.split(":");
+                        setSortBy(col || "created_at"), setSortDir("asc" === dir ? "asc" : "desc")
+                    },
+                    className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm min-w-[12rem]",
+                    children: [(0, r.jsx)("option", {
+                        value: "created_at:desc",
+                        children: tr("дата ↓ новые")
+                    }), (0, r.jsx)("option", {
+                        value: "created_at:asc",
+                        children: tr("дата ↑ старые")
+                    }), (0, r.jsx)("option", {
+                        value: "email:asc",
+                        children: tr("почта A→Z")
+                    }), (0, r.jsx)("option", {
+                        value: "email:desc",
+                        children: tr("почта Z→A")
+                    }), (0, r.jsx)("option", {
+                        value: "expires_at:desc",
+                        children: tr("срок ↓")
+                    }), (0, r.jsx)("option", {
+                        value: "expires_at:asc",
+                        children: tr("срок ↑")
+                    }), (0, r.jsx)("option", {
+                        value: "status:asc",
+                        children: tr("статус: идёт → вышло → рег.")
+                    })]
+                })]
             }), w > 0 ? (0, r.jsxs)("p", {
                 className: "text-xs text-amber-400/90",
                 children: [tr("Скрыто фильтром: "), w, tr(" из "), allRowsCount, tr(" (это не удаление)")]
             }) : null]
+        }), (0, r.jsxs)("div", {
+            className: "flex flex-wrap items-center gap-2 border border-indigo-900/40 rounded-lg p-3 bg-indigo-950/20",
+            children: [(0, r.jsx)("button", {
+                type: "button",
+                onClick: toggleSelectAllVisible,
+                disabled: busyDelete || 0 === visibleIds.length,
+                className: "text-sm px-3 py-1.5 rounded border border-gray-700 text-gray-200 hover:border-gray-500 disabled:opacity-50",
+                children: allVisibleSelected ? tr("Снять выбор") : tr("Выбрать все видимые")
+            }), (0, r.jsx)("button", {
+                type: "button",
+                onClick: selectVisibleChecks,
+                disabled: busyDelete,
+                className: "text-sm px-3 py-1.5 rounded border border-amber-800/70 text-amber-200 hover:border-amber-600 disabled:opacity-50",
+                children: tr("Выбрать проверки")
+            }), (0, r.jsx)("button", {
+                type: "button",
+                onClick: () => setSelectedIds(new Set),
+                disabled: busyDelete || 0 === selectedIds.size,
+                className: "text-sm px-3 py-1.5 rounded border border-gray-800 text-gray-400 hover:text-gray-200 disabled:opacity-50",
+                children: tr("Очистить выбор")
+            }), (0, r.jsx)("button", {
+                type: "button",
+                onClick: () => void removeSelected(),
+                disabled: busyDelete || 0 === selectedIds.size,
+                className: "text-sm px-3 py-1.5 rounded bg-rose-700 hover:bg-rose-600 text-white disabled:opacity-50",
+                children: bulkProgress ? tr("Удаление… ").concat(bulkProgress.done, "/").concat(bulkProgress.total) : tr("Удалить выбранные").concat(selectedIds.size ? " (".concat(selectedIds.size, ")") : "")
+            }), (0, r.jsxs)("span", {
+                className: "text-xs text-gray-500 ml-auto",
+                children: [tr("Выбрано: "), selectedIds.size, selectedVisibleCount !== selectedIds.size ? " · ".concat(tr("на экране"), " ").concat(selectedVisibleCount) : ""]
+            })]
         }), (0, r.jsxs)("div", {
             className: "flex flex-wrap items-end gap-3 border border-rose-900/50 rounded-lg p-3",
             children: [(0, r.jsxs)("div", {
@@ -5428,7 +5599,7 @@ function eS() {
             }), (0, r.jsx)("button", {
                 type: "button",
                 onClick: () => void resetByEmail(),
-                disabled: resetting || !!deletingId || !resetEmail.includes("@"),
+                disabled: busyDelete || !resetEmail.includes("@"),
                 className: "text-sm px-3 py-2 rounded bg-rose-700 hover:bg-rose-600 disabled:opacity-50",
                 children: resetting ? tr("Сброс…") : tr("Сбросить и разрешить /demo снова")
             })]
@@ -5464,23 +5635,38 @@ function eS() {
                     className: "bg-gray-900 text-gray-400 text-left",
                     children: (0, r.jsxs)("tr", {
                         children: [(0, r.jsx)("th", {
-                            className: "px-3 py-2",
-                            children: tr("Почта входа в демо")
+                            className: "px-2 py-2 w-10",
+                            children: (0, r.jsx)("input", {
+                                type: "checkbox",
+                                checked: allVisibleSelected,
+                                onChange: toggleSelectAllVisible,
+                                disabled: busyDelete || 0 === visibleIds.length,
+                                className: "rounded border-gray-600",
+                                title: tr("Выбрать все видимые"),
+                                "aria-label": tr("Выбрать все видимые")
+                            })
+                        }), (0, r.jsx)("th", {
+                            className: "px-3 py-2 cursor-pointer select-none hover:text-gray-200",
+                            onClick: () => toggleSort("email"),
+                            children: tr("Почта входа в демо") + sortMark("email")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
                             children: tr("Язык")
                         }), (0, r.jsx)("th", {
-                            className: "px-3 py-2",
-                            children: tr("Запросили")
+                            className: "px-3 py-2 cursor-pointer select-none hover:text-gray-200",
+                            onClick: () => toggleSort("created_at"),
+                            children: tr("Запросили") + sortMark("created_at")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
                             children: tr("Вход по ссылке")
                         }), (0, r.jsx)("th", {
-                            className: "px-3 py-2",
-                            children: tr("До")
+                            className: "px-3 py-2 cursor-pointer select-none hover:text-gray-200",
+                            onClick: () => toggleSort("expires_at"),
+                            children: tr("До") + sortMark("expires_at")
                         }), (0, r.jsx)("th", {
-                            className: "px-3 py-2",
-                            children: tr("Период")
+                            className: "px-3 py-2 cursor-pointer select-none hover:text-gray-200",
+                            onClick: () => toggleSort("status"),
+                            children: tr("Период") + sortMark("status")
                         }), (0, r.jsx)("th", {
                             className: "px-3 py-2",
                             children: tr("Тур")
@@ -5494,10 +5680,20 @@ function eS() {
                         let t = "expired" === e.status || new Date(e.expires_at).getTime() <= Date.now(),
                             a = !0 === e.registered || null != e.converted_at,
                             s = q(e.email, N),
-                            busy = deletingId === e.id;
+                            busy = deletingId === e.id,
+                            checked = selectedIds.has(e.id);
                         return (0, r.jsxs)("tr", {
-                            className: "border-t border-gray-800",
-                            children: [(0, r.jsxs)("td", {
+                            className: "border-t border-gray-800 ".concat(checked ? "bg-rose-950/20" : ""),
+                            children: [(0, r.jsx)("td", {
+                                className: "px-2 py-2",
+                                children: (0, r.jsx)("input", {
+                                    type: "checkbox",
+                                    checked: checked,
+                                    onChange: () => toggleSelect(e.id),
+                                    disabled: busyDelete,
+                                    className: "rounded border-gray-600"
+                                })
+                            }), (0, r.jsxs)("td", {
                                 className: "px-3 py-2 text-gray-100",
                                 children: [(0, r.jsx)("div", {
                                     children: e.email
@@ -5514,7 +5710,7 @@ function eS() {
                                     }), (0, r.jsx)("button", {
                                         type: "button",
                                         onClick: () => void removeSandbox(e),
-                                        disabled: !!deletingId || resetting,
+                                        disabled: busyDelete,
                                         className: "text-[10px] text-rose-400 hover:text-rose-300 disabled:opacity-50",
                                         children: busy ? tr("удаление…") : tr("удалить")
                                     })]
@@ -5562,7 +5758,7 @@ function eS() {
                         }, e.id)
                     }), 0 === _.length ? (0, r.jsx)("tr", {
                         children: (0, r.jsx)("td", {
-                            colSpan: 8,
+                            colSpan: 9,
                             className: "px-3 py-6 text-center text-gray-500",
                             children: allRowsCount === 0 ? tr("Пока никто не запрашивал демо") : tr("Сейчас видны только проверки. Снимите «Скрыть проверки», чтобы увидеть все строки.")
                         })
