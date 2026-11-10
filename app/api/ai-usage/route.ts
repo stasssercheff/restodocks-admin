@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRequest } from '@/lib/admin-auth'
 import { createServiceClient } from '@/lib/supabase-server'
 import { addDaysYmd, parseHm, parseYmd, todayYmd, zonedDateTime } from '@/lib/query-range'
+import {
+  chooseUsageBucket,
+  fillUsageSeries,
+  type UsagePoint,
+} from '@/lib/ai-usage-series'
 
 type AggPayload = {
   summary?: {
@@ -15,8 +20,23 @@ type AggPayload = {
   }
   byProvider?: Array<{ provider: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
   byContext?: Array<{ context: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
-  byDay?: Array<{ date: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
+  byDay?: UsagePoint[]
+  byHour?: UsagePoint[]
+  byModel?: Array<{ model: string; requests: number; totalTokens: number; estimatedCostUsd: number }>
   recent?: unknown[]
+}
+
+function asPoints(rows: unknown): UsagePoint[] {
+  if (!Array.isArray(rows)) return []
+  return rows.map(row => {
+    const r = row as Record<string, unknown>
+    return {
+      date: String(r.date ?? ''),
+      requests: Number(r.requests) || 0,
+      totalTokens: Number(r.totalTokens) || 0,
+      estimatedCostUsd: Number(r.estimatedCostUsd) || 0,
+    }
+  }).filter(r => r.date)
 }
 
 export async function GET(req: NextRequest) {
@@ -32,8 +52,11 @@ export async function GET(req: NextRequest) {
   const rangeTo = parseYmd(url.searchParams.get('to')) || todayYmd(tz)
   const fromTime = url.searchParams.has('fromTime') ? parseHm(url.searchParams.get('fromTime'), '00:00') : null
   const toTime = url.searchParams.has('toTime') ? parseHm(url.searchParams.get('toTime'), '23:59') : null
-  const fromIso = zonedDateTime(rangeFrom, fromTime || '00:00', tz).toISOString()
-  const toIso = zonedDateTime(rangeTo, toTime || '23:59', tz, true).toISOString()
+  const rangeFromTime = fromTime || '00:00'
+  const rangeToTime = toTime || '23:59'
+  const fromIso = zonedDateTime(rangeFrom, rangeFromTime, tz).toISOString()
+  const toIso = zonedDateTime(rangeTo, rangeToTime, tz, true).toISOString()
+  const chartBucket = chooseUsageBucket(fromIso, toIso)
 
   const supabase = createServiceClient()
   if ('error' in supabase) return NextResponse.json({ error: supabase.error }, { status: 500 })
@@ -55,6 +78,15 @@ export async function GET(req: NextRequest) {
   const summary = payload.summary ?? {}
   const requests = Number(summary.requests) || 0
   const recent = Array.isArray(payload.recent) ? payload.recent : []
+  const byDay = asPoints(payload.byDay)
+  const byHour = asPoints(payload.byHour)
+  const series = fillUsageSeries(
+    fromIso,
+    toIso,
+    tz,
+    chartBucket,
+    chartBucket === 'hour' ? byHour : byDay,
+  )
 
   return NextResponse.json({
     meta: {
@@ -69,6 +101,7 @@ export async function GET(req: NextRequest) {
       rangeFromTime: fromTime,
       rangeToTime: toTime,
       timeZone: tz,
+      chartBucket,
       totalRows: requests,
       aggregatedRows: requests,
       truncated: false,
@@ -87,7 +120,10 @@ export async function GET(req: NextRequest) {
     },
     byProvider: Array.isArray(payload.byProvider) ? payload.byProvider : [],
     byContext: Array.isArray(payload.byContext) ? payload.byContext : [],
-    byDay: Array.isArray(payload.byDay) ? payload.byDay : [],
+    byDay,
+    byHour,
+    byModel: Array.isArray(payload.byModel) ? payload.byModel : [],
+    series,
     recent,
   })
 }

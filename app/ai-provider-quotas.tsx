@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAdminLocaleTag, useAdminTr } from '@/lib/admin-tr'
+import { formatBucketLabel, formatBucketTooltip, type UsageBucket } from '@/lib/ai-usage-series'
 import {
   formatMoneyBalance,
   pickPreferredBalance,
   type DayAgg,
+  type ModelAgg,
   type ProviderQuotasPayload,
 } from '@/lib/provider-quotas'
 
@@ -20,32 +22,90 @@ function fmtUsd(n: number) {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
 }
 
+function rangeCaption(
+  meta: ProviderQuotasPayload['meta'] | undefined,
+  locale: string,
+): string | null {
+  if (!meta?.rangeFrom || !meta?.rangeTo) return null
+  const fromD = new Date(`${meta.rangeFrom}T12:00:00`).toLocaleDateString(locale)
+  const toD = new Date(`${meta.rangeTo}T12:00:00`).toLocaleDateString(locale)
+  const same = meta.rangeFrom === meta.rangeTo
+  const fullDay = meta.rangeFromTime === '00:00' && meta.rangeToTime === '23:59'
+  if (same && fullDay) return fromD
+  if (same) return `${fromD} ${meta.rangeFromTime} — ${meta.rangeToTime}`
+  if (fullDay) return `${fromD} — ${toD}`
+  return `${fromD} ${meta.rangeFromTime} — ${toD} ${meta.rangeToTime}`
+}
+
 function MiniBars({
-  days,
+  points,
+  bucket,
   valueKey,
   accent,
 }: {
-  days: DayAgg[]
+  points: DayAgg[]
+  bucket: UsageBucket
   valueKey: 'estimatedCostUsd' | 'totalTokens' | 'requests'
   accent: string
 }) {
-  const max = Math.max(1, ...days.map(d => d[valueKey]))
-  if (!days.length) {
-    return <div className="h-28 flex items-end text-xs text-gray-600">—</div>
+  const [hover, setHover] = useState<number | null>(null)
+  const max = Math.max(1, ...points.map(d => d[valueKey]))
+  if (!points.length) {
+    return <div className="h-32 flex items-end text-xs text-gray-600">—</div>
   }
+
+  const tip = hover != null ? points[hover] : null
+
   return (
-    <div className="h-28 flex items-end gap-[2px]">
-      {days.map(d => {
-        const h = Math.max(2, Math.round((d[valueKey] / max) * 100))
-        return (
-          <div
-            key={d.date}
-            title={`${d.date}: ${d[valueKey]}`}
-            className="flex-1 min-w-0 rounded-t-sm"
-            style={{ height: `${h}%`, background: accent, opacity: 0.85 }}
-          />
-        )
-      })}
+    <div className="relative">
+      {tip ? (
+        <div className="pointer-events-none absolute -top-1 left-1/2 z-10 -translate-x-1/2 -translate-y-full rounded-md border border-gray-700 bg-gray-950 px-2.5 py-1.5 text-[11px] text-gray-100 shadow-lg whitespace-pre text-center">
+          {formatBucketTooltip(tip, bucket, valueKey)}
+        </div>
+      ) : null}
+      <div
+        className="h-32 flex items-end gap-[2px]"
+        onMouseLeave={() => setHover(null)}
+      >
+        {points.map((d, i) => {
+          const h = Math.max(d[valueKey] > 0 ? 3 : 1, Math.round((d[valueKey] / max) * 100))
+          return (
+            <div
+              key={d.date}
+              title={formatBucketTooltip(d, bucket, valueKey)}
+              onMouseEnter={() => setHover(i)}
+              className="flex-1 min-w-0 rounded-t-sm cursor-default transition-opacity"
+              style={{
+                height: `${h}%`,
+                background: accent,
+                opacity: hover == null || hover === i ? 0.95 : 0.35,
+              }}
+            />
+          )
+        })}
+      </div>
+      <div className="mt-1.5 flex justify-between text-[10px] text-gray-600 tabular-nums">
+        <span>{formatBucketLabel(points[0].date, bucket)}</span>
+        <span>{formatBucketLabel(points[points.length - 1].date, bucket)}</span>
+      </div>
+    </div>
+  )
+}
+
+function ModelSpendList({ models, locale }: { models: ModelAgg[]; locale: string }) {
+  const top = models.slice(0, 4)
+  if (!top.length) return null
+  return (
+    <div className="mt-3 space-y-1.5">
+      {top.map(m => (
+        <div key={m.model} className="flex items-center justify-between gap-2 text-xs">
+          <span className="text-gray-400 truncate min-w-0">{m.model}</span>
+          <span className="text-gray-200 tabular-nums shrink-0">
+            {fmtUsd(m.estimatedCostUsd)}
+            <span className="text-gray-600"> · {fmtInt(m.requests, locale)}</span>
+          </span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -53,10 +113,14 @@ function MiniBars({
 export default function AiProviderQuotas({
   from,
   to,
+  fromTime,
+  toTime,
   tz,
 }: {
   from: string
   to: string
+  fromTime: string
+  toTime: string
   tz: string
 }) {
   const tr = useAdminTr()
@@ -74,7 +138,7 @@ export default function AiProviderQuotas({
     else setRefreshing(true)
     if (mode !== 'poll') setError(null)
     try {
-      const q = new URLSearchParams({ from, to, tz })
+      const q = new URLSearchParams({ from, to, fromTime, toTime, tz })
       const res = await fetch(`/api/ai-provider-quotas?${q}`, { cache: 'no-store' })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -94,7 +158,7 @@ export default function AiProviderQuotas({
       setLoading(false)
       setRefreshing(false)
     }
-  }, [from, to, tz, tr])
+  }, [from, to, fromTime, toTime, tz, tr])
 
   const loadRef = useRef(load)
   loadRef.current = load
@@ -117,7 +181,7 @@ export default function AiProviderQuotas({
       window.clearInterval(id)
       document.removeEventListener('visibilitychange', onVis)
     }
-  }, [from, to, tz])
+  }, [from, to, fromTime, toTime, tz])
 
   const deeplPct = useMemo(() => {
     const live = data?.deepl.live
@@ -126,6 +190,12 @@ export default function AiProviderQuotas({
   }, [data])
 
   const deepseekBal = pickPreferredBalance(data?.deepseek.live?.balances)
+  const caption = rangeCaption(data?.meta, locale)
+  const bucket: UsageBucket = data?.meta.chartBucket ?? 'day'
+  const chartTitle =
+    bucket === 'hour' ? tr('Стоимость по часам') : tr('Стоимость по дням')
+  const deeplChartTitle =
+    bucket === 'hour' ? tr('По часам (логи)') : tr('По дням (логи)')
 
   return (
     <div className="space-y-4">
@@ -140,6 +210,12 @@ export default function AiProviderQuotas({
               : null}
             {refreshing ? ` · ${tr('синхронизация…')}` : null}
           </p>
+          {caption ? (
+            <p className="text-xs text-sky-300/80 mt-1">
+              {tr('Расход по логам за')}: {caption}
+              {bucket === 'hour' ? ` · ${tr('почасовая разбивка')}` : null}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
@@ -218,9 +294,10 @@ export default function AiProviderQuotas({
           </div>
 
           <div className="mt-4">
-            <div className="text-xs text-gray-500 mb-2">{tr('По дням (логи)')}</div>
+            <div className="text-xs text-gray-500 mb-2">{deeplChartTitle}</div>
             <MiniBars
-              days={data?.deepl.period.byDay ?? []}
+              points={data?.deepl.period.series ?? []}
+              bucket={bucket}
               valueKey="totalTokens"
               accent="#38bdf8"
             />
@@ -303,12 +380,19 @@ export default function AiProviderQuotas({
           </div>
 
           <div className="mt-4">
-            <div className="text-xs text-gray-500 mb-2">{tr('Стоимость по дням')}</div>
+            <div className="text-xs text-gray-500 mb-2">
+              {chartTitle}
+              {data?.deepseek.period.estimatedCostUsd != null
+                ? ` ${fmtUsd(data.deepseek.period.estimatedCostUsd)}`
+                : null}
+            </div>
             <MiniBars
-              days={data?.deepseek.period.byDay ?? []}
+              points={data?.deepseek.period.series ?? []}
+              bucket={bucket}
               valueKey="estimatedCostUsd"
               accent="#fb923c"
             />
+            <ModelSpendList models={data?.deepseek.period.byModel ?? []} locale={locale} />
           </div>
         </section>
       </div>
