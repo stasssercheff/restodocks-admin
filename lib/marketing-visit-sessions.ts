@@ -12,6 +12,7 @@ export type VisitEvent = {
   city: string | null
   timezone: string | null
   location_label: string | null
+  user_agent?: string | null
   visitor_kind: string | null
   visitor_hint: string | null
   viewport_width?: number | null
@@ -48,6 +49,7 @@ export type VisitSession = {
   timezone: string | null
   language_code: string | null
   client_host: string | null
+  user_agent: string | null
   visitor_kind: string | null
   visitor_hint: string | null
   session_active: boolean
@@ -193,6 +195,7 @@ function buildSession(key: string, events: VisitEvent[]): VisitSession {
     timezone: newest.timezone,
     language_code: newest.language_code,
     client_host: newest.client_host,
+    user_agent: newest.user_agent ?? null,
     visitor_kind: newest.visitor_kind,
     visitor_hint: newest.visitor_hint,
     session_active: sorted.some(item => item.session_active),
