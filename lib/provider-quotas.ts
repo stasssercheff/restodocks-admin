@@ -1,13 +1,22 @@
 import { createServiceClient, readEnv } from '@/lib/supabase-server'
-import { addDaysYmd, parseYmd, todayYmd, zonedDateTime } from '@/lib/query-range'
+import { addDaysYmd, parseHm, parseYmd, todayYmd, zonedDateTime } from '@/lib/query-range'
+import {
+  chooseUsageBucket,
+  fillUsageSeries,
+  type UsageBucket,
+  type UsagePoint,
+} from '@/lib/ai-usage-series'
 import type { DeepseekBalanceRow } from '@/lib/provider-quota-format'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type { DeepseekBalanceRow }
 export { formatMoneyBalance, pickPreferredBalance } from '@/lib/provider-quota-format'
+export type { UsageBucket, UsagePoint }
 
-export type DayAgg = {
-  date: string
+export type DayAgg = UsagePoint
+
+export type ModelAgg = {
+  model: string
   requests: number
   totalTokens: number
   estimatedCostUsd: number
@@ -17,7 +26,12 @@ export type ProviderPeriod = {
   requests: number
   totalTokens: number
   estimatedCostUsd: number
+  bucket: UsageBucket
+  /** Zero-filled series for the active bucket (hour or day). */
+  series: UsagePoint[]
   byDay: DayAgg[]
+  byHour: DayAgg[]
+  byModel: ModelAgg[]
 }
 
 export type DeeplLiveUsage = {
@@ -33,9 +47,12 @@ export type ProviderQuotasPayload = {
   meta: {
     rangeFrom: string
     rangeTo: string
+    rangeFromTime: string
+    rangeToTime: string
     fromIso: string
     toIso: string
     timeZone: string
+    chartBucket: UsageBucket
     liveFetchedAt: string | null
   }
   deepl: {
@@ -50,8 +67,43 @@ export type ProviderQuotasPayload = {
   }
 }
 
-function emptyPeriod(): ProviderPeriod {
-  return { requests: 0, totalTokens: 0, estimatedCostUsd: 0, byDay: [] }
+function emptyPeriod(bucket: UsageBucket = 'day'): ProviderPeriod {
+  return {
+    requests: 0,
+    totalTokens: 0,
+    estimatedCostUsd: 0,
+    bucket,
+    series: [],
+    byDay: [],
+    byHour: [],
+    byModel: [],
+  }
+}
+
+function asPoints(rows: unknown): UsagePoint[] {
+  if (!Array.isArray(rows)) return []
+  return rows.map(row => {
+    const r = row as Record<string, unknown>
+    return {
+      date: String(r.date ?? ''),
+      requests: Number(r.requests) || 0,
+      totalTokens: Number(r.totalTokens) || 0,
+      estimatedCostUsd: Number(r.estimatedCostUsd) || 0,
+    }
+  }).filter(r => r.date)
+}
+
+function asModels(rows: unknown): ModelAgg[] {
+  if (!Array.isArray(rows)) return []
+  return rows.map(row => {
+    const r = row as Record<string, unknown>
+    return {
+      model: String(r.model ?? '(empty)'),
+      requests: Number(r.requests) || 0,
+      totalTokens: Number(r.totalTokens) || 0,
+      estimatedCostUsd: Number(r.estimatedCostUsd) || 0,
+    }
+  })
 }
 
 async function periodFromRpc(
@@ -60,6 +112,7 @@ async function periodFromRpc(
   fromIso: string,
   toIso: string,
   tz: string,
+  bucket: UsageBucket,
 ): Promise<ProviderPeriod | { error: string }> {
   const { data, error } = await supabase.rpc('admin_ai_usage_stats', {
     p_from: fromIso,
@@ -70,15 +123,26 @@ async function periodFromRpc(
     p_recent_limit: 1,
   })
   if (error) return { error: error.message }
-  const summary = (data as { summary?: Record<string, number> } | null)?.summary ?? {}
-  const byDay = Array.isArray((data as { byDay?: DayAgg[] } | null)?.byDay)
-    ? ((data as { byDay: DayAgg[] }).byDay)
-    : []
+  const payload = (data ?? {}) as {
+    summary?: Record<string, number>
+    byDay?: UsagePoint[]
+    byHour?: UsagePoint[]
+    byModel?: ModelAgg[]
+  }
+  const summary = payload.summary ?? {}
+  const byDay = asPoints(payload.byDay)
+  const byHour = asPoints(payload.byHour)
+  const byModel = asModels(payload.byModel)
+  const raw = bucket === 'hour' ? byHour : byDay
   return {
     requests: Number(summary.requests) || 0,
     totalTokens: Number(summary.totalTokens) || 0,
     estimatedCostUsd: Number(summary.estimatedCostUsd) || 0,
+    bucket,
+    series: fillUsageSeries(fromIso, toIso, tz, bucket, raw),
     byDay,
+    byHour,
+    byModel,
   }
 }
 
@@ -161,20 +225,25 @@ export async function buildProviderQuotas(opts: {
   tz?: string | null
   from?: string | null
   to?: string | null
+  fromTime?: string | null
+  toTime?: string | null
 }): Promise<ProviderQuotasPayload | { error: string }> {
   const tz = opts.tz?.trim() || 'UTC'
   const rangeFrom = parseYmd(opts.from ?? null) || addDaysYmd(todayYmd(tz), -30)
   const rangeTo = parseYmd(opts.to ?? null) || todayYmd(tz)
-  const fromIso = zonedDateTime(rangeFrom, '00:00', tz).toISOString()
-  const toIso = zonedDateTime(rangeTo, '23:59', tz, true).toISOString()
+  const rangeFromTime = parseHm(opts.fromTime ?? null, '00:00')
+  const rangeToTime = parseHm(opts.toTime ?? null, '23:59')
+  const fromIso = zonedDateTime(rangeFrom, rangeFromTime, tz).toISOString()
+  const toIso = zonedDateTime(rangeTo, rangeToTime, tz, true).toISOString()
+  const chartBucket = chooseUsageBucket(fromIso, toIso)
 
   const supabase = createServiceClient()
   if ('error' in supabase) return { error: supabase.error }
 
   const [live, deeplPeriod, deepseekPeriod] = await Promise.all([
     fetchLiveQuotas(),
-    periodFromRpc(supabase, 'deepl', fromIso, toIso, tz),
-    periodFromRpc(supabase, 'deepseek', fromIso, toIso, tz),
+    periodFromRpc(supabase, 'deepl', fromIso, toIso, tz, chartBucket),
+    periodFromRpc(supabase, 'deepseek', fromIso, toIso, tz, chartBucket),
   ])
 
   if ('error' in deeplPeriod) return { error: deeplPeriod.error }
@@ -184,9 +253,12 @@ export async function buildProviderQuotas(opts: {
     meta: {
       rangeFrom,
       rangeTo,
+      rangeFromTime,
+      rangeToTime,
       fromIso,
       toIso,
       timeZone: tz,
+      chartBucket,
       liveFetchedAt: live.fetchedAt,
     },
     deepl: {
@@ -197,7 +269,7 @@ export async function buildProviderQuotas(opts: {
     deepseek: {
       live: live.deepseek.live,
       liveError: live.deepseek.liveError,
-      period: deepseekPeriod ?? emptyPeriod(),
+      period: deepseekPeriod ?? emptyPeriod(chartBucket),
     },
   }
 }

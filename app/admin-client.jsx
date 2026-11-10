@@ -12,6 +12,7 @@ import PartnerScopeBanner from './partner-scope-banner'
 import SettingsTab from './settings-tab'
 import MarketingVisitsRecent from './marketing-visits-recent'
 import AiProviderQuotas from './ai-provider-quotas'
+import { formatBucketLabel, lastHourPreset, todaySoFarPreset } from '@/lib/ai-usage-series'
 import { LanguageSwitcher, useI18n } from '@/lib/i18n'
 import { canAccessPage } from '@/lib/admin-pages'
 import { matchesCreatedAt, normalizeDateInput } from '@/lib/created-at-filter'
@@ -4780,7 +4781,18 @@ function e_() {
         [S, L] = (0, s.useState)(!0),
         [T, P] = (0, s.useState)(null),
         E = e => {
-            u(ed(-e)), g(ed(0)), y("00:00"), j("23:59")
+            if ("1h" === e) {
+                let t = lastHourPreset(x);
+                u(t.from), g(t.to), y(t.fromTime), j(t.toTime);
+                return
+            }
+            if ("today" === e) {
+                let t = todaySoFarPreset(x);
+                u(t.from), g(t.to), y(t.fromTime), j(t.toTime);
+                return
+            }
+            let t = Number(e);
+            t && (u(ed(-t)), g(ed(0)), y("00:00"), j("23:59"))
         },
         I = (0, s.useCallback)(async () => {
             if (!m || !p) {
@@ -4812,6 +4824,8 @@ function e_() {
         I()
     }, [I]);
     let A = (null == k ? void 0 : k.summary.requests) ? Math.round(k.summary.successRequests / k.summary.requests * 1e3) / 10 : 0,
+        chartBucket = (null == k ? void 0 : k.meta) && "hour" === k.meta.chartBucket ? "hour" : "day",
+        seriesRows = (null == k ? void 0 : k.series) && k.series.length ? k.series : "hour" === chartBucket ? null == k || !k.byHour ? [] : k.byHour : null == k || !k.byDay ? [] : k.byDay,
         R = (0, s.useMemo)(() => {
             var e, t, a, r, s;
             if (!(null == k ? void 0 : null === (e = k.meta) || void 0 === e ? void 0 : e.rangeFrom) || !(null == k ? void 0 : null === (t = k.meta) || void 0 === t ? void 0 : t.rangeTo)) return (null == k ? void 0 : null === (a = k.meta) || void 0 === a ? void 0 : a.fromIso) ? tr("с ").concat(es(k.meta.fromIso)) : null;
@@ -4823,11 +4837,7 @@ function e_() {
         }, [null == k ? void 0 : k.meta]);
     return (0, r.jsxs)("div", {
         className: "space-y-6",
-        children: [(0, r.jsx)(AiProviderQuotas, {
-            from: m,
-            to: p,
-            tz: x
-        }), (0, r.jsxs)("div", {
+        children: [(0, r.jsxs)("div", {
             className: "bg-gray-900 rounded-xl p-4 border border-gray-800 flex flex-wrap items-end gap-3",
             children: [(0, r.jsxs)("div", {
                 className: "flex items-end gap-2",
@@ -4884,7 +4894,7 @@ function e_() {
                 }), (0, r.jsxs)("select", {
                     defaultValue: "",
                     onChange: e => {
-                        let t = Number(e.target.value);
+                        let t = e.target.value;
                         t && (E(t), e.target.value = "")
                     },
                     className: "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm min-w-[10rem]",
@@ -4892,19 +4902,25 @@ function e_() {
                         value: "",
                         children: tr("выбрать…")
                     }), (0, r.jsx)("option", {
-                        value: 7,
+                        value: "1h",
+                        children: tr("последний час")
+                    }), (0, r.jsx)("option", {
+                        value: "today",
+                        children: tr("сегодня")
+                    }), (0, r.jsx)("option", {
+                        value: "7",
                         children: tr("последние 7 дней")
                     }), (0, r.jsx)("option", {
-                        value: 14,
+                        value: "14",
                         children: tr("последние 14 дней")
                     }), (0, r.jsx)("option", {
-                        value: 30,
+                        value: "30",
                         children: tr("последние 30 дней")
                     }), (0, r.jsx)("option", {
-                        value: 90,
+                        value: "90",
                         children: tr("последние 90 дней")
                     }), (0, r.jsx)("option", {
-                        value: 180,
+                        value: "180",
                         children: tr("последние 180 дней")
                     })]
                 })]
@@ -4986,6 +5002,12 @@ function e_() {
                     children: [tr("Все "), k.meta.totalRows.toLocaleString(localeTag), tr(" записей учтены")]
                 }) : null]
             }) : null]
+        }), (0, r.jsx)(AiProviderQuotas, {
+            from: m,
+            to: p,
+            fromTime: h,
+            toTime: b,
+            tz: x
         }), T ? (0, r.jsx)("div", {
             className: "p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm",
             children: T
@@ -5088,7 +5110,7 @@ function e_() {
                 className: "bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
                 children: [(0, r.jsx)("div", {
                     className: "px-4 py-3 border-b border-gray-800 text-sm text-gray-300",
-                    children: tr("По дням")
+                    children: "hour" === chartBucket ? tr("По часам") : tr("По дням")
                 }), (0, r.jsx)("div", {
                     className: "max-h-72 overflow-auto",
                     children: (0, r.jsxs)("table", {
@@ -5098,7 +5120,7 @@ function e_() {
                             children: (0, r.jsxs)("tr", {
                                 children: [(0, r.jsx)("th", {
                                     className: "text-left px-3 py-2 font-medium",
-                                    children: tr("Дата")
+                                    children: "hour" === chartBucket ? tr("Час") : tr("Дата")
                                 }), (0, r.jsx)("th", {
                                     className: "text-right px-3 py-2 font-medium",
                                     children: tr("Запросы")
@@ -5111,22 +5133,22 @@ function e_() {
                                 })]
                             })
                         }), (0, r.jsx)("tbody", {
-                            children: (null !== (d = null == k ? void 0 : k.byDay) && void 0 !== d ? d : []).map(e => (0, r.jsxs)("tr", {
+                            children: seriesRows.filter(row => row.requests > 0 || row.estimatedCostUsd > 0 || row.totalTokens > 0).map(row => (0, r.jsxs)("tr", {
                                 className: "border-t border-gray-800/70",
                                 children: [(0, r.jsx)("td", {
                                     className: "px-3 py-2 text-gray-300",
-                                    children: es(e.date)
+                                    children: "hour" === chartBucket ? "".concat(row.date.slice(0, 10) !== m && row.date.slice(0, 10) !== p ? row.date.slice(0, 10) + " " : "", formatBucketLabel(row.date, "hour")) : es(row.date)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right",
-                                    children: e.requests.toLocaleString(localeTag)
+                                    children: row.requests.toLocaleString(localeTag)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right",
-                                    children: e.totalTokens.toLocaleString(localeTag)
+                                    children: row.totalTokens.toLocaleString(localeTag)
                                 }), (0, r.jsx)("td", {
                                     className: "px-3 py-2 text-right text-emerald-300",
-                                    children: eo(e.estimatedCostUsd)
+                                    children: eo(row.estimatedCostUsd)
                                 })]
-                            }, e.date))
+                            }, row.date))
                         })]
                     })
                 })]

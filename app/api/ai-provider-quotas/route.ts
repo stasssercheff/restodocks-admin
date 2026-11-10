@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
     tz: url.searchParams.get('tz'),
     from: url.searchParams.get('from'),
     to: url.searchParams.get('to'),
+    fromTime: url.searchParams.get('fromTime'),
+    toTime: url.searchParams.get('toTime'),
   })
   if ('error' in payload) {
     return NextResponse.json({ error: payload.error }, { status: 500 })
