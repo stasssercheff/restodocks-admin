@@ -7,7 +7,6 @@ import {
   formatMoneyBalance,
   pickPreferredBalance,
   type DayAgg,
-  type EstablishmentAgg,
   type ModelAgg,
   type ProviderQuotasPayload,
 } from '@/lib/provider-quotas'
@@ -130,53 +129,6 @@ function ModelSpendList({
           </span>
         </div>
       ) : null}
-    </div>
-  )
-}
-
-function establishmentLabel(row: EstablishmentAgg, tr: (s: string) => string) {
-  if (row.name === '(system)') return tr('система / очередь')
-  if (row.name === '(none)') return tr('без заведения')
-  if (row.name === '(unnamed)') return tr('без названия')
-  return row.name
-}
-
-function EstablishmentSpendList({
-  rows,
-  locale,
-  tr,
-}: {
-  rows: EstablishmentAgg[]
-  locale: string
-  tr: (s: string) => string
-}) {
-  const top = rows.slice(0, 12)
-  if (!top.length) return null
-  const total = top.reduce((sum, row) => sum + row.estimatedCostUsd, 0)
-  return (
-    <div className="mt-4 pt-3 border-t border-gray-800">
-      <div className="text-xs text-gray-500 mb-2">
-        {tr('Расход DeepSeek по заведениям')}
-        {total > 0 ? ` · ${fmtUsd(total)}` : null}
-      </div>
-      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-        {top.map(row => (
-          <div
-            key={row.establishmentId ?? row.name}
-            className="flex items-center justify-between gap-2 text-xs"
-            title={row.establishmentId ?? undefined}
-          >
-            <span className="text-gray-300 truncate min-w-0">{establishmentLabel(row, tr)}</span>
-            <span className="text-orange-200/90 tabular-nums shrink-0">
-              {fmtUsd(row.estimatedCostUsd)}
-              <span className="text-gray-600"> · {fmtInt(row.requests, locale)}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-      <p className="mt-2 text-[11px] text-gray-600 leading-snug">
-        {tr('По логам (токены → $). Общий баланс DeepSeek один на всех — списания с кошелька не делятся по API, только оценка по учёткам.')}
-      </p>
     </div>
   )
 }
@@ -482,15 +434,10 @@ export default function AiProviderQuotas({
               accent="#fb923c"
             />
             <ModelSpendList models={data?.deepseek.period.byModel ?? []} locale={locale} tr={tr} />
-            <EstablishmentSpendList
-              rows={data?.deepseek.period.byEstablishment ?? []}
-              locale={locale}
-              tr={tr}
-            />
             <p className="mt-3 text-[11px] text-gray-600 leading-snug">
               {walletReady
-                ? tr('График «Списание с баланса» — реальные дельты /user/balance (снимки каждые 5 мин + при открытии вкладки). Оценка по логам и по заведениям — отдельно.')
-                : tr('Снимки баланса пишутся каждые 5 минут автоматически. После 2+ снимков график совпадёт со списаниями в кабинете DeepSeek. Пока столбики — оценка по логам.')}
+                ? tr('График «Списание с баланса» — реальные дельты /user/balance (снимки каждые 5 мин + при открытии вкладки). Оценка по логам — отдельно. Расход по заведениям — во вкладке «Заведения».')
+                : tr('Снимки баланса пишутся каждые 5 минут автоматически. После 2+ снимков график совпадёт со списаниями в кабинете DeepSeek. Пока столбики — оценка по логам. Расход по заведениям — во вкладке «Заведения».')}
               {wallet?.trackedFrom
                 ? ` ${tr('Учёт с')} ${new Date(wallet.trackedFrom).toLocaleString(locale)}.`
                 : null}

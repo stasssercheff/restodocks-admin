@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceClient, fetchAllRows } from '@/lib/supabase-server'
 import { buildReferralLevels, type DataScope, summarizeScopedRows, type ScopeStats } from '@/lib/admin-scope'
 
@@ -37,6 +38,60 @@ export type EstablishmentRow = {
   last_activity_at: string | null
   referred_by_establishment_id: string | null
   referral_level: number | null
+  /** DeepSeek prepaid estimate from ai_spend_daily (tokens → $). */
+  deepseek_usd_30d: number
+  deepseek_tokens_30d: number
+  deepseek_calls_30d: number
+  deepseek_usd_all: number
+  deepseek_tokens_all: number
+  deepseek_calls_all: number
+}
+
+type DeepseekSpendCell = {
+  usdAll?: unknown
+  usd30d?: unknown
+  tokensAll?: unknown
+  tokens30d?: unknown
+  callsAll?: unknown
+  calls30d?: unknown
+}
+
+function numOr0(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+type DeepseekSpendRow = {
+  usdAll: number
+  usd30d: number
+  tokensAll: number
+  tokens30d: number
+  callsAll: number
+  calls30d: number
+}
+
+async function loadDeepseekSpendByEstablishment(
+  supabase: SupabaseClient,
+): Promise<Map<string, DeepseekSpendRow>> {
+  const empty = new Map<string, DeepseekSpendRow>()
+  try {
+    const { data, error } = await supabase.rpc('admin_deepseek_spend_by_establishment')
+    if (error || !data || typeof data !== 'object') return empty
+    for (const [id, raw] of Object.entries(data as Record<string, DeepseekSpendCell>)) {
+      if (!id) continue
+      empty.set(id, {
+        usdAll: numOr0(raw?.usdAll),
+        usd30d: numOr0(raw?.usd30d),
+        tokensAll: numOr0(raw?.tokensAll),
+        tokens30d: numOr0(raw?.tokens30d),
+        callsAll: numOr0(raw?.callsAll),
+        calls30d: numOr0(raw?.calls30d),
+      })
+    }
+    return empty
+  } catch {
+    return empty
+  }
 }
 
 type EstablishmentRecord = {
@@ -278,7 +333,7 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
      * chunking blows Cloudflare Worker subrequest limits. Paginate whole related
      * tables (few round-trips), then keep rows for our establishment/owner set.
      */
-    const [employeesAll, redemptionsAll, pendingAll, billingAll, appleAll] = await Promise.all([
+    const [employeesAll, redemptionsAll, pendingAll, billingAll, appleAll, deepseekSpend] = await Promise.all([
       fetchAllRows<EmployeeRecord>((from, to) =>
         supabase
           .from('employees')
@@ -320,6 +375,7 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
           .order('owner_id', { ascending: true })
           .range(from, to),
       ),
+      loadDeepseekSpendByEstablishment(supabase),
     ])
 
     if ('error' in employeesAll) return employeesAll
@@ -431,6 +487,7 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
         .filter((value): value is string => !!value)
         .sort()
         .at(-1) ?? null
+      const spend = deepseekSpend.get(est.id)
 
       return {
         id: est.id,
@@ -460,6 +517,12 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
         last_activity_at: lastActivity,
         referred_by_establishment_id: est.referred_by_establishment_id,
         referral_level: null,
+        deepseek_usd_30d: spend?.usd30d ?? 0,
+        deepseek_tokens_30d: spend?.tokens30d ?? 0,
+        deepseek_calls_30d: spend?.calls30d ?? 0,
+        deepseek_usd_all: spend?.usdAll ?? 0,
+        deepseek_tokens_all: spend?.tokensAll ?? 0,
+        deepseek_calls_all: spend?.callsAll ?? 0,
       } satisfies EstablishmentRow
     })
 
