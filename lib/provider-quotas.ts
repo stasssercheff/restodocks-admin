@@ -30,6 +30,14 @@ export type ModelAgg = {
   estimatedCostUsd: number
 }
 
+export type EstablishmentAgg = {
+  establishmentId: string | null
+  name: string
+  requests: number
+  totalTokens: number
+  estimatedCostUsd: number
+}
+
 export type ProviderPeriod = {
   requests: number
   totalTokens: number
@@ -40,6 +48,7 @@ export type ProviderPeriod = {
   byDay: DayAgg[]
   byHour: DayAgg[]
   byModel: ModelAgg[]
+  byEstablishment: EstablishmentAgg[]
 }
 
 export type DeeplLiveUsage = {
@@ -93,6 +102,7 @@ function emptyPeriod(bucket: UsageBucket = 'day'): ProviderPeriod {
     byDay: [],
     byHour: [],
     byModel: [],
+    byEstablishment: [],
   }
 }
 
@@ -122,6 +132,23 @@ function asModels(rows: unknown): ModelAgg[] {
   })
 }
 
+function asEstablishments(rows: unknown): EstablishmentAgg[] {
+  if (!Array.isArray(rows)) return []
+  return rows.map(row => {
+    const r = row as Record<string, unknown>
+    const rawId = r.establishmentId
+    const establishmentId =
+      rawId == null || rawId === '' || rawId === 'null' ? null : String(rawId)
+    return {
+      establishmentId,
+      name: String(r.name ?? '(unnamed)'),
+      requests: Number(r.requests) || 0,
+      totalTokens: Number(r.totalTokens) || 0,
+      estimatedCostUsd: Number(r.estimatedCostUsd) || 0,
+    }
+  })
+}
+
 async function periodFromRpc(
   supabase: SupabaseClient,
   provider: string,
@@ -144,11 +171,13 @@ async function periodFromRpc(
     byDay?: UsagePoint[]
     byHour?: UsagePoint[]
     byModel?: ModelAgg[]
+    byEstablishment?: EstablishmentAgg[]
   }
   const summary = payload.summary ?? {}
   const byDay = asPoints(payload.byDay)
   const byHour = asPoints(payload.byHour)
   const byModel = asModels(payload.byModel)
+  const byEstablishment = asEstablishments(payload.byEstablishment)
   const raw = bucket === 'hour' ? byHour : byDay
   return {
     requests: Number(summary.requests) || 0,
@@ -159,6 +188,7 @@ async function periodFromRpc(
     byDay,
     byHour,
     byModel,
+    byEstablishment,
   }
 }
 
@@ -279,7 +309,7 @@ async function maybeRecordDeepseekSnapshot(
     || Math.abs(last.granted_balance - current.granted_balance) >= 0.01
 
   if (!last || ageMs >= SNAPSHOT_MIN_INTERVAL_MS || changed) {
-    await supabase.from('provider_balance_snapshots').insert({
+    const { error } = await supabase.from('provider_balance_snapshots').insert({
       provider: 'deepseek',
       currency: current.currency,
       captured_at: nowIso,
@@ -288,6 +318,9 @@ async function maybeRecordDeepseekSnapshot(
       topped_up_balance: current.topped_up_balance,
       is_available: live?.is_available !== false,
     })
+    if (error) {
+      console.error('[provider-quotas] snapshot insert failed', error.message)
+    }
   }
 
   return current
