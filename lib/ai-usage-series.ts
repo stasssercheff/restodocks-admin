@@ -51,9 +51,23 @@ function emptyPoint(date: string): UsagePoint {
   return { date, requests: 0, totalTokens: 0, estimatedCostUsd: 0 }
 }
 
+function nextDayKey(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d + 1))
+  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`
+}
+
+function nextHourKey(key: string): string {
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}):00$/.exec(key)
+  if (!m) return key
+  const hour = Number(m[2])
+  if (hour < 23) return `${m[1]} ${pad2(hour + 1)}:00`
+  return `${nextDayKey(m[1])} 00:00`
+}
+
 /**
- * Zero-fill day or hour slots between fromIso and toIso (inclusive of start hour/day).
- * Caps at 800 points to keep Worker payloads small.
+ * Zero-fill day or hour slots between fromIso and toIso (inclusive).
+ * Iterates calendar keys in the target TZ so we never spill a phantom next day.
  */
 export function fillUsageSeries(
   fromIso: string,
@@ -75,26 +89,16 @@ export function fillUsageSeries(
     estimatedCostUsd: Number(r.estimatedCostUsd) || 0,
   }]))
 
-  const stepMs = bucket === 'hour' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000
+  const startKey = formatInTimeZone(from, timeZone, bucket)
+  const endKey = formatInTimeZone(to, timeZone, bucket)
   const maxPoints = 800
   const out: UsagePoint[] = []
-
-  // Align cursor to bucket start in the target zone by formatting then reconstructing roughly via steps.
-  let cursor = from
+  let key = startKey
   let guard = 0
-  while (cursor <= to && guard < maxPoints) {
-    const key = formatInTimeZone(cursor, timeZone, bucket)
-    if (!out.length || out[out.length - 1].date !== key) {
-      out.push(byKey.get(key) ?? emptyPoint(key))
-    }
-    cursor += stepMs
+  while (key <= endKey && guard < maxPoints) {
+    out.push(byKey.get(key) ?? emptyPoint(key))
+    key = bucket === 'hour' ? nextHourKey(key) : nextDayKey(key)
     guard += 1
-  }
-
-  // Ensure the end bucket is present (timezone edge cases).
-  const endKey = formatInTimeZone(to, timeZone, bucket)
-  if (!out.length || out[out.length - 1].date !== endKey) {
-    out.push(byKey.get(endKey) ?? emptyPoint(endKey))
   }
 
   return out

@@ -36,6 +36,20 @@ describe('ai-usage-series', () => {
     assert.ok(series.some(p => p.date === '2026-11-10 02:00' && p.requests === 0))
   })
 
+  it('does not spill a phantom next calendar day', () => {
+    // 12.10 — 11.11 Asia/Ho_Chi_Minh (UTC+7), end of 11.11 local
+    const series = fillUsageSeries(
+      '2026-10-11T17:00:00.000Z',
+      '2026-11-11T16:59:59.999Z',
+      'Asia/Ho_Chi_Minh',
+      'day',
+      [{ date: '2026-11-11', requests: 1, totalTokens: 1, estimatedCostUsd: 1 }],
+    )
+    assert.equal(series[0]?.date, '2026-10-12')
+    assert.equal(series[series.length - 1]?.date, '2026-11-11')
+    assert.ok(!series.some(p => p.date === '2026-11-12'))
+  })
+
   it('formats DeepSeek-style hour labels and tooltips', () => {
     assert.equal(formatBucketLabel('2026-11-10 09:00', 'hour'), '09:00~10:00')
     const tip = formatBucketTooltip(
