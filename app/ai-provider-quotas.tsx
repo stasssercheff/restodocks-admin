@@ -92,9 +92,20 @@ function MiniBars({
   )
 }
 
-function ModelSpendList({ models, locale }: { models: ModelAgg[]; locale: string }) {
-  const top = models.slice(0, 4)
-  if (!top.length) return null
+function ModelSpendList({
+  models,
+  locale,
+  tr,
+}: {
+  models: ModelAgg[]
+  locale: string
+  tr: (s: string) => string
+}) {
+  const top = models
+    .filter(m => !(m.model === '(empty)' && m.estimatedCostUsd <= 0))
+    .slice(0, 4)
+  const emptyErrors = models.find(m => m.model === '(empty)' && m.estimatedCostUsd <= 0)
+  if (!top.length && !emptyErrors) return null
   return (
     <div className="mt-3 space-y-1.5">
       {top.map(m => (
@@ -106,6 +117,18 @@ function ModelSpendList({ models, locale }: { models: ModelAgg[]; locale: string
           </span>
         </div>
       ))}
+      {emptyErrors ? (
+        <div
+          className="flex items-center justify-between gap-2 text-xs"
+          title={tr('Вызовы с ошибкой API (модель не записалась), $ в логах = 0')}
+        >
+          <span className="text-amber-400/90 truncate min-w-0">{tr('ошибки API (без $)')}</span>
+          <span className="text-gray-400 tabular-nums shrink-0">
+            $0.00
+            <span className="text-gray-600"> · {fmtInt(emptyErrors.requests, locale)}</span>
+          </span>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -392,7 +415,10 @@ export default function AiProviderQuotas({
               valueKey="estimatedCostUsd"
               accent="#fb923c"
             />
-            <ModelSpendList models={data?.deepseek.period.byModel ?? []} locale={locale} />
+            <ModelSpendList models={data?.deepseek.period.byModel ?? []} locale={locale} tr={tr} />
+            <p className="mt-3 text-[11px] text-gray-600 leading-snug">
+              {tr('Остаток сверху — live-баланс DeepSeek. «Расход по логам» / столбики — сумма estimated_cost_usd из наших логов (оценка, может отличаться от списания в кабинете DeepSeek).')}
+            </p>
           </div>
         </section>
       </div>
