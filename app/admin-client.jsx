@@ -58,6 +58,9 @@ function loadEstFilters() {
       draftTo: normalizeDateInput(parsed.draftTo ?? parsed.dateTo ?? ''),
       appliedFrom: normalizeDateInput(parsed.appliedFrom ?? ''),
       appliedTo: normalizeDateInput(parsed.appliedTo ?? ''),
+      deepseekPeriod: parsed.deepseekPeriod === 'all' ? 'all' : '30d',
+      deepseekFilter: parsed.deepseekFilter === 'with' || parsed.deepseekFilter === 'none' ? parsed.deepseekFilter : 'all',
+      listSort: parsed.listSort === 'deepseek_usd' || parsed.listSort === 'deepseek_tokens' ? parsed.listSort : 'tree',
     }
     // Migrate session → local so filters survive closing the tab.
     try {
@@ -1862,6 +1865,10 @@ async function er(e) {
                 Email: "—" === e.owner_email ? "" : e.owner_email,
                 [tr("Email (ожидает confirm)")]: e.owner_pending_confirmation ? tr("да") : "",
                 Людей: e.employee_count,
+                [tr("DeepSeek $ (30д)")]: Number(e.deepseek_usd_30d) || 0,
+                [tr("DeepSeek токены (30д)")]: Number(e.deepseek_tokens_30d) || 0,
+                [tr("DeepSeek $ (всё)")]: Number(e.deepseek_usd_all) || 0,
+                [tr("DeepSeek токены (всё)")]: Number(e.deepseek_tokens_all) || 0,
                 [tr("Статус подписки")]: null !== (a = null == x ? void 0 : x.statusLabel) && void 0 !== a ? a : "",
                 Оплата: null !== (r = null == x ? void 0 : x.paymentLabel) && void 0 !== r ? r : "",
                 Промокод: null !== (s = null == x ? void 0 : x.promoCode) && void 0 !== s ? s : "",
@@ -2372,7 +2379,7 @@ function ey() {
             }) : null]
         })
     }
-    let [l, n] = (0, s.useState)([]), [i, o] = (0, s.useState)(!0), [d, c] = (0, s.useState)(""), [x, m] = (0, s.useState)("all"), [u, b] = (0, s.useState)("all"), [v, j] = (0, s.useState)("all"), [N, f] = (0, s.useState)("all"), [demoFilter, setDemoFilter] = (0, s.useState)(() => loadEstFilters()?.demoFilter || "hide"), [dateFrom, setDateFrom] = (0, s.useState)(() => loadEstFilters()?.draftFrom || ""), [dateTo, setDateTo] = (0, s.useState)(() => loadEstFilters()?.draftTo || ""), [appliedFrom, setAppliedFrom] = (0, s.useState)(() => loadEstFilters()?.appliedFrom || ""), [appliedTo, setAppliedTo] = (0, s.useState)(() => loadEstFilters()?.appliedTo || ""), [_, w] = (0, s.useState)(null), [k, C] = (0, s.useState)(null), [S, L] = (0, s.useState)(!1), [T, P] = (0, s.useState)(!1), E = (0, s.useCallback)(async () => {
+    let [l, n] = (0, s.useState)([]), [i, o] = (0, s.useState)(!0), [d, c] = (0, s.useState)(""), [x, m] = (0, s.useState)("all"), [u, b] = (0, s.useState)("all"), [v, j] = (0, s.useState)("all"), [N, f] = (0, s.useState)("all"), [demoFilter, setDemoFilter] = (0, s.useState)(() => loadEstFilters()?.demoFilter || "hide"), [dateFrom, setDateFrom] = (0, s.useState)(() => loadEstFilters()?.draftFrom || ""), [dateTo, setDateTo] = (0, s.useState)(() => loadEstFilters()?.draftTo || ""), [appliedFrom, setAppliedFrom] = (0, s.useState)(() => loadEstFilters()?.appliedFrom || ""), [appliedTo, setAppliedTo] = (0, s.useState)(() => loadEstFilters()?.appliedTo || ""), [deepseekPeriod, setDeepseekPeriod] = (0, s.useState)(() => loadEstFilters()?.deepseekPeriod || "30d"), [deepseekFilter, setDeepseekFilter] = (0, s.useState)(() => loadEstFilters()?.deepseekFilter || "all"), [listSort, setListSort] = (0, s.useState)(() => loadEstFilters()?.listSort || "tree"), [_, w] = (0, s.useState)(null), [k, C] = (0, s.useState)(null), [S, L] = (0, s.useState)(!1), [T, P] = (0, s.useState)(!1), E = (0, s.useCallback)(async () => {
         o(!0), w(null);
         let e = await fetch("/api/establishments"),
             t = await e.json();
@@ -2388,8 +2395,29 @@ function ey() {
             draftTo: dateTo,
             appliedFrom,
             appliedTo,
+            deepseekPeriod,
+            deepseekFilter,
+            listSort,
         })
-    }, [demoFilter, dateFrom, dateTo, appliedFrom, appliedTo]);
+    }, [demoFilter, dateFrom, dateTo, appliedFrom, appliedTo, deepseekPeriod, deepseekFilter, listSort]);
+    function deepseekUsd(row) {
+        return "all" === deepseekPeriod ? Number(row.deepseek_usd_all) || 0 : Number(row.deepseek_usd_30d) || 0
+    }
+    function deepseekTokens(row) {
+        return "all" === deepseekPeriod ? Number(row.deepseek_tokens_all) || 0 : Number(row.deepseek_tokens_30d) || 0
+    }
+    function deepseekCalls(row) {
+        return "all" === deepseekPeriod ? Number(row.deepseek_calls_all) || 0 : Number(row.deepseek_calls_30d) || 0
+    }
+    function fmtDeepseekUsd(n) {
+        return "$" + (Number(n) || 0).toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 4
+        })
+    }
+    function fmtDeepseekTokens(n) {
+        return (Number(n) || 0).toLocaleString(localeTag)
+    }
     let dateFilterActive = !!(appliedFrom || appliedTo),
         datesDirty = dateFrom !== appliedFrom || dateTo !== appliedTo,
         baseRows = (0, s.useMemo)(() => l.filter(e => {
@@ -2413,10 +2441,26 @@ function ey() {
             let i = d.toLowerCase(),
                 o = e.subscription_summary,
                 c = o ? [o.statusLabel, o.paymentLabel, o.promoCode, o.detail].filter(Boolean).join(" ").toLowerCase() : "";
-            return !!((e.id.toLowerCase().includes(i) || e.name.toLowerCase().includes(i) || e.owner_email.toLowerCase().includes(i) || e.owner_name.toLowerCase().includes(i) || (null !== (t = e.registration_ip) && void 0 !== t ? t : "").toLowerCase().includes(i) || (null !== (a = e.registration_country) && void 0 !== a ? a : "").toLowerCase().includes(i) || (null !== (r = e.registration_city) && void 0 !== r ? r : "").toLowerCase().includes(i) || (null !== (s = e.registration_client) && void 0 !== s ? s : "").toLowerCase().includes(i) || H(e).toLowerCase().includes(i) || (null !== (l = e.created_at) && void 0 !== l ? l : "").toLowerCase().includes(i) || ec(e.created_at).toLowerCase().includes(i) || c.includes(i) || (e.referral_level ? tr("ур. ").concat(e.referral_level).includes(i) || String(e.referral_level) === i : false)) && ("all" === x || e.establishment_type === x) && h(e.subscription_filter_key, u) && y(e.subscription_filter_key, v)) && (n = e.employee_count, "all" === N || ("0" === N ? 0 === n : "1" === N ? 1 === n : "2-5" === N ? !!(n >= 2) && !!(n <= 5) : !!(n >= 6)))
+            if (!((e.id.toLowerCase().includes(i) || e.name.toLowerCase().includes(i) || e.owner_email.toLowerCase().includes(i) || e.owner_name.toLowerCase().includes(i) || (null !== (t = e.registration_ip) && void 0 !== t ? t : "").toLowerCase().includes(i) || (null !== (a = e.registration_country) && void 0 !== a ? a : "").toLowerCase().includes(i) || (null !== (r = e.registration_city) && void 0 !== r ? r : "").toLowerCase().includes(i) || (null !== (s = e.registration_client) && void 0 !== s ? s : "").toLowerCase().includes(i) || H(e).toLowerCase().includes(i) || (null !== (l = e.created_at) && void 0 !== l ? l : "").toLowerCase().includes(i) || ec(e.created_at).toLowerCase().includes(i) || c.includes(i) || (e.referral_level ? tr("ур. ").concat(e.referral_level).includes(i) || String(e.referral_level) === i : false)) && ("all" === x || e.establishment_type === x) && h(e.subscription_filter_key, u) && y(e.subscription_filter_key, v)) && (n = e.employee_count, "all" === N || ("0" === N ? 0 === n : "1" === N ? 1 === n : "2-5" === N ? !!(n >= 2) && !!(n <= 5) : !!(n >= 6)))) return !1;
+            let spendUsd = deepseekUsd(e);
+            if ("with" === deepseekFilter && !(spendUsd > 0)) return !1;
+            if ("none" === deepseekFilter && spendUsd > 0) return !1;
+            return !0
         }),
         R = (0, s.useMemo)(() => new Set(D.map(e => e.id)), [D]),
-        U = (0, s.useMemo)(() => ea(baseRows).filter(e => R.has(e.id)), [baseRows, R]);
+        U = (0, s.useMemo)(() => {
+            if ("deepseek_usd" === listSort || "deepseek_tokens" === listSort) {
+                let rows = D.slice();
+                rows.sort((a, b) => {
+                    let av = "deepseek_tokens" === listSort ? deepseekTokens(a) : deepseekUsd(a);
+                    let bv = "deepseek_tokens" === listSort ? deepseekTokens(b) : deepseekUsd(b);
+                    if (bv !== av) return bv - av;
+                    return String(a.name || "").localeCompare(String(b.name || ""), "ru")
+                });
+                return rows
+            }
+            return ea(baseRows).filter(e => R.has(e.id))
+        }, [baseRows, R, D, listSort, deepseekPeriod]);
     function applyDateFilter() {
         let from = normalizeDateInput(dateFrom)
         let to = normalizeDateInput(dateTo)
@@ -2697,6 +2741,45 @@ function ey() {
                     value: "6+",
                     children: "6+"
                 })]
+            }), (0, r.jsxs)("select", {
+                value: deepseekPeriod,
+                onChange: e => setDeepseekPeriod(e.target.value === "all" ? "all" : "30d"),
+                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs w-full min-w-0 max-w-full",
+                children: [(0, r.jsx)("option", {
+                    value: "30d",
+                    children: tr("DeepSeek: 30 дн.")
+                }), (0, r.jsx)("option", {
+                    value: "all",
+                    children: tr("DeepSeek: всё время")
+                })]
+            }), (0, r.jsxs)("select", {
+                value: deepseekFilter,
+                onChange: e => setDeepseekFilter(e.target.value === "with" || e.target.value === "none" ? e.target.value : "all"),
+                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs w-full min-w-0 max-w-full",
+                children: [(0, r.jsx)("option", {
+                    value: "all",
+                    children: tr("Расход: все")
+                }), (0, r.jsx)("option", {
+                    value: "with",
+                    children: tr("Расход: есть $")
+                }), (0, r.jsx)("option", {
+                    value: "none",
+                    children: tr("Расход: $0")
+                })]
+            }), (0, r.jsxs)("select", {
+                value: listSort,
+                onChange: e => setListSort(e.target.value === "deepseek_usd" || e.target.value === "deepseek_tokens" ? e.target.value : "tree"),
+                className: "bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs w-full min-w-0 max-w-full col-span-2",
+                children: [(0, r.jsx)("option", {
+                    value: "tree",
+                    children: tr("Сорт.: дерево владельца")
+                }), (0, r.jsx)("option", {
+                    value: "deepseek_usd",
+                    children: tr("Сорт.: DeepSeek $ ↓")
+                }), (0, r.jsx)("option", {
+                    value: "deepseek_tokens",
+                    children: tr("Сорт.: токены ↓")
+                })]
             })]
         }), (0, r.jsxs)("div", {
             className: "mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-emerald-800/50 bg-emerald-950/25",
@@ -2898,8 +2981,54 @@ function ey() {
                                         children: "6+"
                                     })]
                                 })]
+                            }), (0, r.jsxs)("th", {
+                                className: "px-2 py-2 text-right w-[8%] align-top",
+                                title: tr("Оценка DeepSeek по логам (токены → $). Период и фильтр — ниже / в мобильных селектах."),
+                                children: [(0, r.jsx)("div", {
+                                    className: "mb-1",
+                                    children: tr("DeepSeek")
+                                }), (0, r.jsxs)("select", {
+                                    value: deepseekPeriod,
+                                    onChange: e => setDeepseekPeriod(e.target.value === "all" ? "all" : "30d"),
+                                    className: "w-full bg-gray-950 border border-gray-700 rounded-md px-0.5 py-0.5 text-[10px] text-gray-200 font-normal normal-case tracking-normal mb-0.5",
+                                    children: [(0, r.jsx)("option", {
+                                        value: "30d",
+                                        children: tr("30 дн.")
+                                    }), (0, r.jsx)("option", {
+                                        value: "all",
+                                        children: tr("всё время")
+                                    })]
+                                }), (0, r.jsxs)("select", {
+                                    value: deepseekFilter,
+                                    onChange: e => setDeepseekFilter(e.target.value === "with" || e.target.value === "none" ? e.target.value : "all"),
+                                    className: "w-full bg-gray-950 border border-gray-700 rounded-md px-0.5 py-0.5 text-[10px] text-gray-200 font-normal normal-case tracking-normal mb-0.5",
+                                    children: [(0, r.jsx)("option", {
+                                        value: "all",
+                                        children: tr("все")
+                                    }), (0, r.jsx)("option", {
+                                        value: "with",
+                                        children: tr("есть $")
+                                    }), (0, r.jsx)("option", {
+                                        value: "none",
+                                        children: "$0"
+                                    })]
+                                }), (0, r.jsxs)("select", {
+                                    value: listSort,
+                                    onChange: e => setListSort(e.target.value === "deepseek_usd" || e.target.value === "deepseek_tokens" ? e.target.value : "tree"),
+                                    className: "w-full bg-gray-950 border border-gray-700 rounded-md px-0.5 py-0.5 text-[10px] text-gray-200 font-normal normal-case tracking-normal",
+                                    children: [(0, r.jsx)("option", {
+                                        value: "tree",
+                                        children: tr("дерево")
+                                    }), (0, r.jsx)("option", {
+                                        value: "deepseek_usd",
+                                        children: "$ ↓"
+                                    }), (0, r.jsx)("option", {
+                                        value: "deepseek_tokens",
+                                        children: tr("ток. ↓")
+                                    })]
+                                })]
                             }), (0, r.jsx)("th", {
-                                className: "px-2 py-2 text-left w-[9%]",
+                                className: "px-2 py-2 text-left w-[8%]",
                                 children: tr("Регистрация")
                             }), (0, r.jsx)("th", {
                                 className: "px-2 py-2 text-left w-[7%]",
@@ -2926,7 +3055,7 @@ function ey() {
                                 children: [l.isOwnerGroupStart && (null !== (o = l.ownerGroupSize) && void 0 !== o ? o : 0) > 1 ? (0, r.jsx)("tr", {
                                     className: "bg-indigo-950/35 border-b border-indigo-900/40",
                                     children: (0, r.jsxs)("td", {
-                                        colSpan: 11,
+                                        colSpan: 12,
                                         className: "px-3 py-2 text-xs text-indigo-200/90",
                                         children: [(0, r.jsx)("span", {
                                             className: "font-medium",
@@ -3010,6 +3139,16 @@ function ey() {
                                             title: tr("Активные сотрудники этого заведения (1 человек с несколькими ролями = 1)"),
                                             children: l.employee_count
                                         })
+                                    }), (0, r.jsxs)("td", {
+                                        className: "px-2 py-2 text-right tabular-nums leading-snug",
+                                        title: tr("Оценка DeepSeek: $ и токены (логи). Вызовы: ") + fmtDeepseekTokens(deepseekCalls(l)),
+                                        children: [(0, r.jsx)("div", {
+                                            className: deepseekUsd(l) > 0 ? "text-orange-300 text-[11px] font-medium" : "text-gray-600 text-[11px]",
+                                            children: fmtDeepseekUsd(deepseekUsd(l))
+                                        }), (0, r.jsx)("div", {
+                                            className: "text-gray-500 text-[10px]",
+                                            children: fmtDeepseekTokens(deepseekTokens(l)) + " tok"
+                                        })]
                                     }), (0, r.jsx)("td", {
                                         className: "px-2 py-2 text-gray-500 text-[10px] leading-snug",
                                         title: l.created_at,
@@ -3112,6 +3251,10 @@ function ey() {
                             }), (0, r.jsx)("div", {
                                 className: "text-gray-500 text-xs",
                                 children: en(l)
+                            }), (0, r.jsxs)("div", {
+                                className: "text-orange-200/90 text-xs mt-1 tabular-nums",
+                                title: tr("Оценка DeepSeek: $ и токены (логи)"),
+                                children: [tr("DeepSeek: "), fmtDeepseekUsd(deepseekUsd(l)), " · ", fmtDeepseekTokens(deepseekTokens(l)), " tok"]
                             }), (0, r.jsxs)("div", {
                                 className: "text-gray-600 text-xs mt-1",
                                 title: l.created_at,

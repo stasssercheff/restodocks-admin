@@ -215,8 +215,17 @@ export default function AiProviderQuotas({
   const deepseekBal = pickPreferredBalance(data?.deepseek.live?.balances)
   const caption = rangeCaption(data?.meta, locale)
   const bucket: UsageBucket = data?.meta.chartBucket ?? 'day'
-  const chartTitle =
-    bucket === 'hour' ? tr('Стоимость по часам') : tr('Стоимость по дням')
+  const wallet = data?.deepseek.wallet
+  const walletReady = (wallet?.snapshotCount ?? 0) >= 2 || (wallet?.spendUsd ?? 0) > 0
+  const deepseekChartPoints = walletReady
+    ? (wallet?.series ?? [])
+    : (data?.deepseek.period.series ?? [])
+  const deepseekChartTotal = walletReady
+    ? (wallet?.spendUsd ?? 0)
+    : (data?.deepseek.period.estimatedCostUsd ?? 0)
+  const chartTitle = walletReady
+    ? (bucket === 'hour' ? tr('Списание с баланса по часам') : tr('Списание с баланса по дням'))
+    : (bucket === 'hour' ? tr('Стоимость по часам (оценка логов)') : tr('Стоимость по дням (оценка логов)'))
   const deeplChartTitle =
     bucket === 'hour' ? tr('По часам (логи)') : tr('По дням (логи)')
 
@@ -381,10 +390,21 @@ export default function AiProviderQuotas({
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-3">
-              <div className="text-[11px] text-gray-500">{tr('Расход по логам')}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="rounded-lg border border-orange-900/50 bg-orange-950/30 p-3">
+              <div className="text-[11px] text-orange-200/80">{tr('Списано с баланса')}</div>
               <div className="text-xl font-bold text-orange-300 mt-1">
+                {walletReady ? fmtUsd(wallet?.spendUsd ?? 0) : '—'}
+              </div>
+              <div className="text-[10px] text-gray-500 mt-1">
+                {walletReady
+                  ? tr('по снимкам /user/balance')
+                  : tr('копим снимки баланса…')}
+              </div>
+            </div>
+            <div className="rounded-lg border border-gray-800 bg-gray-950/40 p-3">
+              <div className="text-[11px] text-gray-500">{tr('Оценка по логам')}</div>
+              <div className="text-xl font-bold text-gray-300 mt-1">
                 {fmtUsd(data?.deepseek.period.estimatedCostUsd ?? 0)}
               </div>
             </div>
@@ -405,19 +425,22 @@ export default function AiProviderQuotas({
           <div className="mt-4">
             <div className="text-xs text-gray-500 mb-2">
               {chartTitle}
-              {data?.deepseek.period.estimatedCostUsd != null
-                ? ` ${fmtUsd(data.deepseek.period.estimatedCostUsd)}`
-                : null}
+              {` ${fmtUsd(deepseekChartTotal)}`}
             </div>
             <MiniBars
-              points={data?.deepseek.period.series ?? []}
+              points={deepseekChartPoints}
               bucket={bucket}
               valueKey="estimatedCostUsd"
               accent="#fb923c"
             />
             <ModelSpendList models={data?.deepseek.period.byModel ?? []} locale={locale} tr={tr} />
             <p className="mt-3 text-[11px] text-gray-600 leading-snug">
-              {tr('Остаток сверху — live-баланс DeepSeek. «Расход по логам» / столбики — сумма estimated_cost_usd из наших логов (оценка, может отличаться от списания в кабинете DeepSeek).')}
+              {walletReady
+                ? tr('График «Списание с баланса» — реальные дельты /user/balance (снимки каждые 5 мин + при открытии вкладки). Оценка по логам — отдельно. Расход по заведениям — во вкладке «Заведения».')
+                : tr('Снимки баланса пишутся каждые 5 минут автоматически. После 2+ снимков график совпадёт со списаниями в кабинете DeepSeek. Пока столбики — оценка по логам. Расход по заведениям — во вкладке «Заведения».')}
+              {wallet?.trackedFrom
+                ? ` ${tr('Учёт с')} ${new Date(wallet.trackedFrom).toLocaleString(locale)}.`
+                : null}
             </p>
           </div>
         </section>

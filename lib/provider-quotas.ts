@@ -6,17 +6,33 @@ import {
   type UsageBucket,
   type UsagePoint,
 } from '@/lib/ai-usage-series'
-import type { DeepseekBalanceRow } from '@/lib/provider-quota-format'
+import {
+  formatMoneyBalance,
+  pickPreferredBalance,
+  type DeepseekBalanceRow,
+} from '@/lib/provider-quota-format'
+import { normalizeSnapshot, type BalanceSnapshot } from '@/lib/provider-wallet-math'
+import { buildWalletSpendSeries } from '@/lib/provider-wallet-spend'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type { DeepseekBalanceRow }
-export { formatMoneyBalance, pickPreferredBalance } from '@/lib/provider-quota-format'
+export { formatMoneyBalance, pickPreferredBalance }
 export type { UsageBucket, UsagePoint }
+
+const SNAPSHOT_MIN_INTERVAL_MS = 2 * 60 * 1000
 
 export type DayAgg = UsagePoint
 
 export type ModelAgg = {
   model: string
+  requests: number
+  totalTokens: number
+  estimatedCostUsd: number
+}
+
+export type EstablishmentAgg = {
+  establishmentId: string | null
+  name: string
   requests: number
   totalTokens: number
   estimatedCostUsd: number
@@ -32,6 +48,7 @@ export type ProviderPeriod = {
   byDay: DayAgg[]
   byHour: DayAgg[]
   byModel: ModelAgg[]
+  byEstablishment: EstablishmentAgg[]
 }
 
 export type DeeplLiveUsage = {
@@ -64,6 +81,14 @@ export type ProviderQuotasPayload = {
     live: { is_available: boolean; balances: DeepseekBalanceRow[] } | null
     liveError: string | null
     period: ProviderPeriod
+    /** Real wallet deductions from /user/balance snapshots (matches prepaid spend). */
+    wallet: {
+      series: UsagePoint[]
+      spendUsd: number
+      trackedFrom: string | null
+      snapshotCount: number
+      currency: string
+    }
   }
 }
 
@@ -77,6 +102,7 @@ function emptyPeriod(bucket: UsageBucket = 'day'): ProviderPeriod {
     byDay: [],
     byHour: [],
     byModel: [],
+    byEstablishment: [],
   }
 }
 
@@ -106,6 +132,23 @@ function asModels(rows: unknown): ModelAgg[] {
   })
 }
 
+function asEstablishments(rows: unknown): EstablishmentAgg[] {
+  if (!Array.isArray(rows)) return []
+  return rows.map(row => {
+    const r = row as Record<string, unknown>
+    const rawId = r.establishmentId
+    const establishmentId =
+      rawId == null || rawId === '' || rawId === 'null' ? null : String(rawId)
+    return {
+      establishmentId,
+      name: String(r.name ?? '(unnamed)'),
+      requests: Number(r.requests) || 0,
+      totalTokens: Number(r.totalTokens) || 0,
+      estimatedCostUsd: Number(r.estimatedCostUsd) || 0,
+    }
+  })
+}
+
 async function periodFromRpc(
   supabase: SupabaseClient,
   provider: string,
@@ -128,11 +171,13 @@ async function periodFromRpc(
     byDay?: UsagePoint[]
     byHour?: UsagePoint[]
     byModel?: ModelAgg[]
+    byEstablishment?: EstablishmentAgg[]
   }
   const summary = payload.summary ?? {}
   const byDay = asPoints(payload.byDay)
   const byHour = asPoints(payload.byHour)
   const byModel = asModels(payload.byModel)
+  const byEstablishment = asEstablishments(payload.byEstablishment)
   const raw = bucket === 'hour' ? byHour : byDay
   return {
     requests: Number(summary.requests) || 0,
@@ -143,6 +188,7 @@ async function periodFromRpc(
     byDay,
     byHour,
     byModel,
+    byEstablishment,
   }
 }
 
@@ -221,6 +267,93 @@ async function fetchLiveQuotas(): Promise<{
   }
 }
 
+async function maybeRecordDeepseekSnapshot(
+  supabase: SupabaseClient,
+  live: { is_available: boolean; balances: DeepseekBalanceRow[] } | null,
+  fetchedAt: string | null,
+): Promise<BalanceSnapshot | null> {
+  const preferred = pickPreferredBalance(live?.balances)
+  if (!preferred) return null
+  const nowIso = fetchedAt || new Date().toISOString()
+  const current = normalizeSnapshot({
+    captured_at: nowIso,
+    currency: preferred.currency,
+    total_balance: preferred.total_balance,
+    granted_balance: preferred.granted_balance,
+    topped_up_balance: preferred.topped_up_balance,
+  })
+
+  const { data: lastRows } = await supabase
+    .from('provider_balance_snapshots')
+    .select('captured_at, currency, total_balance, granted_balance, topped_up_balance')
+    .eq('provider', 'deepseek')
+    .eq('currency', current.currency)
+    .order('captured_at', { ascending: false })
+    .limit(1)
+
+  const last = lastRows?.[0]
+    ? normalizeSnapshot(lastRows[0] as {
+      captured_at: string
+      currency: string
+      total_balance: unknown
+      granted_balance: unknown
+      topped_up_balance: unknown
+    })
+    : null
+
+  const ageMs = last ? Date.parse(nowIso) - Date.parse(last.captured_at) : Number.POSITIVE_INFINITY
+  const changed =
+    !last
+    || Math.abs(last.total_balance - current.total_balance) >= 0.01
+    || Math.abs(last.topped_up_balance - current.topped_up_balance) >= 0.01
+    || Math.abs(last.granted_balance - current.granted_balance) >= 0.01
+
+  if (!last || ageMs >= SNAPSHOT_MIN_INTERVAL_MS || changed) {
+    const { error } = await supabase.from('provider_balance_snapshots').insert({
+      provider: 'deepseek',
+      currency: current.currency,
+      captured_at: nowIso,
+      total_balance: current.total_balance,
+      granted_balance: current.granted_balance,
+      topped_up_balance: current.topped_up_balance,
+      is_available: live?.is_available !== false,
+    })
+    if (error) {
+      console.error('[provider-quotas] snapshot insert failed', error.message)
+    }
+  }
+
+  return current
+}
+
+async function loadDeepseekSnapshots(
+  supabase: SupabaseClient,
+  fromIso: string,
+  toIso: string,
+  currency: string,
+): Promise<BalanceSnapshot[]> {
+  // Include a little lookback so the first bucket has a previous end-of-bucket start.
+  const lookbackMs = 36 * 60 * 60 * 1000
+  const fromLookback = new Date(Date.parse(fromIso) - lookbackMs).toISOString()
+  const { data, error } = await supabase
+    .from('provider_balance_snapshots')
+    .select('captured_at, currency, total_balance, granted_balance, topped_up_balance')
+    .eq('provider', 'deepseek')
+    .eq('currency', currency)
+    .gte('captured_at', fromLookback)
+    .lte('captured_at', toIso)
+    .order('captured_at', { ascending: true })
+    .limit(5000)
+  if (error || !data) return []
+  return data.map(row => normalizeSnapshot(row as {
+    captured_at: string
+    currency: string
+    total_balance: unknown
+    granted_balance: unknown
+    topped_up_balance: unknown
+  }))
+}
+
 export async function buildProviderQuotas(opts: {
   tz?: string | null
   from?: string | null
@@ -249,6 +382,28 @@ export async function buildProviderQuotas(opts: {
   if ('error' in deeplPeriod) return { error: deeplPeriod.error }
   if ('error' in deepseekPeriod) return { error: deepseekPeriod.error }
 
+  const preferred = pickPreferredBalance(live.deepseek.live?.balances)
+  const currency = (preferred?.currency || 'USD').toUpperCase()
+  const liveSnap = await maybeRecordDeepseekSnapshot(
+    supabase,
+    live.deepseek.live,
+    live.fetchedAt,
+  )
+  const snapshots = await loadDeepseekSnapshots(supabase, fromIso, toIso, currency)
+  // Close the open window with the freshest live balance when it falls inside the range.
+  const liveEnd =
+    liveSnap && Date.parse(liveSnap.captured_at) <= Date.parse(toIso) + 60_000
+      ? liveSnap
+      : null
+  const wallet = buildWalletSpendSeries({
+    snapshots,
+    fromIso,
+    toIso,
+    timeZone: tz,
+    bucket: chartBucket,
+    liveEnd,
+  })
+
   return {
     meta: {
       rangeFrom,
@@ -270,6 +425,13 @@ export async function buildProviderQuotas(opts: {
       live: live.deepseek.live,
       liveError: live.deepseek.liveError,
       period: deepseekPeriod ?? emptyPeriod(chartBucket),
+      wallet: {
+        series: wallet.series,
+        spendUsd: wallet.spendUsd,
+        trackedFrom: wallet.trackedFrom,
+        snapshotCount: snapshots.length + (liveEnd ? 1 : 0),
+        currency,
+      },
     },
   }
 }
