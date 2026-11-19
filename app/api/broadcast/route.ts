@@ -1,139 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminRequest } from '@/lib/admin-auth'
 import { readAdminConfig } from '@/lib/admin-kv'
-import { createServiceClient, fetchAllRows, readEnv } from '@/lib/supabase-server'
+import {
+  matchingBroadcastRecipients,
+  parseBroadcastFilters,
+  searchBroadcastUsers,
+  type BroadcastRecipient,
+} from '@/lib/broadcast-recipients'
+import { createServiceClient, readEnv } from '@/lib/supabase-server'
 
-type EmployeeRow = {
-  id: string
-  email: string | null
-  roles: string[] | null
-  is_active: boolean | null
-  created_at: string | null
-  establishment_id: string
-}
-
-type EstRow = {
-  id: string
-  subscription_type: string | null
-  pro_paid_until: string | null
-  owner_id: string | null
-}
-
-function isOwner(roles: string[] | null): boolean {
-  return !!roles?.includes('owner')
-}
-
-function hasPaidLike(est: EstRow | undefined): boolean {
-  if (!est) return false
-  const type = (est.subscription_type ?? 'free').toLowerCase()
-  if (type && type !== 'free') return true
-  return !!(est.pro_paid_until && new Date(est.pro_paid_until).getTime() > Date.now())
-}
-
-async function matchingRecipients(params: {
-  userKind: string
-  subscriptionMode: string
-  subscriptionTypes: string[]
-  registeredFrom: string | null
-  registeredTo: string | null
-}): Promise<{ emails: string[] } | { error: string }> {
-  const supabase = createServiceClient()
-  if ('error' in supabase) return supabase
-
-  const employeesRes = await fetchAllRows<EmployeeRow>((from, to) => {
-    let query = supabase
-      .from('employees')
-      .select('id, email, roles, is_active, created_at, establishment_id')
-      .eq('is_active', true)
-      .not('email', 'is', null)
-      .range(from, to)
-    if (params.registeredFrom) query = query.gte('created_at', `${params.registeredFrom}T00:00:00.000Z`)
-    if (params.registeredTo) query = query.lte('created_at', `${params.registeredTo}T23:59:59.999Z`)
-    return query
-  })
-  if ('error' in employeesRes) return employeesRes
-
-  let employees = employeesRes.data.filter(row => row.email && row.email.includes('@'))
-  if (params.userKind === 'owners') employees = employees.filter(row => isOwner(row.roles))
-  if (params.userKind === 'line') employees = employees.filter(row => !isOwner(row.roles))
-
-  const estIds = [...new Set(employees.map(row => row.establishment_id))]
-  const estRes = estIds.length
-    ? await fetchAllRows<EstRow>((from, to) =>
-        supabase.from('establishments').select('id, subscription_type, pro_paid_until, owner_id').in('id', estIds).range(from, to),
-      )
-    : { data: [] as EstRow[] }
-  if ('error' in estRes) return estRes
-  const estById = new Map(estRes.data.map(item => [item.id, item]))
-
-  if (params.subscriptionMode === 'with_any_subscription') {
-    employees = employees.filter(row => hasPaidLike(estById.get(row.establishment_id)))
-  } else if (params.subscriptionMode === 'without_subscription') {
-    employees = employees.filter(row => !hasPaidLike(estById.get(row.establishment_id)))
-  } else if (params.subscriptionMode === 'with_specific_subscriptions' && params.subscriptionTypes.length) {
-    const wanted = new Set(params.subscriptionTypes.map(item => item.toLowerCase()))
-    employees = employees.filter(row => wanted.has((estById.get(row.establishment_id)?.subscription_type ?? '').toLowerCase()))
-  }
-
-  const emails = [...new Set(employees.map(row => row.email!.trim().toLowerCase()))]
-  return { emails }
-}
+const INBOX_CHUNK = 400
 
 function filtersFrom(req: NextRequest, body?: Record<string, unknown>) {
   const url = req.nextUrl
-  const userKind = String(body?.userKind ?? url.searchParams.get('userKind') ?? 'all')
-  const subscriptionMode = String(body?.subscriptionMode ?? url.searchParams.get('subscriptionMode') ?? 'all')
-  const typesRaw = body?.subscriptionTypes ?? url.searchParams.get('subscriptionTypes') ?? ''
-  const subscriptionTypes = Array.isArray(typesRaw)
-    ? typesRaw.map(item => String(item))
-    : String(typesRaw).split(',').map(item => item.trim()).filter(Boolean)
-  const registeredFrom = (body?.registeredFrom as string | null | undefined) ?? url.searchParams.get('registeredFrom')
-  const registeredTo = (body?.registeredTo as string | null | undefined) ?? url.searchParams.get('registeredTo')
-  return {
-    userKind,
-    subscriptionMode,
-    subscriptionTypes,
-    registeredFrom: registeredFrom || null,
-    registeredTo: registeredTo || null,
-  }
+  const statusesParam = body?.statuses ?? body?.subscriptionStatuses ?? url.searchParams.get('statuses')
+  const typesParam = body?.subscriptionTypes ?? url.searchParams.get('subscriptionTypes')
+  return parseBroadcastFilters({
+    userKind: body?.userKind ?? url.searchParams.get('userKind'),
+    statuses: statusesParam,
+    subscriptionMode: body?.subscriptionMode ?? url.searchParams.get('subscriptionMode'),
+    subscriptionTypes: typesParam,
+    registeredFrom: body?.registeredFrom ?? url.searchParams.get('registeredFrom'),
+    registeredTo: body?.registeredTo ?? url.searchParams.get('registeredTo'),
+    excludeDemo: body?.excludeDemo ?? url.searchParams.get('excludeDemo'),
+    employeeId: body?.employeeId ?? url.searchParams.get('employeeId'),
+    employeeIds: body?.employeeIds ?? url.searchParams.get('employeeIds'),
+  })
 }
 
-export async function GET(req: NextRequest) {
-  const auth = await requireAdminRequest(req, 'broadcast')
-  if ('response' in auth) return auth.response
-
-  const result = await matchingRecipients(filtersFrom(req))
-  if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
-  return NextResponse.json({ count: result.emails.length })
+function channelsFrom(body?: Record<string, unknown>, url?: URL) {
+  const inboxRaw = body?.channelInbox ?? url?.searchParams.get('channelInbox')
+  const emailRaw = body?.channelEmail ?? url?.searchParams.get('channelEmail')
+  // Defaults: inbox on, email off (new primary channel is in-app system DM).
+  const channelInbox = inboxRaw === undefined || inboxRaw === null || inboxRaw === ''
+    ? true
+    : inboxRaw === true || inboxRaw === '1' || inboxRaw === 'true'
+  const channelEmail = emailRaw === true || emailRaw === '1' || emailRaw === 'true'
+  return { channelInbox, channelEmail }
 }
 
-export async function POST(req: NextRequest) {
-  const auth = await requireAdminRequest(req, 'broadcast')
-  if ('response' in auth) return auth.response
+function inboxContent(subject: string, body: string): string {
+  const s = subject.trim()
+  const b = body.trim()
+  if (s && b) return `${s}\n\n${b}`
+  return s || b
+}
 
-  const body = await req.json().catch(() => ({})) as Record<string, unknown>
-  const subject = typeof body.subject === 'string' ? body.subject.trim() : ''
-  const text = typeof body.body === 'string' ? body.body.trim() : ''
-  if (!subject || !text) {
-    return NextResponse.json({ error: 'Укажите тему и текст письма' }, { status: 400 })
+async function sendSystemInbox(
+  recipients: BroadcastRecipient[],
+  content: string,
+): Promise<{ inserted: number; error?: string }> {
+  const supabase = createServiceClient()
+  if ('error' in supabase) return { inserted: 0, error: supabase.error }
+
+  let inserted = 0
+  const ids = recipients.map(r => r.employeeId)
+  for (let i = 0; i < ids.length; i += INBOX_CHUNK) {
+    const chunk = ids.slice(i, i + INBOX_CHUNK)
+    const { data, error } = await supabase.rpc('admin_broadcast_system_dm', {
+      p_employee_ids: chunk,
+      p_content: content,
+      p_links: [],
+    })
+    if (error) {
+      return { inserted, error: error.message }
+    }
+    const n = Number((data as { inserted?: number } | null)?.inserted) || 0
+    inserted += n
   }
+  return { inserted }
+}
 
-  const result = await matchingRecipients(filtersFrom(req, body))
-  if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
+async function sendEmails(
+  recipients: BroadcastRecipient[],
+  subject: string,
+  text: string,
+): Promise<{ sent: number; failed: number; skippedNoEmail: number; errors: string[] }> {
+  const withEmail = recipients.filter(r => r.email)
+  const skippedNoEmail = recipients.length - withEmail.length
+  const uniqueEmails = [...new Set(withEmail.map(r => r.email!))]
 
   const apiKey = await readAdminConfig('resend_api_key') || readEnv('RESEND_API_KEY')
   const fromEmail = await readAdminConfig('resend_from_email') || readEnv('RESEND_FROM_EMAIL') || 'Restodocks <info@restodocks.com>'
   if (!apiKey) {
-    return NextResponse.json({
-      error: 'Resend не настроен: в ADMIN_CONFIG нет ключа resend_api_key (или RESEND_API_KEY).',
-      recipientCount: result.emails.length,
-    }, { status: 503 })
+    return {
+      sent: 0,
+      failed: uniqueEmails.length,
+      skippedNoEmail,
+      errors: ['Resend не настроен: нет resend_api_key / RESEND_API_KEY'],
+    }
   }
 
   let sent = 0
   let failed = 0
   const errors: string[] = []
-  for (const email of result.emails) {
+  for (const email of uniqueEmails) {
     try {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -158,12 +119,115 @@ export async function POST(req: NextRequest) {
       if (errors.length < 8) errors.push(`${email}: ${err instanceof Error ? err.message : 'send_failed'}`)
     }
   }
+  return { sent, failed, skippedNoEmail, errors }
+}
 
+export async function GET(req: NextRequest) {
+  const auth = await requireAdminRequest(req, 'broadcast')
+  if ('response' in auth) return auth.response
+
+  const mode = req.nextUrl.searchParams.get('mode')
+  if (mode === 'search') {
+    const q = req.nextUrl.searchParams.get('q') ?? ''
+    const result = await searchBroadcastUsers(q, { limit: 30, excludeDemo: true })
+    if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
+    return NextResponse.json({ users: result.users })
+  }
+
+  const filters = filtersFrom(req)
+  const result = await matchingBroadcastRecipients(filters)
+  if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
+
+  const withEmail = result.recipients.filter(r => r.email).length
+  const PREVIEW_CAP = 200
+  const recipients = result.recipients.slice(0, PREVIEW_CAP).map(r => ({
+    employeeId: r.employeeId,
+    fullName: r.fullName ?? null,
+    email: r.email,
+    establishmentId: r.establishmentId,
+    establishmentName: r.establishmentName ?? null,
+    isOwner: r.isOwner,
+  }))
   return NextResponse.json({
-    sent,
-    failed,
-    recipientCount: result.emails.length,
-    errors,
-    message: `Отправлено: ${sent}${failed > 0 ? `, не доставлено (ошибки API): ${failed}` : ''}. В списке было: ${result.emails.length}.`,
+    count: result.recipients.length,
+    withEmail,
+    owners: result.recipients.filter(r => r.isOwner).length,
+    recipients,
+    recipientsTruncated: result.recipients.length > PREVIEW_CAP,
   })
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requireAdminRequest(req, 'broadcast')
+  if ('response' in auth) return auth.response
+
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>
+  const subject = typeof body.subject === 'string' ? body.subject.trim() : ''
+  const text = typeof body.body === 'string' ? body.body.trim() : ''
+  const { channelInbox, channelEmail } = channelsFrom(body)
+
+  if (!channelInbox && !channelEmail) {
+    return NextResponse.json({ error: 'Выберите канал: сообщения в аккаунт и/или email' }, { status: 400 })
+  }
+  if (!text) {
+    return NextResponse.json({ error: 'Укажите текст сообщения' }, { status: 400 })
+  }
+  if (channelEmail && !subject) {
+    return NextResponse.json({ error: 'Для email укажите тему письма' }, { status: 400 })
+  }
+
+  const filters = filtersFrom(req, body)
+  if (filters.subscriptionTypes.length > 0 && filters.statuses.length === 0) {
+    // types alone are fine (OR branch)
+  }
+
+  const result = await matchingBroadcastRecipients(filters)
+  if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
+
+  const recipients = result.recipients
+  if ((filters.employeeIds?.length || filters.employeeId) && recipients.length === 0) {
+    return NextResponse.json({ error: 'Пользователи не найдены или недоступны (демо / неактивны)' }, { status: 404 })
+  }
+  let inboxInserted = 0
+  let inboxError: string | undefined
+  let emailSent = 0
+  let emailFailed = 0
+  let emailSkipped = 0
+  let emailErrors: string[] = []
+
+  if (channelInbox) {
+    const inbox = await sendSystemInbox(recipients, inboxContent(subject, text))
+    inboxInserted = inbox.inserted
+    inboxError = inbox.error
+  }
+
+  if (channelEmail) {
+    const mail = await sendEmails(recipients, subject || 'Restodocks', text)
+    emailSent = mail.sent
+    emailFailed = mail.failed
+    emailSkipped = mail.skippedNoEmail
+    emailErrors = mail.errors
+  }
+
+  const parts: string[] = []
+  if (channelInbox) {
+    parts.push(inboxError
+      ? `Входящие: ошибка после ${inboxInserted} (${inboxError})`
+      : `Входящие (системные): ${inboxInserted}`)
+  }
+  if (channelEmail) {
+    parts.push(`Email: отправлено ${emailSent}${emailFailed ? `, ошибок ${emailFailed}` : ''}${emailSkipped ? `, без email ${emailSkipped}` : ''}`)
+  }
+
+  const status = inboxError && inboxInserted === 0 && emailSent === 0 ? 500 : 200
+  return NextResponse.json({
+    recipientCount: recipients.length,
+    inboxInserted,
+    inboxError: inboxError ?? null,
+    emailSent,
+    emailFailed,
+    emailSkippedNoEmail: emailSkipped,
+    errors: emailErrors,
+    message: `${parts.join('. ')}. Получателей в фильтре: ${recipients.length}.`,
+  }, { status })
 }
