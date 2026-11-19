@@ -6445,11 +6445,16 @@ function eL() {
 
 function eT() {
     const tr = useAdminTr();
-    let [userKind, setUserKind] = (0, s.useState)("owners"),
+    let [targetMode, setTargetMode] = (0, s.useState)("group"),
+        [userKind, setUserKind] = (0, s.useState)("owners"),
         [statuses, setStatuses] = (0, s.useState)([]),
         [subTypes, setSubTypes] = (0, s.useState)([]),
         [dateFrom, setDateFrom] = (0, s.useState)(""),
         [dateTo, setDateTo] = (0, s.useState)(""),
+        [pickedUser, setPickedUser] = (0, s.useState)(null),
+        [userQuery, setUserQuery] = (0, s.useState)(""),
+        [userHits, setUserHits] = (0, s.useState)([]),
+        [userSearching, setUserSearching] = (0, s.useState)(!1),
         [channelInbox, setChannelInbox] = (0, s.useState)(!0),
         [channelEmail, setChannelEmail] = (0, s.useState)(!1),
         [subject, setSubject] = (0, s.useState)(""),
@@ -6459,7 +6464,8 @@ function eT() {
         [counting, setCounting] = (0, s.useState)(!1),
         [sending, setSending] = (0, s.useState)(!1),
         [error, setError] = (0, s.useState)(null),
-        [okMsg, setOkMsg] = (0, s.useState)(null);
+        [okMsg, setOkMsg] = (0, s.useState)(null),
+        searchTimerRef = (0, s.useRef)(null);
 
     function bumpFilters() {
         setCount(null), setWithEmail(null)
@@ -6475,8 +6481,54 @@ function eT() {
         setSubTypes(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key])
     }
 
+    function selectOneUser(u) {
+        setPickedUser(u);
+        setUserHits([]);
+        setUserQuery("");
+        setCount(1);
+        setWithEmail(u.email ? 1 : 0);
+        setError(null)
+    }
+
+    function clearPickedUser() {
+        setPickedUser(null);
+        bumpFilters()
+    }
+
+    async function searchUsers(q) {
+        setUserSearching(!0);
+        try {
+            let params = new URLSearchParams({
+                mode: "search",
+                q: q || ""
+            });
+            let res = await fetch("/api/broadcast?".concat(params.toString())),
+                json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setError("string" == typeof(null == json ? void 0 : json.error) ? json.error : tr("Ошибка (").concat(res.status, ")"));
+                setUserHits([]);
+                return
+            }
+            setUserHits(Array.isArray(null == json ? void 0 : json.users) ? json.users : [])
+        } finally {
+            setUserSearching(!1)
+        }
+    }
+
+    function onUserQueryChange(value) {
+        setUserQuery(value);
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+        searchTimerRef.current = setTimeout(() => {
+            void searchUsers(value.trim())
+        }, 280)
+    }
+
     function queryParams() {
         let q = new URLSearchParams;
+        if ("one" === targetMode && pickedUser) {
+            q.set("employeeId", pickedUser.employeeId);
+            return q
+        }
         q.set("userKind", userKind);
         if (statuses.length) q.set("statuses", statuses.join(","));
         if (subTypes.length) q.set("subscriptionTypes", subTypes.join(","));
@@ -6486,6 +6538,16 @@ function eT() {
     }
 
     async function doCount() {
+        if ("one" === targetMode) {
+            if (!pickedUser) {
+                setError(tr("Выберите пользователя из списка"));
+                return
+            }
+            setCount(1);
+            setWithEmail(pickedUser.email ? 1 : 0);
+            setError(null);
+            return
+        }
         setCounting(!0), setError(null), setOkMsg(null);
         try {
             let res = await fetch("/api/broadcast?".concat(queryParams().toString())),
@@ -6516,29 +6578,41 @@ function eT() {
             setError(tr("Для email укажите тему письма"));
             return
         }
-        let who = "owners" === userKind ? tr("собственники") : "line" === userKind ? tr("линейный персонал") : tr("все пользователи");
-        let statusLabel = statuses.length ? statuses.map(st => "trial" === st ? tr("триал") : "paid" === st ? tr("с подпиской") : tr("без подписки")).join(", ") : tr("любой статус");
-        let typesLabel = subTypes.length ? subTypes.map(t => d(t)).join(", ") : "—";
+        if ("one" === targetMode && !pickedUser) {
+            setError(tr("Выберите пользователя из списка"));
+            return
+        }
+        let who = "one" === targetMode && pickedUser
+            ? (pickedUser.fullName || pickedUser.email || pickedUser.employeeId) + (pickedUser.establishmentName ? " · " + pickedUser.establishmentName : "")
+            : "owners" === userKind ? tr("собственники") : "line" === userKind ? tr("линейный персонал") : tr("все пользователи");
+        let statusLabel = "one" === targetMode ? "—" : statuses.length ? statuses.map(st => "trial" === st ? tr("триал") : "paid" === st ? tr("с подпиской") : tr("без подписки")).join(", ") : tr("любой статус");
+        let typesLabel = "one" === targetMode ? "—" : subTypes.length ? subTypes.map(t => d(t)).join(", ") : "—";
         let channels = [channelInbox ? tr("сообщения в аккаунт") : null, channelEmail ? "email" : null].filter(Boolean).join(" + ");
-        if (!window.confirm(tr("Отправить рассылку?") + "\n\n" + tr("Кто") + ": " + who + "\n" + tr("Статус") + ": " + statusLabel + "\n" + tr("Типы подписки") + ": " + typesLabel + "\n" + tr("Регистрация") + ": " + (dateFrom || tr("любая")) + " — " + (dateTo || tr("любая")) + "\n" + tr("Каналы") + ": " + channels + "\n" + tr("Получателей") + ": " + (null != count ? count : "—"))) return;
+        let recipCount = "one" === targetMode ? 1 : null != count ? count : "—";
+        if (!window.confirm(tr("Отправить рассылку?") + "\n\n" + tr("Кто") + ": " + who + "\n" + tr("Статус") + ": " + statusLabel + "\n" + tr("Типы подписки") + ": " + typesLabel + "\n" + tr("Регистрация") + ": " + ("one" === targetMode ? "—" : (dateFrom || tr("любая")) + " — " + (dateTo || tr("любая"))) + "\n" + tr("Каналы") + ": " + channels + "\n" + tr("Получателей") + ": " + recipCount)) return;
         setSending(!0), setError(null), setOkMsg(null);
         try {
+            let payload = {
+                channelInbox,
+                channelEmail,
+                subject: subj,
+                body: text
+            };
+            if ("one" === targetMode && pickedUser) {
+                payload.employeeId = pickedUser.employeeId
+            } else {
+                payload.userKind = userKind;
+                payload.statuses = statuses;
+                payload.subscriptionTypes = subTypes;
+                payload.registeredFrom = dateFrom.trim() || null;
+                payload.registeredTo = dateTo.trim() || null
+            }
             let res = await fetch("/api/broadcast", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
-                    body: JSON.stringify({
-                        userKind,
-                        statuses,
-                        subscriptionTypes: subTypes,
-                        registeredFrom: dateFrom.trim() || null,
-                        registeredTo: dateTo.trim() || null,
-                        channelInbox,
-                        channelEmail,
-                        subject: subj,
-                        body: text
-                    })
+                    body: JSON.stringify(payload)
                 }),
                 json = await res.json().catch(() => ({}));
             if (!res.ok) {
@@ -6553,7 +6627,7 @@ function eT() {
         }
     }
 
-    let canSend = body.trim().length > 0 && (channelInbox || channelEmail) && (!channelEmail || subject.trim().length > 0);
+    let canSend = body.trim().length > 0 && (channelInbox || channelEmail) && (!channelEmail || subject.trim().length > 0) && ("group" === targetMode || !!pickedUser);
 
     return (0, r.jsxs)("div", {
         className: "space-y-4 max-w-2xl",
@@ -6570,7 +6644,7 @@ function eT() {
                 children: tr("Рассылка")
             }), (0, r.jsx)("p", {
                 className: "text-xs text-gray-500 leading-relaxed",
-                children: tr("Системные сообщения появляются во «Входящих» аккаунта (чат с системой). Email — опционально через Resend. Фильтры комбинируются: роль + статусы (триал / подписка / без) + типы тарифа. Демо-кухни не входят.")
+                children: tr("Системные сообщения появляются во «Входящих» аккаунта (чат с системой). Email — опционально через Resend. Фильтры комбинируются: роль + статусы (триал / подписка / без) + типы тарифа. Можно выбрать одного пользователя. Демо-кухни не входят.")
             }), (0, r.jsxs)("div", {
                 className: "space-y-2",
                 children: [(0, r.jsx)("div", {
@@ -6608,9 +6682,9 @@ function eT() {
                         children: [(0, r.jsx)("input", {
                             type: "radio",
                             name: "broadcast_audience",
-                            checked: "all" === userKind,
+                            checked: "group" === targetMode && "all" === userKind,
                             onChange: () => {
-                                setUserKind("all"), bumpFilters()
+                                setTargetMode("group"), setUserKind("all"), clearPickedUser(), bumpFilters()
                             }
                         }), tr("Все пользователи")]
                     }), (0, r.jsxs)("label", {
@@ -6618,9 +6692,9 @@ function eT() {
                         children: [(0, r.jsx)("input", {
                             type: "radio",
                             name: "broadcast_audience",
-                            checked: "owners" === userKind,
+                            checked: "group" === targetMode && "owners" === userKind,
                             onChange: () => {
-                                setUserKind("owners"), bumpFilters()
+                                setTargetMode("group"), setUserKind("owners"), clearPickedUser(), bumpFilters()
                             }
                         }), tr("Собственники (owner)")]
                     }), (0, r.jsxs)("label", {
@@ -6628,80 +6702,149 @@ function eT() {
                         children: [(0, r.jsx)("input", {
                             type: "radio",
                             name: "broadcast_audience",
-                            checked: "line" === userKind,
+                            checked: "group" === targetMode && "line" === userKind,
                             onChange: () => {
-                                setUserKind("line"), bumpFilters()
+                                setTargetMode("group"), setUserKind("line"), clearPickedUser(), bumpFilters()
                             }
                         }), tr("Линейный персонал")]
+                    }), (0, r.jsxs)("label", {
+                        className: "flex items-center gap-2 cursor-pointer",
+                        children: [(0, r.jsx)("input", {
+                            type: "radio",
+                            name: "broadcast_audience",
+                            checked: "one" === targetMode,
+                            onChange: () => {
+                                setTargetMode("one"), bumpFilters();
+                                if (!pickedUser) void searchUsers("")
+                            }
+                        }), tr("Конкретный пользователь")]
                     })]
                 })]
-            }), (0, r.jsxs)("div", {
+            }), "one" === targetMode ? (0, r.jsxs)("div", {
                 className: "space-y-2",
-                children: [(0, r.jsx)("div", {
-                    className: "text-xs text-gray-400",
-                    children: tr("Статус подписки (можно несколько — OR)")
-                }), (0, r.jsxs)("div", {
-                    className: "flex flex-wrap gap-4 text-sm",
-                    children: [(0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "checkbox",
-                            checked: statuses.includes("trial"),
-                            onChange: () => toggleStatus("trial")
-                        }), tr("На триальном месяце")]
-                    }), (0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "checkbox",
-                            checked: statuses.includes("paid"),
-                            onChange: () => toggleStatus("paid")
-                        }), tr("С подпиской (любая)")]
-                    }), (0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "checkbox",
-                            checked: statuses.includes("none"),
-                            onChange: () => toggleStatus("none")
-                        }), tr("Без подписки")]
+                children: [pickedUser ? (0, r.jsxs)("div", {
+                    className: "flex flex-wrap items-start justify-between gap-2 rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2 text-sm",
+                    children: [(0, r.jsxs)("div", {
+                        className: "min-w-0",
+                        children: [(0, r.jsx)("div", {
+                            className: "text-white font-medium truncate",
+                            children: pickedUser.fullName || pickedUser.email || pickedUser.employeeId
+                        }), (0, r.jsx)("div", {
+                            className: "text-xs text-gray-400 truncate",
+                            children: (pickedUser.email || "—") + (pickedUser.establishmentName ? " · " + pickedUser.establishmentName : "") + (pickedUser.isOwner ? " · owner" : "")
+                        })]
+                    }), (0, r.jsx)("button", {
+                        type: "button",
+                        onClick: () => {
+                            clearPickedUser();
+                            void searchUsers(userQuery.trim())
+                        },
+                        className: "text-xs text-gray-400 hover:text-white shrink-0",
+                        children: tr("Сменить")
                     })]
-                }), (0, r.jsx)("div", {
-                    className: "text-[11px] text-gray-600",
-                    children: tr("Ничего не отмечено = любой статус. Типы тарифа ниже тоже OR и комбинируются со статусами.")
-                }), (0, r.jsx)("div", {
-                    className: "grid sm:grid-cols-3 gap-2 text-sm pt-1",
-                    children: i.map(tier => {
-                        let on = subTypes.includes(tier);
-                        return (0, r.jsxs)("label", {
+                }) : (0, r.jsxs)(r.Fragment, {
+                    children: [(0, r.jsx)("input", {
+                        type: "search",
+                        value: userQuery,
+                        onChange: e => onUserQueryChange(e.target.value),
+                        onFocus: () => {
+                            if (!userHits.length && !userSearching) void searchUsers(userQuery.trim())
+                        },
+                        placeholder: tr("Поиск по имени или email…"),
+                        className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                    }), userSearching && (0, r.jsx)("div", {
+                        className: "text-xs text-gray-500",
+                        children: tr("Поиск…")
+                    }),                     !userSearching && userHits.length > 0 && (0, r.jsx)("ul", {
+                        className: "max-h-56 overflow-y-auto rounded-lg border border-gray-700 divide-y divide-gray-800",
+                        children: userHits.map(u => (0, r.jsx)("li", {
+                            children: (0, r.jsxs)("button", {
+                                type: "button",
+                                onClick: () => selectOneUser(u),
+                                className: "w-full text-left px-3 py-2 hover:bg-gray-800 text-sm",
+                                children: [(0, r.jsx)("div", {
+                                    className: "text-white truncate",
+                                    children: u.fullName || u.email || u.employeeId
+                                }), (0, r.jsx)("div", {
+                                    className: "text-xs text-gray-500 truncate",
+                                    children: (u.email || "—") + (u.establishmentName ? " · " + u.establishmentName : "") + (u.isOwner ? " · owner" : "")
+                                })]
+                            })
+                        }, u.employeeId))
+                    }), !userSearching && 0 === userHits.length && (0, r.jsx)("div", {
+                        className: "text-xs text-gray-500",
+                        children: tr("Никого не найдено")
+                    })]
+                })]
+            }) : (0, r.jsxs)(r.Fragment, {
+                children: [(0, r.jsxs)("div", {
+                    className: "space-y-2",
+                    children: [(0, r.jsx)("div", {
+                        className: "text-xs text-gray-400",
+                        children: tr("Статус подписки (можно несколько — OR)")
+                    }), (0, r.jsxs)("div", {
+                        className: "flex flex-wrap gap-4 text-sm",
+                        children: [(0, r.jsxs)("label", {
                             className: "flex items-center gap-2 cursor-pointer",
                             children: [(0, r.jsx)("input", {
                                 type: "checkbox",
-                                checked: on,
-                                onChange: () => toggleSubType(tier)
-                            }), d(tier)]
-                        }, tier)
-                    })
-                })]
-            }), (0, r.jsxs)("div", {
-                className: "space-y-2",
-                children: [(0, r.jsx)("div", {
-                    className: "text-xs text-gray-400",
-                    children: tr("Диапазон регистрации (дата создания аккаунта)")
+                                checked: statuses.includes("trial"),
+                                onChange: () => toggleStatus("trial")
+                            }), tr("На триальном месяце")]
+                        }), (0, r.jsxs)("label", {
+                            className: "flex items-center gap-2 cursor-pointer",
+                            children: [(0, r.jsx)("input", {
+                                type: "checkbox",
+                                checked: statuses.includes("paid"),
+                                onChange: () => toggleStatus("paid")
+                            }), tr("С подпиской (любая)")]
+                        }), (0, r.jsxs)("label", {
+                            className: "flex items-center gap-2 cursor-pointer",
+                            children: [(0, r.jsx)("input", {
+                                type: "checkbox",
+                                checked: statuses.includes("none"),
+                                onChange: () => toggleStatus("none")
+                            }), tr("Без подписки")]
+                        })]
+                    }), (0, r.jsx)("div", {
+                        className: "text-[11px] text-gray-600",
+                        children: tr("Ничего не отмечено = любой статус. Типы тарифа ниже тоже OR и комбинируются со статусами.")
+                    }), (0, r.jsx)("div", {
+                        className: "grid sm:grid-cols-3 gap-2 text-sm pt-1",
+                        children: i.map(tier => {
+                            let on = subTypes.includes(tier);
+                            return (0, r.jsxs)("label", {
+                                className: "flex items-center gap-2 cursor-pointer",
+                                children: [(0, r.jsx)("input", {
+                                    type: "checkbox",
+                                    checked: on,
+                                    onChange: () => toggleSubType(tier)
+                                }), d(tier)]
+                            }, tier)
+                        })
+                    })]
                 }), (0, r.jsxs)("div", {
-                    className: "grid sm:grid-cols-2 gap-2",
-                    children: [(0, r.jsx)("input", {
-                        type: "date",
-                        value: dateFrom,
-                        onChange: e => {
-                            setDateFrom(e.target.value), bumpFilters()
-                        },
-                        className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-                    }), (0, r.jsx)("input", {
-                        type: "date",
-                        value: dateTo,
-                        onChange: e => {
-                            setDateTo(e.target.value), bumpFilters()
-                        },
-                        className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                    className: "space-y-2",
+                    children: [(0, r.jsx)("div", {
+                        className: "text-xs text-gray-400",
+                        children: tr("Диапазон регистрации (дата создания аккаунта)")
+                    }), (0, r.jsxs)("div", {
+                        className: "grid sm:grid-cols-2 gap-2",
+                        children: [(0, r.jsx)("input", {
+                            type: "date",
+                            value: dateFrom,
+                            onChange: e => {
+                                setDateFrom(e.target.value), bumpFilters()
+                            },
+                            className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                        }), (0, r.jsx)("input", {
+                            type: "date",
+                            value: dateTo,
+                            onChange: e => {
+                                setDateTo(e.target.value), bumpFilters()
+                            },
+                            className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                        })]
                     })]
                 })]
             }), (0, r.jsxs)("div", {
@@ -6709,7 +6852,7 @@ function eT() {
                 children: [(0, r.jsx)("button", {
                     type: "button",
                     onClick: () => void doCount(),
-                    disabled: counting,
+                    disabled: counting || "one" === targetMode && !pickedUser,
                     className: "bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
                     children: counting ? tr("Подсчёт…") : tr("Подсчитать получателей")
                 }), null !== count && (0, r.jsxs)("span", {

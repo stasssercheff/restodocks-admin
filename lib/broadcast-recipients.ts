@@ -21,11 +21,23 @@ export type BroadcastRecipient = {
   email: string | null
   establishmentId: string
   isOwner: boolean
+  fullName?: string | null
+  establishmentName?: string | null
+}
+
+export type BroadcastUserOption = {
+  employeeId: string
+  fullName: string | null
+  email: string | null
+  establishmentId: string
+  establishmentName: string | null
+  isOwner: boolean
 }
 
 type EmployeeRow = {
   id: string
   email: string | null
+  full_name: string | null
   roles: string[] | null
   is_active: boolean | null
   created_at: string | null
@@ -54,10 +66,39 @@ export async function matchingBroadcastRecipients(
 
   const excludeDemo = filters.excludeDemo !== false
 
+  // Single-user target: ignore group filters.
+  if (filters.employeeId) {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('id, email, full_name, roles, is_active, created_at, establishment_id')
+      .eq('id', filters.employeeId)
+      .maybeSingle()
+    if (error) return { error: error.message }
+    if (!data || data.is_active === false) return { recipients: [] }
+    const est = await supabase
+      .from('establishments')
+      .select('id, name, is_demo')
+      .eq('id', data.establishment_id)
+      .maybeSingle()
+    if (est.error) return { error: est.error.message }
+    if (excludeDemo && est.data?.is_demo) return { recipients: [] }
+    const email = data.email?.trim() || null
+    return {
+      recipients: [{
+        employeeId: data.id,
+        email: email && email.includes('@') ? email.toLowerCase() : null,
+        establishmentId: data.establishment_id,
+        isOwner: isOwnerRoles(data.roles),
+        fullName: data.full_name,
+        establishmentName: est.data?.name ?? null,
+      }],
+    }
+  }
+
   const employeesRes = await fetchAllRows<EmployeeRow>((from, to) => {
     let query = supabase
       .from('employees')
-      .select('id, email, roles, is_active, created_at, establishment_id')
+      .select('id, email, full_name, roles, is_active, created_at, establishment_id')
       .eq('is_active', true)
       .order('id', { ascending: true })
       .range(from, to)
@@ -106,8 +147,67 @@ export async function matchingBroadcastRecipients(
       email: email && email.includes('@') ? email.toLowerCase() : null,
       establishmentId: row.establishment_id,
       isOwner: isOwnerRoles(row.roles),
+      fullName: row.full_name,
     })
   }
 
   return { recipients }
+}
+
+/** Search active employees for the single-recipient picker. */
+export async function searchBroadcastUsers(
+  q: string,
+  opts?: { limit?: number; excludeDemo?: boolean },
+  supabaseClient?: SupabaseClient,
+): Promise<{ users: BroadcastUserOption[] } | { error: string }> {
+  const supabase = supabaseClient ?? createServiceClient()
+  if ('error' in supabase) return supabase
+
+  const needle = q.trim().replace(/[%_,()]/g, ' ').replace(/\s+/g, ' ').slice(0, 80)
+  const limit = Math.min(Math.max(opts?.limit ?? 30, 1), 50)
+  const excludeDemo = opts?.excludeDemo !== false
+
+  let query = supabase
+    .from('employees')
+    .select('id, email, full_name, roles, establishment_id')
+    .eq('is_active', true)
+    .order('full_name', { ascending: true })
+    .limit(limit * 3) // oversample; filter demos / refine in memory
+
+  if (needle.length >= 1) {
+    const like = `%${needle}%`
+    query = query.or(`email.ilike.${like},full_name.ilike.${like}`)
+  }
+
+  const { data, error } = await query
+  if (error) return { error: error.message }
+
+  const rows = data ?? []
+  if (!rows.length) return { users: [] }
+
+  const estIds = [...new Set(rows.map(r => r.establishment_id))]
+  const { data: estRows, error: estErr } = await supabase
+    .from('establishments')
+    .select('id, name, is_demo')
+    .in('id', estIds)
+  if (estErr) return { error: estErr.message }
+  const estById = new Map((estRows ?? []).map(e => [e.id, e]))
+
+  const users: BroadcastUserOption[] = []
+  for (const row of rows) {
+    const est = estById.get(row.establishment_id)
+    if (!est) continue
+    if (excludeDemo && est.is_demo) continue
+    const email = row.email?.trim() || null
+    users.push({
+      employeeId: row.id,
+      fullName: row.full_name,
+      email: email && email.includes('@') ? email.toLowerCase() : null,
+      establishmentId: row.establishment_id,
+      establishmentName: est.name,
+      isOwner: isOwnerRoles(row.roles as string[] | null),
+    })
+    if (users.length >= limit) break
+  }
+  return { users }
 }

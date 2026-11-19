@@ -79,4 +79,12 @@ describe('parseBroadcastFilters', () => {
     const b = parseBroadcastFilters({ subscriptionMode: 'without_subscription' })
     assert.deepEqual(b.statuses, ['none'])
   })
+
+  it('parses employeeId for single-recipient target', () => {
+    const id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    const a = parseBroadcastFilters({ employeeId: id, userKind: 'owners' })
+    assert.equal(a.employeeId, id)
+    const b = parseBroadcastFilters({ employeeId: 'not-a-uuid' })
+    assert.equal(b.employeeId, null)
+  })
 })

@@ -13,6 +13,11 @@ export type BroadcastFilters = {
   registeredTo: string | null
   /** Skip demo kitchens. Default true. */
   excludeDemo?: boolean
+  /**
+   * If set, send only to this employee (ignores audience/status/date filters).
+   * UUID of `employees.id`.
+   */
+  employeeId?: string | null
 }
 
 const MS_DAY = 24 * 60 * 60 * 1000
@@ -85,10 +90,15 @@ export function parseBroadcastFilters(input: {
   registeredFrom?: unknown
   registeredTo?: unknown
   excludeDemo?: unknown
+  employeeId?: unknown
 }): BroadcastFilters {
   const userKindRaw = String(input.userKind ?? 'all')
   const userKind: BroadcastUserKind =
     userKindRaw === 'owners' || userKindRaw === 'line' ? userKindRaw : 'all'
+  const employeeIdRaw = typeof input.employeeId === 'string' ? input.employeeId.trim() : ''
+  const employeeId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(employeeIdRaw)
+    ? employeeIdRaw
+    : null
 
   const statusesRaw = input.statuses ?? input.subscriptionStatuses
   let statuses: BroadcastStatusFilter[] = []
@@ -133,5 +143,6 @@ export function parseBroadcastFilters(input: {
     registeredFrom,
     registeredTo,
     excludeDemo: input.excludeDemo === false ? false : true,
+    employeeId,
   }
 }

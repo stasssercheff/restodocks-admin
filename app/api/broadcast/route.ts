@@ -4,6 +4,7 @@ import { readAdminConfig } from '@/lib/admin-kv'
 import {
   matchingBroadcastRecipients,
   parseBroadcastFilters,
+  searchBroadcastUsers,
   type BroadcastRecipient,
 } from '@/lib/broadcast-recipients'
 import { createServiceClient, readEnv } from '@/lib/supabase-server'
@@ -22,6 +23,7 @@ function filtersFrom(req: NextRequest, body?: Record<string, unknown>) {
     registeredFrom: body?.registeredFrom ?? url.searchParams.get('registeredFrom'),
     registeredTo: body?.registeredTo ?? url.searchParams.get('registeredTo'),
     excludeDemo: body?.excludeDemo ?? url.searchParams.get('excludeDemo'),
+    employeeId: body?.employeeId ?? url.searchParams.get('employeeId'),
   })
 }
 
@@ -123,6 +125,14 @@ export async function GET(req: NextRequest) {
   const auth = await requireAdminRequest(req, 'broadcast')
   if ('response' in auth) return auth.response
 
+  const mode = req.nextUrl.searchParams.get('mode')
+  if (mode === 'search') {
+    const q = req.nextUrl.searchParams.get('q') ?? ''
+    const result = await searchBroadcastUsers(q, { limit: 30, excludeDemo: true })
+    if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
+    return NextResponse.json({ users: result.users })
+  }
+
   const filters = filtersFrom(req)
   const result = await matchingBroadcastRecipients(filters)
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
@@ -163,6 +173,9 @@ export async function POST(req: NextRequest) {
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
 
   const recipients = result.recipients
+  if (filters.employeeId && recipients.length === 0) {
+    return NextResponse.json({ error: 'Пользователь не найден или недоступен (демо / неактивен)' }, { status: 404 })
+  }
   let inboxInserted = 0
   let inboxError: string | undefined
   let emailSent = 0
