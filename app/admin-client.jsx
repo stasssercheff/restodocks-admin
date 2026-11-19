@@ -108,7 +108,8 @@ function isAllowedPromoGrantType(value) {
 }
 
 let n = ["pro", "ultra", "ultimate"],
-    i = ["pro", "premium", "ultra", "ultimate", "plus", "starter", "business"];
+    // Public lineup Lite/Pro/Ultra + Ultimate (promo-only). Do not invent Premium/Business/etc.
+    i = ["lite", "pro", "ultra", "ultimate"];
 
 function o(e) {
     return null == e || "" === e ? "free" : "string" == typeof e ? e.toLowerCase().trim() : String(e).toLowerCase().trim()
@@ -6629,8 +6630,266 @@ function eT() {
 
     let canSend = body.trim().length > 0 && (channelInbox || channelEmail) && (!channelEmail || subject.trim().length > 0) && ("group" === targetMode || !!pickedUser);
 
+    let audienceBlock = (0, r.jsxs)(r.Fragment, {
+        children: [(0, r.jsxs)("div", {
+            className: "space-y-2",
+            children: [(0, r.jsx)("div", {
+                className: "text-xs text-gray-400",
+                children: tr("Канал доставки")
+            }), (0, r.jsxs)("div", {
+                className: "flex flex-wrap gap-4 text-sm",
+                children: [(0, r.jsxs)("label", {
+                    className: "flex items-center gap-2 cursor-pointer",
+                    children: [(0, r.jsx)("input", {
+                        type: "checkbox",
+                        checked: channelInbox,
+                        onChange: e => setChannelInbox(e.target.checked)
+                    }), tr("Сообщения в аккаунт (системные)")]
+                }), (0, r.jsxs)("label", {
+                    className: "flex items-center gap-2 cursor-pointer",
+                    children: [(0, r.jsx)("input", {
+                        type: "checkbox",
+                        checked: channelEmail,
+                        onChange: e => {
+                            setChannelEmail(e.target.checked), bumpFilters()
+                        }
+                    }), tr("Email")]
+                })]
+            })]
+        }), (0, r.jsxs)("div", {
+            className: "space-y-2",
+            children: [(0, r.jsx)("div", {
+                className: "text-xs text-gray-400",
+                children: tr("Кто получает")
+            }), (0, r.jsxs)("div", {
+                className: "flex flex-wrap gap-x-4 gap-y-2 text-sm",
+                children: [(0, r.jsxs)("label", {
+                    className: "flex items-center gap-2 cursor-pointer",
+                    children: [(0, r.jsx)("input", {
+                        type: "radio",
+                        name: "broadcast_audience",
+                        checked: "group" === targetMode && "all" === userKind,
+                        onChange: () => {
+                            setTargetMode("group"), setUserKind("all"), clearPickedUser(), bumpFilters()
+                        }
+                    }), tr("Все пользователи")]
+                }), (0, r.jsxs)("label", {
+                    className: "flex items-center gap-2 cursor-pointer",
+                    children: [(0, r.jsx)("input", {
+                        type: "radio",
+                        name: "broadcast_audience",
+                        checked: "group" === targetMode && "owners" === userKind,
+                        onChange: () => {
+                            setTargetMode("group"), setUserKind("owners"), clearPickedUser(), bumpFilters()
+                        }
+                    }), tr("Собственники (owner)")]
+                }), (0, r.jsxs)("label", {
+                    className: "flex items-center gap-2 cursor-pointer",
+                    children: [(0, r.jsx)("input", {
+                        type: "radio",
+                        name: "broadcast_audience",
+                        checked: "group" === targetMode && "line" === userKind,
+                        onChange: () => {
+                            setTargetMode("group"), setUserKind("line"), clearPickedUser(), bumpFilters()
+                        }
+                    }), tr("Линейный персонал")]
+                }), (0, r.jsxs)("label", {
+                    className: "flex items-center gap-2 cursor-pointer",
+                    children: [(0, r.jsx)("input", {
+                        type: "radio",
+                        name: "broadcast_audience",
+                        checked: "one" === targetMode,
+                        onChange: () => {
+                            setTargetMode("one"), bumpFilters();
+                            if (!pickedUser) void searchUsers("")
+                        }
+                    }), tr("Конкретный пользователь")]
+                })]
+            })]
+        }), "one" === targetMode ? (0, r.jsxs)("div", {
+            className: "space-y-2",
+            children: [pickedUser ? (0, r.jsxs)("div", {
+                className: "flex flex-wrap items-start justify-between gap-2 rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2 text-sm",
+                children: [(0, r.jsxs)("div", {
+                    className: "min-w-0",
+                    children: [(0, r.jsx)("div", {
+                        className: "text-white font-medium truncate",
+                        children: pickedUser.fullName || pickedUser.email || pickedUser.employeeId
+                    }), (0, r.jsx)("div", {
+                        className: "text-xs text-gray-400 truncate",
+                        children: (pickedUser.email || "—") + (pickedUser.establishmentName ? " · " + pickedUser.establishmentName : "") + (pickedUser.isOwner ? " · owner" : "")
+                    })]
+                }), (0, r.jsx)("button", {
+                    type: "button",
+                    onClick: () => {
+                        clearPickedUser();
+                        void searchUsers(userQuery.trim())
+                    },
+                    className: "text-xs text-gray-400 hover:text-white shrink-0",
+                    children: tr("Сменить")
+                })]
+            }) : (0, r.jsxs)(r.Fragment, {
+                children: [(0, r.jsx)("input", {
+                    type: "search",
+                    value: userQuery,
+                    onChange: e => onUserQueryChange(e.target.value),
+                    onFocus: () => {
+                        if (!userHits.length && !userSearching) void searchUsers(userQuery.trim())
+                    },
+                    placeholder: tr("Поиск по имени или email…"),
+                    className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                }), userSearching && (0, r.jsx)("div", {
+                    className: "text-xs text-gray-500",
+                    children: tr("Поиск…")
+                }), !userSearching && userHits.length > 0 && (0, r.jsx)("ul", {
+                    className: "max-h-64 overflow-y-auto rounded-lg border border-gray-700 divide-y divide-gray-800",
+                    children: userHits.map(u => (0, r.jsx)("li", {
+                        children: (0, r.jsxs)("button", {
+                            type: "button",
+                            onClick: () => selectOneUser(u),
+                            className: "w-full text-left px-3 py-2 hover:bg-gray-800 text-sm",
+                            children: [(0, r.jsx)("div", {
+                                className: "text-white truncate",
+                                children: u.fullName || u.email || u.employeeId
+                            }), (0, r.jsx)("div", {
+                                className: "text-xs text-gray-500 truncate",
+                                children: (u.email || "—") + (u.establishmentName ? " · " + u.establishmentName : "") + (u.isOwner ? " · owner" : "")
+                            })]
+                        })
+                    }, u.employeeId))
+                }), !userSearching && 0 === userHits.length && (0, r.jsx)("div", {
+                    className: "text-xs text-gray-500",
+                    children: tr("Никого не найдено")
+                })]
+            })]
+        }) : (0, r.jsxs)(r.Fragment, {
+            children: [(0, r.jsxs)("div", {
+                className: "space-y-2",
+                children: [(0, r.jsx)("div", {
+                    className: "text-xs text-gray-400",
+                    children: tr("Статус подписки (можно несколько — OR)")
+                }), (0, r.jsxs)("div", {
+                    className: "flex flex-wrap gap-4 text-sm",
+                    children: [(0, r.jsxs)("label", {
+                        className: "flex items-center gap-2 cursor-pointer",
+                        children: [(0, r.jsx)("input", {
+                            type: "checkbox",
+                            checked: statuses.includes("trial"),
+                            onChange: () => toggleStatus("trial")
+                        }), tr("На триальном месяце")]
+                    }), (0, r.jsxs)("label", {
+                        className: "flex items-center gap-2 cursor-pointer",
+                        children: [(0, r.jsx)("input", {
+                            type: "checkbox",
+                            checked: statuses.includes("paid"),
+                            onChange: () => toggleStatus("paid")
+                        }), tr("С подпиской (любая)")]
+                    }), (0, r.jsxs)("label", {
+                        className: "flex items-center gap-2 cursor-pointer",
+                        children: [(0, r.jsx)("input", {
+                            type: "checkbox",
+                            checked: statuses.includes("none"),
+                            onChange: () => toggleStatus("none")
+                        }), tr("Без подписки")]
+                    })]
+                }), (0, r.jsx)("div", {
+                    className: "text-[11px] text-gray-600",
+                    children: tr("Ничего не отмечено = любой статус. Тарифы: Lite / Pro / Ultra (+ Ultimate по промо).")
+                }), (0, r.jsx)("div", {
+                    className: "grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm pt-1",
+                    children: i.map(tier => {
+                        let on = subTypes.includes(tier);
+                        return (0, r.jsxs)("label", {
+                            className: "flex items-center gap-2 cursor-pointer",
+                            children: [(0, r.jsx)("input", {
+                                type: "checkbox",
+                                checked: on,
+                                onChange: () => toggleSubType(tier)
+                            }), d(tier)]
+                        }, tier)
+                    })
+                })]
+            }), (0, r.jsxs)("div", {
+                className: "space-y-2",
+                children: [(0, r.jsx)("div", {
+                    className: "text-xs text-gray-400",
+                    children: tr("Диапазон регистрации (дата создания аккаунта)")
+                }), (0, r.jsxs)("div", {
+                    className: "grid sm:grid-cols-2 gap-2",
+                    children: [(0, r.jsx)("input", {
+                        type: "date",
+                        value: dateFrom,
+                        onChange: e => {
+                            setDateFrom(e.target.value), bumpFilters()
+                        },
+                        className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                    }), (0, r.jsx)("input", {
+                        type: "date",
+                        value: dateTo,
+                        onChange: e => {
+                            setDateTo(e.target.value), bumpFilters()
+                        },
+                        className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                    })]
+                })]
+            })]
+        }), (0, r.jsxs)("div", {
+            className: "flex flex-wrap items-center gap-2",
+            children: [(0, r.jsx)("button", {
+                type: "button",
+                onClick: () => void doCount(),
+                disabled: counting || "one" === targetMode && !pickedUser,
+                className: "bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
+                children: counting ? tr("Подсчёт…") : tr("Подсчитать получателей")
+            }), null !== count && (0, r.jsxs)("span", {
+                className: "text-sm text-gray-400",
+                children: [tr("В списке"), ": ", (0, r.jsx)("span", {
+                    className: "text-white font-medium",
+                    children: count
+                }), null !== withEmail ? (0, r.jsxs)("span", {
+                    className: "text-gray-500",
+                    children: [" · email: ", withEmail]
+                }) : null]
+            })]
+        })]
+    });
+
+    let messageBlock = (0, r.jsxs)(r.Fragment, {
+        children: [(0, r.jsxs)("div", {
+            className: "space-y-1",
+            children: [(0, r.jsx)("label", {
+                className: "text-xs text-gray-400",
+                children: channelEmail ? tr("Тема (обязательна для email; для входящих — заголовок)") : tr("Тема (опционально, попадёт в начало сообщения)")
+            }), (0, r.jsx)("input", {
+                value: subject,
+                onChange: e => setSubject(e.target.value),
+                placeholder: tr("Тема"),
+                maxLength: 200,
+                className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+            })]
+        }), (0, r.jsxs)("div", {
+            className: "space-y-1 flex-1 flex flex-col min-h-0",
+            children: [(0, r.jsx)("label", {
+                className: "text-xs text-gray-400",
+                children: tr("Текст (простой текст, переносы строк сохраняются)")
+            }), (0, r.jsx)("textarea", {
+                value: body,
+                onChange: e => setBody(e.target.value),
+                placeholder: tr("Текст рассылки…"),
+                rows: 16,
+                className: "w-full flex-1 min-h-[16rem] bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono leading-relaxed"
+            })]
+        }), (0, r.jsx)("button", {
+            type: "button",
+            onClick: () => void doSend(),
+            disabled: sending || !canSend,
+            className: "bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm self-start",
+            children: sending ? tr("Отправка…") : tr("Отправить рассылку")
+        })]
+    });
+
     return (0, r.jsxs)("div", {
-        className: "space-y-4 max-w-2xl",
+        className: "space-y-4 w-full",
         children: [error && (0, r.jsx)("div", {
             className: "p-3 rounded-lg border border-red-800 bg-red-950/40 text-red-200 text-sm",
             children: error
@@ -6638,263 +6897,22 @@ function eT() {
             className: "p-3 rounded-lg border border-emerald-800/60 bg-emerald-950/30 text-emerald-100 text-sm whitespace-pre-wrap",
             children: okMsg
         }), (0, r.jsxs)("div", {
-            className: "bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-4",
+            className: "bg-gray-900 rounded-xl border border-gray-800 p-4 sm:p-5 space-y-4 w-full",
             children: [(0, r.jsx)("h2", {
                 className: "text-sm font-semibold text-white",
                 children: tr("Рассылка")
             }), (0, r.jsx)("p", {
-                className: "text-xs text-gray-500 leading-relaxed",
+                className: "text-xs text-gray-500 leading-relaxed max-w-4xl",
                 children: tr("Системные сообщения появляются во «Входящих» аккаунта (чат с системой). Email — опционально через Resend. Фильтры комбинируются: роль + статусы (триал / подписка / без) + типы тарифа. Можно выбрать одного пользователя. Демо-кухни не входят.")
             }), (0, r.jsxs)("div", {
-                className: "space-y-2",
+                className: "grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start",
                 children: [(0, r.jsx)("div", {
-                    className: "text-xs text-gray-400",
-                    children: tr("Канал доставки")
-                }), (0, r.jsxs)("div", {
-                    className: "flex flex-wrap gap-4 text-sm",
-                    children: [(0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "checkbox",
-                            checked: channelInbox,
-                            onChange: e => setChannelInbox(e.target.checked)
-                        }), tr("Сообщения в аккаунт (системные)")]
-                    }), (0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "checkbox",
-                            checked: channelEmail,
-                            onChange: e => {
-                                setChannelEmail(e.target.checked), bumpFilters()
-                            }
-                        }), tr("Email")]
-                    })]
+                    className: "space-y-4 min-w-0",
+                    children: audienceBlock
+                }), (0, r.jsx)("div", {
+                    className: "space-y-4 min-w-0 flex flex-col",
+                    children: messageBlock
                 })]
-            }), (0, r.jsxs)("div", {
-                className: "space-y-2",
-                children: [(0, r.jsx)("div", {
-                    className: "text-xs text-gray-400",
-                    children: tr("Кто получает")
-                }), (0, r.jsxs)("div", {
-                    className: "flex flex-wrap gap-4 text-sm",
-                    children: [(0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "radio",
-                            name: "broadcast_audience",
-                            checked: "group" === targetMode && "all" === userKind,
-                            onChange: () => {
-                                setTargetMode("group"), setUserKind("all"), clearPickedUser(), bumpFilters()
-                            }
-                        }), tr("Все пользователи")]
-                    }), (0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "radio",
-                            name: "broadcast_audience",
-                            checked: "group" === targetMode && "owners" === userKind,
-                            onChange: () => {
-                                setTargetMode("group"), setUserKind("owners"), clearPickedUser(), bumpFilters()
-                            }
-                        }), tr("Собственники (owner)")]
-                    }), (0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "radio",
-                            name: "broadcast_audience",
-                            checked: "group" === targetMode && "line" === userKind,
-                            onChange: () => {
-                                setTargetMode("group"), setUserKind("line"), clearPickedUser(), bumpFilters()
-                            }
-                        }), tr("Линейный персонал")]
-                    }), (0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "radio",
-                            name: "broadcast_audience",
-                            checked: "one" === targetMode,
-                            onChange: () => {
-                                setTargetMode("one"), bumpFilters();
-                                if (!pickedUser) void searchUsers("")
-                            }
-                        }), tr("Конкретный пользователь")]
-                    })]
-                })]
-            }), "one" === targetMode ? (0, r.jsxs)("div", {
-                className: "space-y-2",
-                children: [pickedUser ? (0, r.jsxs)("div", {
-                    className: "flex flex-wrap items-start justify-between gap-2 rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2 text-sm",
-                    children: [(0, r.jsxs)("div", {
-                        className: "min-w-0",
-                        children: [(0, r.jsx)("div", {
-                            className: "text-white font-medium truncate",
-                            children: pickedUser.fullName || pickedUser.email || pickedUser.employeeId
-                        }), (0, r.jsx)("div", {
-                            className: "text-xs text-gray-400 truncate",
-                            children: (pickedUser.email || "—") + (pickedUser.establishmentName ? " · " + pickedUser.establishmentName : "") + (pickedUser.isOwner ? " · owner" : "")
-                        })]
-                    }), (0, r.jsx)("button", {
-                        type: "button",
-                        onClick: () => {
-                            clearPickedUser();
-                            void searchUsers(userQuery.trim())
-                        },
-                        className: "text-xs text-gray-400 hover:text-white shrink-0",
-                        children: tr("Сменить")
-                    })]
-                }) : (0, r.jsxs)(r.Fragment, {
-                    children: [(0, r.jsx)("input", {
-                        type: "search",
-                        value: userQuery,
-                        onChange: e => onUserQueryChange(e.target.value),
-                        onFocus: () => {
-                            if (!userHits.length && !userSearching) void searchUsers(userQuery.trim())
-                        },
-                        placeholder: tr("Поиск по имени или email…"),
-                        className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-                    }), userSearching && (0, r.jsx)("div", {
-                        className: "text-xs text-gray-500",
-                        children: tr("Поиск…")
-                    }),                     !userSearching && userHits.length > 0 && (0, r.jsx)("ul", {
-                        className: "max-h-56 overflow-y-auto rounded-lg border border-gray-700 divide-y divide-gray-800",
-                        children: userHits.map(u => (0, r.jsx)("li", {
-                            children: (0, r.jsxs)("button", {
-                                type: "button",
-                                onClick: () => selectOneUser(u),
-                                className: "w-full text-left px-3 py-2 hover:bg-gray-800 text-sm",
-                                children: [(0, r.jsx)("div", {
-                                    className: "text-white truncate",
-                                    children: u.fullName || u.email || u.employeeId
-                                }), (0, r.jsx)("div", {
-                                    className: "text-xs text-gray-500 truncate",
-                                    children: (u.email || "—") + (u.establishmentName ? " · " + u.establishmentName : "") + (u.isOwner ? " · owner" : "")
-                                })]
-                            })
-                        }, u.employeeId))
-                    }), !userSearching && 0 === userHits.length && (0, r.jsx)("div", {
-                        className: "text-xs text-gray-500",
-                        children: tr("Никого не найдено")
-                    })]
-                })]
-            }) : (0, r.jsxs)(r.Fragment, {
-                children: [(0, r.jsxs)("div", {
-                    className: "space-y-2",
-                    children: [(0, r.jsx)("div", {
-                        className: "text-xs text-gray-400",
-                        children: tr("Статус подписки (можно несколько — OR)")
-                    }), (0, r.jsxs)("div", {
-                        className: "flex flex-wrap gap-4 text-sm",
-                        children: [(0, r.jsxs)("label", {
-                            className: "flex items-center gap-2 cursor-pointer",
-                            children: [(0, r.jsx)("input", {
-                                type: "checkbox",
-                                checked: statuses.includes("trial"),
-                                onChange: () => toggleStatus("trial")
-                            }), tr("На триальном месяце")]
-                        }), (0, r.jsxs)("label", {
-                            className: "flex items-center gap-2 cursor-pointer",
-                            children: [(0, r.jsx)("input", {
-                                type: "checkbox",
-                                checked: statuses.includes("paid"),
-                                onChange: () => toggleStatus("paid")
-                            }), tr("С подпиской (любая)")]
-                        }), (0, r.jsxs)("label", {
-                            className: "flex items-center gap-2 cursor-pointer",
-                            children: [(0, r.jsx)("input", {
-                                type: "checkbox",
-                                checked: statuses.includes("none"),
-                                onChange: () => toggleStatus("none")
-                            }), tr("Без подписки")]
-                        })]
-                    }), (0, r.jsx)("div", {
-                        className: "text-[11px] text-gray-600",
-                        children: tr("Ничего не отмечено = любой статус. Типы тарифа ниже тоже OR и комбинируются со статусами.")
-                    }), (0, r.jsx)("div", {
-                        className: "grid sm:grid-cols-3 gap-2 text-sm pt-1",
-                        children: i.map(tier => {
-                            let on = subTypes.includes(tier);
-                            return (0, r.jsxs)("label", {
-                                className: "flex items-center gap-2 cursor-pointer",
-                                children: [(0, r.jsx)("input", {
-                                    type: "checkbox",
-                                    checked: on,
-                                    onChange: () => toggleSubType(tier)
-                                }), d(tier)]
-                            }, tier)
-                        })
-                    })]
-                }), (0, r.jsxs)("div", {
-                    className: "space-y-2",
-                    children: [(0, r.jsx)("div", {
-                        className: "text-xs text-gray-400",
-                        children: tr("Диапазон регистрации (дата создания аккаунта)")
-                    }), (0, r.jsxs)("div", {
-                        className: "grid sm:grid-cols-2 gap-2",
-                        children: [(0, r.jsx)("input", {
-                            type: "date",
-                            value: dateFrom,
-                            onChange: e => {
-                                setDateFrom(e.target.value), bumpFilters()
-                            },
-                            className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-                        }), (0, r.jsx)("input", {
-                            type: "date",
-                            value: dateTo,
-                            onChange: e => {
-                                setDateTo(e.target.value), bumpFilters()
-                            },
-                            className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-                        })]
-                    })]
-                })]
-            }), (0, r.jsxs)("div", {
-                className: "flex flex-wrap items-center gap-2",
-                children: [(0, r.jsx)("button", {
-                    type: "button",
-                    onClick: () => void doCount(),
-                    disabled: counting || "one" === targetMode && !pickedUser,
-                    className: "bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                    children: counting ? tr("Подсчёт…") : tr("Подсчитать получателей")
-                }), null !== count && (0, r.jsxs)("span", {
-                    className: "text-sm text-gray-400",
-                    children: [tr("В списке"), ": ", (0, r.jsx)("span", {
-                        className: "text-white font-medium",
-                        children: count
-                    }), null !== withEmail ? (0, r.jsxs)("span", {
-                        className: "text-gray-500",
-                        children: [" · email: ", withEmail]
-                    }) : null]
-                })]
-            }), (0, r.jsxs)("div", {
-                className: "space-y-1",
-                children: [(0, r.jsx)("label", {
-                    className: "text-xs text-gray-400",
-                    children: channelEmail ? tr("Тема (обязательна для email; для входящих — заголовок)") : tr("Тема (опционально, попадёт в начало сообщения)")
-                }), (0, r.jsx)("input", {
-                    value: subject,
-                    onChange: e => setSubject(e.target.value),
-                    placeholder: tr("Тема"),
-                    maxLength: 200,
-                    className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-                })]
-            }), (0, r.jsxs)("div", {
-                className: "space-y-1",
-                children: [(0, r.jsx)("label", {
-                    className: "text-xs text-gray-400",
-                    children: tr("Текст (простой текст, переносы строк сохраняются)")
-                }), (0, r.jsx)("textarea", {
-                    value: body,
-                    onChange: e => setBody(e.target.value),
-                    placeholder: tr("Текст рассылки…"),
-                    rows: 12,
-                    className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono leading-relaxed"
-                })]
-            }), (0, r.jsx)("button", {
-                type: "button",
-                onClick: () => void doSend(),
-                disabled: sending || !canSend,
-                className: "bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                children: sending ? tr("Отправка…") : tr("Отправить рассылку")
             })]
         })]
     })
