@@ -6444,100 +6444,163 @@ function eL() {
 }
 
 function eT() {
-    const tr = useAdminTr(), localeTag = useAdminLocaleTag();
+    const tr = useAdminTr();
+    let [userKind, setUserKind] = (0, s.useState)("owners"),
+        [statuses, setStatuses] = (0, s.useState)([]),
+        [subTypes, setSubTypes] = (0, s.useState)([]),
+        [dateFrom, setDateFrom] = (0, s.useState)(""),
+        [dateTo, setDateTo] = (0, s.useState)(""),
+        [channelInbox, setChannelInbox] = (0, s.useState)(!0),
+        [channelEmail, setChannelEmail] = (0, s.useState)(!1),
+        [subject, setSubject] = (0, s.useState)(""),
+        [body, setBody] = (0, s.useState)(""),
+        [count, setCount] = (0, s.useState)(null),
+        [withEmail, setWithEmail] = (0, s.useState)(null),
+        [counting, setCounting] = (0, s.useState)(!1),
+        [sending, setSending] = (0, s.useState)(!1),
+        [error, setError] = (0, s.useState)(null),
+        [okMsg, setOkMsg] = (0, s.useState)(null);
 
-    let [e, t] = (0, s.useState)("all"), [a, l] = (0, s.useState)("all"), [n, o] = (0, s.useState)([]), [c, x] = (0, s.useState)(""), [m, u] = (0, s.useState)(""), [p, g] = (0, s.useState)(""), [h, y] = (0, s.useState)(""), [b, v] = (0, s.useState)(null), [j, N] = (0, s.useState)(!1), [f, _] = (0, s.useState)(!1), [w, k] = (0, s.useState)(null), [C, S] = (0, s.useState)(null);
-    async function L() {
-        N(!0), k(null), S(null);
+    function bumpFilters() {
+        setCount(null), setWithEmail(null)
+    }
+
+    function toggleStatus(key) {
+        bumpFilters();
+        setStatuses(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key])
+    }
+
+    function toggleSubType(key) {
+        bumpFilters();
+        setSubTypes(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key])
+    }
+
+    function queryParams() {
+        let q = new URLSearchParams;
+        q.set("userKind", userKind);
+        if (statuses.length) q.set("statuses", statuses.join(","));
+        if (subTypes.length) q.set("subscriptionTypes", subTypes.join(","));
+        if (dateFrom.trim()) q.set("registeredFrom", dateFrom.trim());
+        if (dateTo.trim()) q.set("registeredTo", dateTo.trim());
+        return q
+    }
+
+    async function doCount() {
+        setCounting(!0), setError(null), setOkMsg(null);
         try {
-            let t = await fetch("/api/broadcast?".concat((function() {
-                    let t = new URLSearchParams;
-                    return t.set("userKind", e), t.set("subscriptionMode", a), n.length > 0 && t.set("subscriptionTypes", n.join(",")), c.trim() && t.set("registeredFrom", c.trim()), m.trim() && t.set("registeredTo", m.trim()), t
-                })().toString())),
-                r = await t.json().catch(() => ({}));
-            if (!t.ok) {
-                k("string" == typeof(null == r ? void 0 : r.error) ? r.error : tr("Ошибка (").concat(t.status, ")")), v(null);
+            let res = await fetch("/api/broadcast?".concat(queryParams().toString())),
+                json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setError("string" == typeof(null == json ? void 0 : json.error) ? json.error : tr("Ошибка (").concat(res.status, ")")), setCount(null), setWithEmail(null);
                 return
             }
-            v("number" == typeof(null == r ? void 0 : r.count) ? r.count : null)
+            setCount("number" == typeof(null == json ? void 0 : json.count) ? json.count : null);
+            setWithEmail("number" == typeof(null == json ? void 0 : json.withEmail) ? json.withEmail : null)
         } finally {
-            N(!1)
+            setCounting(!1)
         }
     }
-    async function T() {
-        let t = p.trim(),
-            r = h.trim();
-        if (0 === t.length || 0 === r.length) {
-            k(tr("Укажите тему и текст письма"));
+
+    async function doSend() {
+        let subj = subject.trim(),
+            text = body.trim();
+        if (!text) {
+            setError(tr("Укажите текст сообщения"));
             return
         }
-        if ("with_specific_subscriptions" === a && 0 === n.length) {
-            k(tr("Выберите хотя бы один тип подписки"));
+        if (!channelInbox && !channelEmail) {
+            setError(tr("Выберите канал: сообщения в аккаунт и/или email"));
             return
         }
-        let s = "owners" === e ? tr("только собственники") : "line" === e ? tr("только линейный персонал") : tr("все пользователи"),
-            l = "all" === a ? tr("все") : "without_subscription" === a ? tr("без подписки") : "with_any_subscription" === a ? tr("с любой подпиской") : tr("с выбранными: ").concat(n.map(e => d(e)).join(", "));
-        if (window.confirm(tr("Отправить рассылку?\n\nПользователи: ").concat(s, tr("\nПодписка: ")).concat(l, tr("\nРегистрация: ")).concat(c || tr("любая"), " — ").concat(m || tr("любая"), tr("\nПолучателей (по последнему подсчёту): ")).concat(null != b ? b : "—", tr("\nОт: info@restodocks.com (через Resend)")))) {
-            _(!0), k(null), S(null);
-            try {
-                var i;
-                let s = await fetch("/api/broadcast", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            userKind: e,
-                            subscriptionMode: a,
-                            subscriptionTypes: n,
-                            registeredFrom: c.trim() || null,
-                            registeredTo: m.trim() || null,
-                            subject: t,
-                            body: r
-                        })
-                    }),
-                    l = await s.json().catch(() => ({}));
-                if (!s.ok) {
-                    k("string" == typeof(null == l ? void 0 : l.error) ? l.error : tr("Ошибка (").concat(s.status, ")"));
-                    return
-                }
-                let o = "number" == typeof(null == l ? void 0 : l.sent) ? l.sent : 0,
-                    d = "number" == typeof(null == l ? void 0 : l.failed) ? l.failed : 0,
-                    x = "string" == typeof(null == l ? void 0 : l.message) ? l.message : null,
-                    u = Array.isArray(null == l ? void 0 : l.errors) && l.errors.length ? tr("\nДетали: ").concat(l.errors.map(e => String(e)).join("; ")) : "";
-                S((null != x ? x : tr("Отправлено: ").concat(o).concat(d > 0 ? tr(", не доставлено (ошибки API): ").concat(d) : "", tr(". В списке было: ")).concat(null !== (i = null == l ? void 0 : l.recipientCount) && void 0 !== i ? i : o, ".")) + u)
-            } finally {
-                _(!1)
+        if (channelEmail && !subj) {
+            setError(tr("Для email укажите тему письма"));
+            return
+        }
+        let who = "owners" === userKind ? tr("собственники") : "line" === userKind ? tr("линейный персонал") : tr("все пользователи");
+        let statusLabel = statuses.length ? statuses.map(st => "trial" === st ? tr("триал") : "paid" === st ? tr("с подпиской") : tr("без подписки")).join(", ") : tr("любой статус");
+        let typesLabel = subTypes.length ? subTypes.map(t => d(t)).join(", ") : "—";
+        let channels = [channelInbox ? tr("сообщения в аккаунт") : null, channelEmail ? "email" : null].filter(Boolean).join(" + ");
+        if (!window.confirm(tr("Отправить рассылку?") + "\n\n" + tr("Кто") + ": " + who + "\n" + tr("Статус") + ": " + statusLabel + "\n" + tr("Типы подписки") + ": " + typesLabel + "\n" + tr("Регистрация") + ": " + (dateFrom || tr("любая")) + " — " + (dateTo || tr("любая")) + "\n" + tr("Каналы") + ": " + channels + "\n" + tr("Получателей") + ": " + (null != count ? count : "—"))) return;
+        setSending(!0), setError(null), setOkMsg(null);
+        try {
+            let res = await fetch("/api/broadcast", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        userKind,
+                        statuses,
+                        subscriptionTypes: subTypes,
+                        registeredFrom: dateFrom.trim() || null,
+                        registeredTo: dateTo.trim() || null,
+                        channelInbox,
+                        channelEmail,
+                        subject: subj,
+                        body: text
+                    })
+                }),
+                json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setError("string" == typeof(null == json ? void 0 : json.error) ? json.error : tr("Ошибка (").concat(res.status, ")"));
+                return
             }
+            let msg = "string" == typeof(null == json ? void 0 : json.message) ? json.message : tr("Готово");
+            let details = Array.isArray(null == json ? void 0 : json.errors) && json.errors.length ? "\n" + tr("Детали") + ": " + json.errors.map(e => String(e)).join("; ") : "";
+            setOkMsg(msg + details)
+        } finally {
+            setSending(!1)
         }
     }
+
+    let canSend = body.trim().length > 0 && (channelInbox || channelEmail) && (!channelEmail || subject.trim().length > 0);
+
     return (0, r.jsxs)("div", {
         className: "space-y-4 max-w-2xl",
-        children: [w && (0, r.jsx)("div", {
+        children: [error && (0, r.jsx)("div", {
             className: "p-3 rounded-lg border border-red-800 bg-red-950/40 text-red-200 text-sm",
-            children: w
-        }), C && !w && (0, r.jsx)("div", {
-            className: "p-3 rounded-lg border border-emerald-800/60 bg-emerald-950/30 text-emerald-100 text-sm",
-            children: C
+            children: error
+        }), okMsg && !error && (0, r.jsx)("div", {
+            className: "p-3 rounded-lg border border-emerald-800/60 bg-emerald-950/30 text-emerald-100 text-sm whitespace-pre-wrap",
+            children: okMsg
         }), (0, r.jsxs)("div", {
             className: "bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-4",
             children: [(0, r.jsx)("h2", {
                 className: "text-sm font-semibold text-white",
-                children: tr("Рассылка по email")
-            }), (0, r.jsxs)("p", {
+                children: tr("Рассылка")
+            }), (0, r.jsx)("p", {
                 className: "text-xs text-gray-500 leading-relaxed",
-                children: [tr("Уходят через Resend с адреса по умолчанию"), " ", (0, r.jsx)("span", {
-                    className: "text-gray-400",
-                    children: "Restodocks <info@restodocks.com>"
-                }), tr(" (или"), " ", (0, r.jsx)("code", {
-                    className: "text-gray-500",
-                    children: "RESEND_FROM_EMAIL"
-                }), tr(" в окружении). Попадают только учётки с подтверждённым email в Auth и активной записью сотрудника. Очень большие списки могут упираться в таймаут Cloudflare Worker — при необходимости разбивайте рассылку по времени.")]
+                children: tr("Системные сообщения появляются во «Входящих» аккаунта (чат с системой). Email — опционально через Resend. Фильтры комбинируются: роль + статусы (триал / подписка / без) + типы тарифа. Демо-кухни не входят.")
             }), (0, r.jsxs)("div", {
                 className: "space-y-2",
                 children: [(0, r.jsx)("div", {
                     className: "text-xs text-gray-400",
-                    children: tr("Пользователи")
+                    children: tr("Канал доставки")
+                }), (0, r.jsxs)("div", {
+                    className: "flex flex-wrap gap-4 text-sm",
+                    children: [(0, r.jsxs)("label", {
+                        className: "flex items-center gap-2 cursor-pointer",
+                        children: [(0, r.jsx)("input", {
+                            type: "checkbox",
+                            checked: channelInbox,
+                            onChange: e => setChannelInbox(e.target.checked)
+                        }), tr("Сообщения в аккаунт (системные)")]
+                    }), (0, r.jsxs)("label", {
+                        className: "flex items-center gap-2 cursor-pointer",
+                        children: [(0, r.jsx)("input", {
+                            type: "checkbox",
+                            checked: channelEmail,
+                            onChange: e => {
+                                setChannelEmail(e.target.checked), bumpFilters()
+                            }
+                        }), tr("Email")]
+                    })]
+                })]
+            }), (0, r.jsxs)("div", {
+                className: "space-y-2",
+                children: [(0, r.jsx)("div", {
+                    className: "text-xs text-gray-400",
+                    children: tr("Кто получает")
                 }), (0, r.jsxs)("div", {
                     className: "flex flex-wrap gap-4 text-sm",
                     children: [(0, r.jsxs)("label", {
@@ -6545,9 +6608,9 @@ function eT() {
                         children: [(0, r.jsx)("input", {
                             type: "radio",
                             name: "broadcast_audience",
-                            checked: "all" === e,
+                            checked: "all" === userKind,
                             onChange: () => {
-                                t("all"), v(null)
+                                setUserKind("all"), bumpFilters()
                             }
                         }), tr("Все пользователи")]
                     }), (0, r.jsxs)("label", {
@@ -6555,85 +6618,67 @@ function eT() {
                         children: [(0, r.jsx)("input", {
                             type: "radio",
                             name: "broadcast_audience",
-                            checked: "owners" === e,
+                            checked: "owners" === userKind,
                             onChange: () => {
-                                t("owners"), v(null)
+                                setUserKind("owners"), bumpFilters()
                             }
-                        }), tr("Только собственники (роль owner)")]
+                        }), tr("Собственники (owner)")]
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 cursor-pointer",
                         children: [(0, r.jsx)("input", {
                             type: "radio",
                             name: "broadcast_audience",
-                            checked: "line" === e,
+                            checked: "line" === userKind,
                             onChange: () => {
-                                t("line"), v(null)
+                                setUserKind("line"), bumpFilters()
                             }
-                        }), tr("Только линейный персонал")]
+                        }), tr("Линейный персонал")]
                     })]
                 })]
             }), (0, r.jsxs)("div", {
                 className: "space-y-2",
                 children: [(0, r.jsx)("div", {
                     className: "text-xs text-gray-400",
-                    children: tr("Подписка")
+                    children: tr("Статус подписки (можно несколько — OR)")
                 }), (0, r.jsxs)("div", {
                     className: "flex flex-wrap gap-4 text-sm",
                     children: [(0, r.jsxs)("label", {
                         className: "flex items-center gap-2 cursor-pointer",
                         children: [(0, r.jsx)("input", {
-                            type: "radio",
-                            name: "broadcast_subscription_mode",
-                            checked: "all" === a,
-                            onChange: () => {
-                                l("all"), v(null)
-                            }
-                        }), tr("Все")]
+                            type: "checkbox",
+                            checked: statuses.includes("trial"),
+                            onChange: () => toggleStatus("trial")
+                        }), tr("На триальном месяце")]
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 cursor-pointer",
                         children: [(0, r.jsx)("input", {
-                            type: "radio",
-                            name: "broadcast_subscription_mode",
-                            checked: "with_any_subscription" === a,
-                            onChange: () => {
-                                l("with_any_subscription"), v(null)
-                            }
+                            type: "checkbox",
+                            checked: statuses.includes("paid"),
+                            onChange: () => toggleStatus("paid")
                         }), tr("С подпиской (любая)")]
                     }), (0, r.jsxs)("label", {
                         className: "flex items-center gap-2 cursor-pointer",
                         children: [(0, r.jsx)("input", {
-                            type: "radio",
-                            name: "broadcast_subscription_mode",
-                            checked: "without_subscription" === a,
-                            onChange: () => {
-                                l("without_subscription"), v(null)
-                            }
+                            type: "checkbox",
+                            checked: statuses.includes("none"),
+                            onChange: () => toggleStatus("none")
                         }), tr("Без подписки")]
-                    }), (0, r.jsxs)("label", {
-                        className: "flex items-center gap-2 cursor-pointer",
-                        children: [(0, r.jsx)("input", {
-                            type: "radio",
-                            name: "broadcast_subscription_mode",
-                            checked: "with_specific_subscriptions" === a,
-                            onChange: () => {
-                                l("with_specific_subscriptions"), v(null)
-                            }
-                        }), tr("С конкретной подпиской")]
                     })]
-                }), "with_specific_subscriptions" === a && (0, r.jsx)("div", {
-                    className: "grid sm:grid-cols-3 gap-2 text-sm",
-                    children: i.map(e => {
-                        let t = n.includes(e);
+                }), (0, r.jsx)("div", {
+                    className: "text-[11px] text-gray-600",
+                    children: tr("Ничего не отмечено = любой статус. Типы тарифа ниже тоже OR и комбинируются со статусами.")
+                }), (0, r.jsx)("div", {
+                    className: "grid sm:grid-cols-3 gap-2 text-sm pt-1",
+                    children: i.map(tier => {
+                        let on = subTypes.includes(tier);
                         return (0, r.jsxs)("label", {
                             className: "flex items-center gap-2 cursor-pointer",
                             children: [(0, r.jsx)("input", {
                                 type: "checkbox",
-                                checked: t,
-                                onChange: () => {
-                                    v(null), o(a => t ? a.filter(t => t !== e) : [...a, e])
-                                }
-                            }), d(e)]
-                        }, e)
+                                checked: on,
+                                onChange: () => toggleSubType(tier)
+                            }), d(tier)]
+                        }, tier)
                     })
                 })]
             }), (0, r.jsxs)("div", {
@@ -6645,16 +6690,16 @@ function eT() {
                     className: "grid sm:grid-cols-2 gap-2",
                     children: [(0, r.jsx)("input", {
                         type: "date",
-                        value: c,
+                        value: dateFrom,
                         onChange: e => {
-                            x(e.target.value), v(null)
+                            setDateFrom(e.target.value), bumpFilters()
                         },
                         className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
                     }), (0, r.jsx)("input", {
                         type: "date",
-                        value: m,
+                        value: dateTo,
                         onChange: e => {
-                            u(e.target.value), v(null)
+                            setDateTo(e.target.value), bumpFilters()
                         },
                         className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
                     })]
@@ -6663,26 +6708,29 @@ function eT() {
                 className: "flex flex-wrap items-center gap-2",
                 children: [(0, r.jsx)("button", {
                     type: "button",
-                    onClick: () => void L(),
-                    disabled: j,
+                    onClick: () => void doCount(),
+                    disabled: counting,
                     className: "bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                    children: j ? tr("Подсчёт…") : tr("Подсчитать получателей")
-                }), null !== b && (0, r.jsxs)("span", {
+                    children: counting ? tr("Подсчёт…") : tr("Подсчитать получателей")
+                }), null !== count && (0, r.jsxs)("span", {
                     className: "text-sm text-gray-400",
-                    children: [tr("В списке: "), (0, r.jsx)("span", {
+                    children: [tr("В списке"), ": ", (0, r.jsx)("span", {
                         className: "text-white font-medium",
-                        children: b
-                    })]
+                        children: count
+                    }), null !== withEmail ? (0, r.jsxs)("span", {
+                        className: "text-gray-500",
+                        children: [" · email: ", withEmail]
+                    }) : null]
                 })]
             }), (0, r.jsxs)("div", {
                 className: "space-y-1",
                 children: [(0, r.jsx)("label", {
                     className: "text-xs text-gray-400",
-                    children: tr("Тема")
+                    children: channelEmail ? tr("Тема (обязательна для email; для входящих — заголовок)") : tr("Тема (опционально, попадёт в начало сообщения)")
                 }), (0, r.jsx)("input", {
-                    value: p,
-                    onChange: e => g(e.target.value),
-                    placeholder: tr("Тема письма"),
+                    value: subject,
+                    onChange: e => setSubject(e.target.value),
+                    placeholder: tr("Тема"),
                     maxLength: 200,
                     className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
                 })]
@@ -6692,18 +6740,18 @@ function eT() {
                     className: "text-xs text-gray-400",
                     children: tr("Текст (простой текст, переносы строк сохраняются)")
                 }), (0, r.jsx)("textarea", {
-                    value: h,
-                    onChange: e => y(e.target.value),
+                    value: body,
+                    onChange: e => setBody(e.target.value),
                     placeholder: tr("Текст рассылки…"),
                     rows: 12,
                     className: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono leading-relaxed"
                 })]
             }), (0, r.jsx)("button", {
                 type: "button",
-                onClick: () => void T(),
-                disabled: f || 0 === p.trim().length || 0 === h.trim().length,
+                onClick: () => void doSend(),
+                disabled: sending || !canSend,
                 className: "bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm",
-                children: f ? tr("Отправка…") : tr("Отправить рассылку")
+                children: sending ? tr("Отправка…") : tr("Отправить рассылку")
             })]
         })]
     })
