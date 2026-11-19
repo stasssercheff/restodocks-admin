@@ -138,10 +138,21 @@ export async function GET(req: NextRequest) {
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
 
   const withEmail = result.recipients.filter(r => r.email).length
+  const PREVIEW_CAP = 200
+  const recipients = result.recipients.slice(0, PREVIEW_CAP).map(r => ({
+    employeeId: r.employeeId,
+    fullName: r.fullName ?? null,
+    email: r.email,
+    establishmentId: r.establishmentId,
+    establishmentName: r.establishmentName ?? null,
+    isOwner: r.isOwner,
+  }))
   return NextResponse.json({
     count: result.recipients.length,
     withEmail,
     owners: result.recipients.filter(r => r.isOwner).length,
+    recipients,
+    recipientsTruncated: result.recipients.length > PREVIEW_CAP,
   })
 }
 

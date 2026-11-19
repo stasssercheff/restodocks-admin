@@ -46,6 +46,7 @@ type EmployeeRow = {
 
 type EstRow = {
   id: string
+  name: string | null
   subscription_type: string | null
   pro_paid_until: string | null
   pro_trial_ends_at: string | null
@@ -118,7 +119,7 @@ export async function matchingBroadcastRecipients(
     ? await fetchAllRows<EstRow>((from, to) =>
       supabase
         .from('establishments')
-        .select('id, subscription_type, pro_paid_until, pro_trial_ends_at, created_at, is_demo')
+        .select('id, name, subscription_type, pro_paid_until, pro_trial_ends_at, created_at, is_demo')
         .order('id', { ascending: true })
         .range(from, to),
     )
@@ -148,6 +149,7 @@ export async function matchingBroadcastRecipients(
       establishmentId: row.establishment_id,
       isOwner: isOwnerRoles(row.roles),
       fullName: row.full_name,
+      establishmentName: est.name ?? null,
     })
   }
 
