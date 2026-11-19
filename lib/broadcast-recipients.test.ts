@@ -80,11 +80,16 @@ describe('parseBroadcastFilters', () => {
     assert.deepEqual(b.statuses, ['none'])
   })
 
-  it('parses employeeId for single-recipient target', () => {
+  it('parses employeeId / employeeIds for targeted send', () => {
     const id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    const id2 = 'b2c3d4e5-f6a7-8901-bcde-f12345678901'
     const a = parseBroadcastFilters({ employeeId: id, userKind: 'owners' })
     assert.equal(a.employeeId, id)
+    assert.deepEqual(a.employeeIds, [id])
     const b = parseBroadcastFilters({ employeeId: 'not-a-uuid' })
     assert.equal(b.employeeId, null)
+    assert.deepEqual(b.employeeIds, [])
+    const c = parseBroadcastFilters({ employeeIds: [id, id2, 'bad'] })
+    assert.deepEqual(c.employeeIds, [id, id2])
   })
 })

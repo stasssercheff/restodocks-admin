@@ -24,6 +24,7 @@ function filtersFrom(req: NextRequest, body?: Record<string, unknown>) {
     registeredTo: body?.registeredTo ?? url.searchParams.get('registeredTo'),
     excludeDemo: body?.excludeDemo ?? url.searchParams.get('excludeDemo'),
     employeeId: body?.employeeId ?? url.searchParams.get('employeeId'),
+    employeeIds: body?.employeeIds ?? url.searchParams.get('employeeIds'),
   })
 }
 
@@ -184,8 +185,8 @@ export async function POST(req: NextRequest) {
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
 
   const recipients = result.recipients
-  if (filters.employeeId && recipients.length === 0) {
-    return NextResponse.json({ error: 'Пользователь не найден или недоступен (демо / неактивен)' }, { status: 404 })
+  if ((filters.employeeIds?.length || filters.employeeId) && recipients.length === 0) {
+    return NextResponse.json({ error: 'Пользователи не найдены или недоступны (демо / неактивны)' }, { status: 404 })
   }
   let inboxInserted = 0
   let inboxError: string | undefined

@@ -6464,7 +6464,7 @@ function eT() {
         [withEmail, setWithEmail] = (0, s.useState)(null),
         [matchedUsers, setMatchedUsers] = (0, s.useState)([]),
         [matchedTruncated, setMatchedTruncated] = (0, s.useState)(!1),
-        [selectedMatchId, setSelectedMatchId] = (0, s.useState)(null),
+        [selectedMatchIds, setSelectedMatchIds] = (0, s.useState)([]),
         [counting, setCounting] = (0, s.useState)(!1),
         [sending, setSending] = (0, s.useState)(!1),
         [error, setError] = (0, s.useState)(null),
@@ -6472,12 +6472,17 @@ function eT() {
         searchTimerRef = (0, s.useRef)(null);
 
     function bumpFilters() {
-        setCount(null), setWithEmail(null), setMatchedUsers([]), setMatchedTruncated(!1), setSelectedMatchId(null)
+        setCount(null), setWithEmail(null), setMatchedUsers([]), setMatchedTruncated(!1), setSelectedMatchIds([])
     }
 
-    function selectedMatchUser() {
-        if (!selectedMatchId) return null;
-        return matchedUsers.find(u => u.employeeId === selectedMatchId) || null
+    function toggleMatchId(id) {
+        setSelectedMatchIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    }
+
+    function selectedMatchUsers() {
+        if (!selectedMatchIds.length) return [];
+        let want = new Set(selectedMatchIds);
+        return matchedUsers.filter(u => want.has(u.employeeId))
     }
 
     function toggleStatus(key) {
@@ -6556,11 +6561,11 @@ function eT() {
             setWithEmail(pickedUser.email ? 1 : 0);
             setMatchedUsers([pickedUser]);
             setMatchedTruncated(!1);
-            setSelectedMatchId(pickedUser.employeeId);
+            setSelectedMatchIds([pickedUser.employeeId]);
             setError(null);
             return
         }
-        setCounting(!0), setError(null), setOkMsg(null), setSelectedMatchId(null);
+        setCounting(!0), setError(null), setOkMsg(null), setSelectedMatchIds([]);
         try {
             let res = await fetch("/api/broadcast?".concat(queryParams().toString())),
                 json = await res.json().catch(() => ({}));
@@ -6596,17 +6601,19 @@ function eT() {
             setError(tr("Выберите пользователя из списка"));
             return
         }
-        let fromList = "group" === targetMode ? selectedMatchUser() : null;
+        let fromList = "group" === targetMode ? selectedMatchUsers() : [];
         let who = "one" === targetMode && pickedUser
             ? (pickedUser.fullName || pickedUser.email || pickedUser.employeeId) + (pickedUser.establishmentName ? " · " + pickedUser.establishmentName : "")
-            : fromList
-            ? (fromList.fullName || fromList.email || fromList.employeeId) + (fromList.establishmentName ? " · " + fromList.establishmentName : "")
+            : fromList.length
+            ? fromList.length === 1
+                ? (fromList[0].fullName || fromList[0].email || fromList[0].employeeId) + (fromList[0].establishmentName ? " · " + fromList[0].establishmentName : "")
+                : tr("выбрано из списка") + ": " + fromList.length
             : "owners" === userKind ? tr("собственники") : "line" === userKind ? tr("линейный персонал") : tr("все пользователи");
-        let statusLabel = "one" === targetMode || fromList ? "—" : statuses.length ? statuses.map(st => "trial" === st ? tr("триал") : "paid" === st ? tr("с подпиской") : tr("без подписки")).join(", ") : tr("любой статус");
-        let typesLabel = "one" === targetMode || fromList ? "—" : subTypes.length ? subTypes.map(t => d(t)).join(", ") : "—";
+        let statusLabel = "one" === targetMode || fromList.length ? "—" : statuses.length ? statuses.map(st => "trial" === st ? tr("триал") : "paid" === st ? tr("с подпиской") : tr("без подписки")).join(", ") : tr("любой статус");
+        let typesLabel = "one" === targetMode || fromList.length ? "—" : subTypes.length ? subTypes.map(t => d(t)).join(", ") : "—";
         let channels = [channelInbox ? tr("сообщения в аккаунт") : null, channelEmail ? "email" : null].filter(Boolean).join(" + ");
-        let recipCount = "one" === targetMode || fromList ? 1 : null != count ? count : "—";
-        if (!window.confirm(tr("Отправить рассылку?") + "\n\n" + tr("Кто") + ": " + who + "\n" + tr("Статус") + ": " + statusLabel + "\n" + tr("Типы подписки") + ": " + typesLabel + "\n" + tr("Регистрация") + ": " + ("one" === targetMode || fromList ? "—" : (dateFrom || tr("любая")) + " — " + (dateTo || tr("любая"))) + "\n" + tr("Каналы") + ": " + channels + "\n" + tr("Получателей") + ": " + recipCount)) return;
+        let recipCount = "one" === targetMode ? 1 : fromList.length ? fromList.length : null != count ? count : "—";
+        if (!window.confirm(tr("Отправить рассылку?") + "\n\n" + tr("Кто") + ": " + who + "\n" + tr("Статус") + ": " + statusLabel + "\n" + tr("Типы подписки") + ": " + typesLabel + "\n" + tr("Регистрация") + ": " + ("one" === targetMode || fromList.length ? "—" : (dateFrom || tr("любая")) + " — " + (dateTo || tr("любая"))) + "\n" + tr("Каналы") + ": " + channels + "\n" + tr("Получателей") + ": " + recipCount)) return;
         setSending(!0), setError(null), setOkMsg(null);
         try {
             let payload = {
@@ -6617,8 +6624,8 @@ function eT() {
             };
             if ("one" === targetMode && pickedUser) {
                 payload.employeeId = pickedUser.employeeId
-            } else if (fromList) {
-                payload.employeeId = fromList.employeeId
+            } else if (fromList.length) {
+                payload.employeeIds = fromList.map(u => u.employeeId)
             } else {
                 payload.userKind = userKind;
                 payload.statuses = statuses;
@@ -6877,34 +6884,44 @@ function eT() {
                     className: "flex flex-wrap items-center justify-between gap-2",
                     children: [(0, r.jsx)("div", {
                         className: "text-xs text-gray-400",
-                        children: selectedMatchId ? tr("Выбран один — отправка только ему. Кликните ещё раз, чтобы снять выбор.") : tr("Кликните по строке, чтобы отправить только этому человеку. Без выбора — всем из фильтра.")
-                    }), selectedMatchId && (0, r.jsx)("button", {
-                        type: "button",
-                        onClick: () => setSelectedMatchId(null),
-                        className: "text-xs text-gray-400 hover:text-white shrink-0",
-                        children: tr("Снять выбор (всем)")
+                        children: selectedMatchIds.length
+                            ? tr("Выбрано") + ": " + selectedMatchIds.length + " — " + tr("отправка только отмеченным. Без выбора — всем из фильтра.")
+                            : tr("Отметьте одного или нескольких. Без выбора — всем из фильтра.")
+                    }), (0, r.jsxs)("div", {
+                        className: "flex flex-wrap gap-2 shrink-0",
+                        children: [(0, r.jsx)("button", {
+                            type: "button",
+                            onClick: () => setSelectedMatchIds(matchedUsers.map(u => u.employeeId)),
+                            className: "text-xs text-gray-400 hover:text-white",
+                            children: tr("Выбрать всех в списке")
+                        }), selectedMatchIds.length > 0 && (0, r.jsx)("button", {
+                            type: "button",
+                            onClick: () => setSelectedMatchIds([]),
+                            className: "text-xs text-gray-400 hover:text-white",
+                            children: tr("Снять выбор (всем)")
+                        })]
                     })]
                 }), (0, r.jsx)("ul", {
                     className: "max-h-72 overflow-y-auto rounded-lg border border-gray-700 divide-y divide-gray-800",
                     children: matchedUsers.map(u => {
-                        let selected = selectedMatchId === u.employeeId;
+                        let selected = selectedMatchIds.includes(u.employeeId);
                         return (0, r.jsx)("li", {
-                            children: (0, r.jsxs)("button", {
-                                type: "button",
-                                onClick: () => setSelectedMatchId(selected ? null : u.employeeId),
-                                className: "w-full text-left px-3 py-2 text-sm transition ".concat(selected ? "bg-indigo-950/60 ring-1 ring-inset ring-indigo-500/50" : "hover:bg-gray-800"),
-                                children: [(0, r.jsxs)("div", {
-                                    className: "flex items-center gap-2 min-w-0",
+                            children: (0, r.jsxs)("label", {
+                                className: "flex items-start gap-3 w-full px-3 py-2 text-sm cursor-pointer transition ".concat(selected ? "bg-indigo-950/60" : "hover:bg-gray-800"),
+                                children: [(0, r.jsx)("input", {
+                                    type: "checkbox",
+                                    className: "mt-1 shrink-0",
+                                    checked: selected,
+                                    onChange: () => toggleMatchId(u.employeeId)
+                                }), (0, r.jsxs)("span", {
+                                    className: "min-w-0 flex-1",
                                     children: [(0, r.jsx)("span", {
-                                        className: "text-white truncate font-medium",
+                                        className: "block text-white truncate font-medium",
                                         children: u.fullName || u.email || u.employeeId
-                                    }), selected && (0, r.jsx)("span", {
-                                        className: "text-[10px] uppercase tracking-wide text-indigo-300 shrink-0",
-                                        children: tr("выбран")
+                                    }), (0, r.jsx)("span", {
+                                        className: "block text-xs text-gray-500 truncate",
+                                        children: (u.email || "—") + (u.establishmentName ? " · " + u.establishmentName : "") + (u.isOwner ? " · owner" : "")
                                     })]
-                                }), (0, r.jsx)("div", {
-                                    className: "text-xs text-gray-500 truncate",
-                                    children: (u.email || "—") + (u.establishmentName ? " · " + u.establishmentName : "") + (u.isOwner ? " · owner" : "")
                                 })]
                             })
                         }, u.employeeId)

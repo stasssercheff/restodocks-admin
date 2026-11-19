@@ -14,10 +14,32 @@ export type BroadcastFilters = {
   /** Skip demo kitchens. Default true. */
   excludeDemo?: boolean
   /**
-   * If set, send only to this employee (ignores audience/status/date filters).
-   * UUID of `employees.id`.
+   * If set, send only to these employees (ignores audience/status/date filters).
+   * UUIDs of `employees.id`. Prefer over single `employeeId`.
    */
+  employeeIds?: string[]
+  /** @deprecated use employeeIds — still accepted and merged into employeeIds */
   employeeId?: string | null
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function parseEmployeeIds(raw: unknown): string[] {
+  const out: string[] = []
+  const push = (v: unknown) => {
+    const s = typeof v === 'string' ? v.trim() : ''
+    if (UUID_RE.test(s) && !out.includes(s)) out.push(s)
+  }
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (typeof item === 'string' && item.includes(',')) {
+        for (const part of item.split(',')) push(part)
+      } else push(item)
+    }
+  } else if (typeof raw === 'string' && raw.trim()) {
+    for (const part of raw.split(',')) push(part)
+  }
+  return out
 }
 
 const MS_DAY = 24 * 60 * 60 * 1000
@@ -91,14 +113,16 @@ export function parseBroadcastFilters(input: {
   registeredTo?: unknown
   excludeDemo?: unknown
   employeeId?: unknown
+  employeeIds?: unknown
 }): BroadcastFilters {
   const userKindRaw = String(input.userKind ?? 'all')
   const userKind: BroadcastUserKind =
     userKindRaw === 'owners' || userKindRaw === 'line' ? userKindRaw : 'all'
-  const employeeIdRaw = typeof input.employeeId === 'string' ? input.employeeId.trim() : ''
-  const employeeId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(employeeIdRaw)
-    ? employeeIdRaw
-    : null
+  const employeeIds = [
+    ...parseEmployeeIds(input.employeeIds),
+    ...parseEmployeeIds(input.employeeId),
+  ].filter((id, idx, arr) => arr.indexOf(id) === idx)
+  const employeeId = employeeIds.length === 1 ? employeeIds[0] : employeeIds.length ? employeeIds[0] : null
 
   const statusesRaw = input.statuses ?? input.subscriptionStatuses
   let statuses: BroadcastStatusFilter[] = []
@@ -144,5 +168,6 @@ export function parseBroadcastFilters(input: {
     registeredTo,
     excludeDemo: input.excludeDemo === false ? false : true,
     employeeId,
+    employeeIds,
   }
 }

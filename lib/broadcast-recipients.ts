@@ -67,33 +67,47 @@ export async function matchingBroadcastRecipients(
 
   const excludeDemo = filters.excludeDemo !== false
 
-  // Single-user target: ignore group filters.
-  if (filters.employeeId) {
+  // Explicit employee list: ignore group filters.
+  const targetIds = (filters.employeeIds?.length
+    ? filters.employeeIds
+    : filters.employeeId
+      ? [filters.employeeId]
+      : []).filter(Boolean)
+  if (targetIds.length) {
     const { data, error } = await supabase
       .from('employees')
       .select('id, email, full_name, roles, is_active, created_at, establishment_id')
-      .eq('id', filters.employeeId)
-      .maybeSingle()
+      .in('id', targetIds)
+      .eq('is_active', true)
     if (error) return { error: error.message }
-    if (!data || data.is_active === false) return { recipients: [] }
-    const est = await supabase
+    const rows = data ?? []
+    if (!rows.length) return { recipients: [] }
+    const estIds = [...new Set(rows.map(r => r.establishment_id))]
+    const { data: estRows, error: estErr } = await supabase
       .from('establishments')
       .select('id, name, is_demo')
-      .eq('id', data.establishment_id)
-      .maybeSingle()
-    if (est.error) return { error: est.error.message }
-    if (excludeDemo && est.data?.is_demo) return { recipients: [] }
-    const email = data.email?.trim() || null
-    return {
-      recipients: [{
-        employeeId: data.id,
+      .in('id', estIds)
+    if (estErr) return { error: estErr.message }
+    const estById = new Map((estRows ?? []).map(e => [e.id, e]))
+    const byId = new Map(rows.map(r => [r.id, r]))
+    const recipients: BroadcastRecipient[] = []
+    for (const id of targetIds) {
+      const row = byId.get(id)
+      if (!row) continue
+      const est = estById.get(row.establishment_id)
+      if (!est) continue
+      if (excludeDemo && est.is_demo) continue
+      const email = row.email?.trim() || null
+      recipients.push({
+        employeeId: row.id,
         email: email && email.includes('@') ? email.toLowerCase() : null,
-        establishmentId: data.establishment_id,
-        isOwner: isOwnerRoles(data.roles),
-        fullName: data.full_name,
-        establishmentName: est.data?.name ?? null,
-      }],
+        establishmentId: row.establishment_id,
+        isOwner: isOwnerRoles(row.roles),
+        fullName: row.full_name,
+        establishmentName: est.name ?? null,
+      })
     }
+    return { recipients }
   }
 
   const employeesRes = await fetchAllRows<EmployeeRow>((from, to) => {
