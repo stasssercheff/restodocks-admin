@@ -2378,11 +2378,19 @@ function ey() {
             }) : null]
         })
     }
-    let [l, n] = (0, s.useState)([]), [i, o] = (0, s.useState)(!0), [d, c] = (0, s.useState)(""), [x, m] = (0, s.useState)("all"), [u, b] = (0, s.useState)("all"), [v, j] = (0, s.useState)("all"), [N, f] = (0, s.useState)("all"), [demoFilter, setDemoFilter] = (0, s.useState)(() => loadEstFilters()?.demoFilter || "hide"), [dateFrom, setDateFrom] = (0, s.useState)(() => loadEstFilters()?.draftFrom || ""), [dateTo, setDateTo] = (0, s.useState)(() => loadEstFilters()?.draftTo || ""), [appliedFrom, setAppliedFrom] = (0, s.useState)(() => loadEstFilters()?.appliedFrom || ""), [appliedTo, setAppliedTo] = (0, s.useState)(() => loadEstFilters()?.appliedTo || ""), [deepseekPeriod, setDeepseekPeriod] = (0, s.useState)(() => loadEstFilters()?.deepseekPeriod || "30d"), [deepseekFilter, setDeepseekFilter] = (0, s.useState)(() => loadEstFilters()?.deepseekFilter || "all"), [listSort, setListSort] = (0, s.useState)(() => loadEstFilters()?.listSort || "tree"), [_, w] = (0, s.useState)(null), [k, C] = (0, s.useState)(null), [S, L] = (0, s.useState)(!1), [T, P] = (0, s.useState)(!1), E = (0, s.useCallback)(async () => {
+    let [l, n] = (0, s.useState)([]), [i, o] = (0, s.useState)(!0), [d, c] = (0, s.useState)(""), [x, m] = (0, s.useState)("all"), [u, b] = (0, s.useState)("all"), [v, j] = (0, s.useState)("all"), [N, f] = (0, s.useState)("all"), [demoFilter, setDemoFilter] = (0, s.useState)(() => loadEstFilters()?.demoFilter || "hide"), [dateFrom, setDateFrom] = (0, s.useState)(() => loadEstFilters()?.draftFrom || ""), [dateTo, setDateTo] = (0, s.useState)(() => loadEstFilters()?.draftTo || ""), [appliedFrom, setAppliedFrom] = (0, s.useState)(() => loadEstFilters()?.appliedFrom || ""), [appliedTo, setAppliedTo] = (0, s.useState)(() => loadEstFilters()?.appliedTo || ""), [deepseekPeriod, setDeepseekPeriod] = (0, s.useState)(() => loadEstFilters()?.deepseekPeriod || "30d"), [deepseekFilter, setDeepseekFilter] = (0, s.useState)(() => loadEstFilters()?.deepseekFilter || "all"), [listSort, setListSort] = (0, s.useState)(() => loadEstFilters()?.listSort || "tree"), [_, w] = (0, s.useState)(null), [k, C] = (0, s.useState)(null), [S, L] = (0, s.useState)(!1), [T, P] = (0, s.useState)(!1), [orphanOwners, setOrphanOwners] = (0, s.useState)([]), [orphanBusyId, setOrphanBusyId] = (0, s.useState)(null), E = (0, s.useCallback)(async () => {
         o(!0), w(null);
         let e = await fetch("/api/establishments"),
             t = await e.json();
-        e.ok ? n(Array.isArray(t) ? t : []) : (w("string" == typeof(null == t ? void 0 : t.error) ? t.error : tr("Ошибка загрузки")), n([])), o(!1)
+        e.ok ? n(Array.isArray(t) ? t : []) : (w("string" == typeof(null == t ? void 0 : t.error) ? t.error : tr("Ошибка загрузки")), n([]));
+        try {
+            let orphansRes = await fetch("/api/orphan-owners"),
+                orphansJson = await orphansRes.json().catch(() => ({}));
+            orphansRes.ok && Array.isArray(orphansJson.owners) ? setOrphanOwners(orphansJson.owners) : setOrphanOwners([])
+        } catch (err) {
+            setOrphanOwners([])
+        }
+        o(!1)
     }, []);
     (0, s.useEffect)(() => {
         E()
@@ -2575,6 +2583,41 @@ function ey() {
             C(null)
         }
     }
+
+    async function deleteOrphanOwnerRow(owner) {
+        if (!canMutate) return;
+        if (owner.withinCoolingOff) {
+            let daysLeft = Math.max(0, 30 - (null != owner.daysSinceVenueDelete ? owner.daysSinceVenueDelete : 0));
+            if (!confirm(tr("У этого собственника ещё не прошло 30 дней после удаления заведения") + ".\n\n" + tr("Почта") + ": " + owner.email + "\n" + tr("Прошло дней") + ": " + (null != owner.daysSinceVenueDelete ? owner.daysSinceVenueDelete : "—") + "\n" + tr("Осталось примерно") + ": " + daysLeft + "\n\n" + tr("Сначала можно написать письмо с предупреждением. Продолжить удаление учётной записи?"))) return
+        } else if (!confirm(tr("Удалить учётную запись собственника?") + "\n\n" + tr("Почта") + ": " + owner.email + (owner.fullName ? "\n" + tr("Имя") + ": " + owner.fullName : ""))) return;
+        let typed = prompt(tr("Для подтверждения введите слово «удалить»:"));
+        if (null === typed) return;
+        if (typed.trim().toLocaleLowerCase("ru-RU") !== "удалить") {
+            alert(tr("Отменено: нужно слово «удалить»."));
+            return
+        }
+        setOrphanBusyId(owner.authUserId);
+        try {
+            let res = await fetch("/api/orphan-owners", {
+                    method: "DELETE",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        authUserId: owner.authUserId,
+                        confirm: typed.trim()
+                    })
+                }),
+                json = await res.json().catch(() => ({}));
+            if (!res.ok) throw Error("string" == typeof(null == json ? void 0 : json.error) ? json.error : tr("Ошибка удаления"));
+            await E(), alert(tr("Учётная запись собственника удалена") + ": " + owner.email)
+        } catch (err) {
+            alert(err instanceof Error ? err.message : tr("Ошибка удаления"))
+        } finally {
+            setOrphanBusyId(null)
+        }
+    }
+
     return (0, r.jsxs)("div", {
         className: "min-w-0 max-w-full overflow-x-hidden",
         children: [_ && (0, r.jsxs)("div", {
@@ -3285,6 +3328,49 @@ function ey() {
                         })]
                     }, l.id)
                 })
+            })]
+        }), canMutate && (0, r.jsxs)("div", {
+            className: "mt-8 mb-4 p-3 sm:p-4 bg-gray-900 border border-gray-800 rounded-xl space-y-3",
+            children: [(0, r.jsx)("h3", {
+                className: "text-sm font-semibold text-white",
+                children: tr("Собственники без заведений")
+            }), (0, r.jsx)("p", {
+                className: "text-xs text-gray-500 leading-relaxed",
+                children: tr("После удаления последнего заведения учётка собственника остаётся в Auth. Здесь видно почту — можно сначала написать предупреждение. Удаление учётки: слово «удалить» (без PIN). Если не прошло 30 дней после удаления заведения — покажем предупреждение.")
+            }), 0 === orphanOwners.length ? (0, r.jsx)("div", {
+                className: "text-sm text-gray-600",
+                children: tr("Пока нет собственников без заведений в журнале удалений.")
+            }) : (0, r.jsx)("ul", {
+                className: "divide-y divide-gray-800 rounded-lg border border-gray-800 overflow-hidden",
+                children: orphanOwners.map(owner => (0, r.jsxs)("li", {
+                    className: "flex flex-wrap items-start justify-between gap-3 px-3 py-3 bg-gray-950/40",
+                    children: [(0, r.jsxs)("div", {
+                        className: "min-w-0 space-y-1",
+                        children: [(0, r.jsx)("a", {
+                            href: "mailto:".concat(owner.email, "?subject=").concat(encodeURIComponent(tr("Restodocks: предупреждение об удалении учётной записи"))),
+                            className: "text-sm text-indigo-300 hover:text-indigo-200 break-all",
+                            children: owner.email
+                        }), owner.fullName ? (0, r.jsx)("div", {
+                            className: "text-xs text-gray-400",
+                            children: owner.fullName
+                        }) : null, (0, r.jsxs)("div", {
+                            className: "text-[11px] text-gray-500",
+                            children: [tr("Заведение удалено"), ": ", owner.lastVenueDeletedAt ? new Date(owner.lastVenueDeletedAt).toLocaleString(localeTag) : "—", owner.lastVenueName ? " · " + owner.lastVenueName : "", null != owner.daysSinceVenueDelete ? " · " + owner.daysSinceVenueDelete + " " + tr("дн.") : ""]
+                        }), owner.withinCoolingOff ? (0, r.jsx)("div", {
+                            className: "text-[11px] text-amber-400",
+                            children: tr("Ещё не прошло 30 дней после удаления заведения")
+                        }) : (0, r.jsx)("div", {
+                            className: "text-[11px] text-emerald-500/80",
+                            children: tr("30 дней после удаления заведения уже прошли")
+                        })]
+                    }), (0, r.jsx)("button", {
+                        type: "button",
+                        disabled: orphanBusyId === owner.authUserId,
+                        onClick: () => void deleteOrphanOwnerRow(owner),
+                        className: "shrink-0 text-xs px-3 py-1.5 rounded-lg border border-red-900/60 bg-red-950/40 text-red-200 hover:bg-red-900/40 disabled:opacity-50",
+                        children: orphanBusyId === owner.authUserId ? tr("удаление…") : tr("Удалить собственника")
+                    })]
+                }, owner.authUserId))
             })]
         })]
     })

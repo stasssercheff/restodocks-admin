@@ -611,13 +611,56 @@ export async function deleteEstablishment(id: string): Promise<{ ok: true } | { 
   const supabase = createServiceClient()
   if ('error' in supabase) return supabase
 
-  const rpc = await supabase.rpc('admin_delete_establishment', { p_establishment_id: id })
-  if (!rpc.error) return { ok: true }
+  const { data: estBefore } = await supabase
+    .from('establishments')
+    .select('id, name, owner_id')
+    .eq('id', id)
+    .maybeSingle()
 
-  const fallback = await supabase.from('establishments').delete().eq('id', id)
-  if (fallback.error) {
-    return { error: rpc.error.message || fallback.error.message, code: rpc.error.code }
+  let ownerEmail: string | null = null
+  if (estBefore?.owner_id) {
+    const { data: ownerEmp } = await supabase
+      .from('employees')
+      .select('email')
+      .or(`id.eq.${estBefore.owner_id},auth_user_id.eq.${estBefore.owner_id}`)
+      .limit(1)
+      .maybeSingle()
+    ownerEmail = ownerEmp?.email?.trim() || null
+    if (!ownerEmail) {
+      const { data: pending } = await supabase
+        .from('pending_owner_registrations')
+        .select('email')
+        .eq('auth_user_id', estBefore.owner_id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      ownerEmail = pending?.email?.trim() || null
+    }
+    if (!ownerEmail) {
+      const auth = await supabase.auth.admin.getUserById(estBefore.owner_id)
+      ownerEmail = auth.data?.user?.email?.trim() || null
+    }
   }
+
+  const rpc = await supabase.rpc('admin_delete_establishment', { p_establishment_id: id })
+  if (rpc.error) {
+    const fallback = await supabase.from('establishments').delete().eq('id', id)
+    if (fallback.error) {
+      return { error: rpc.error.message || fallback.error.message, code: rpc.error.code }
+    }
+  }
+
+  // Keep orphan owner in Auth for cooling-off; log so admin can purge later.
+  if (estBefore?.owner_id) {
+    const { logOwnerVenueDeletion } = await import('@/lib/orphan-owners')
+    await logOwnerVenueDeletion({
+      ownerAuthId: estBefore.owner_id,
+      ownerEmail,
+      establishmentId: estBefore.id,
+      establishmentName: estBefore.name,
+    })
+  }
+
   return { ok: true }
 }
 
