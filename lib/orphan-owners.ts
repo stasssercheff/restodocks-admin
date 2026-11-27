@@ -34,11 +34,21 @@ function isNoiseEmail(email: string): boolean {
   )
 }
 
+type CandidateMeta = {
+  email: string | null
+  fullName: string | null
+  deletedAt: string | null
+  venueName: string | null
+  pendingRegistration: boolean
+}
+
 export async function listOrphanOwners(): Promise<
   { owners: OrphanOwnerRow[] } | { error: string }
 > {
   const supabase = createServiceClient()
   if ('error' in supabase) return supabase
+
+  const candidates = new Map<string, CandidateMeta>()
 
   const logsRes = await fetchAllRows<{
     owner_auth_id: string
@@ -53,39 +63,21 @@ export async function listOrphanOwners(): Promise<
       .range(from, to),
   )
   if ('error' in logsRes) {
-    if (/admin_owner_venue_deletions|does not exist|42P01/i.test(logsRes.error)) {
-      return { owners: [] }
+    if (!/admin_owner_venue_deletions|does not exist|42P01/i.test(logsRes.error)) {
+      return logsRes
     }
-    return logsRes
+  } else {
+    for (const row of logsRes.data) {
+      if (!row.owner_auth_id || candidates.has(row.owner_auth_id)) continue
+      candidates.set(row.owner_auth_id, {
+        email: row.owner_email,
+        fullName: null,
+        deletedAt: row.deleted_at,
+        venueName: row.establishment_name,
+        pendingRegistration: false,
+      })
+    }
   }
-
-  const latestByOwner = new Map<string, {
-    email: string
-    deletedAt: string
-    venueName: string | null
-  }>()
-  for (const row of logsRes.data) {
-    if (!row.owner_auth_id || latestByOwner.has(row.owner_auth_id)) continue
-    latestByOwner.set(row.owner_auth_id, {
-      email: row.owner_email,
-      deletedAt: row.deleted_at,
-      venueName: row.establishment_name,
-    })
-  }
-
-  if (latestByOwner.size === 0) return { owners: [] }
-
-  const ownerIds = [...latestByOwner.keys()]
-  const estRes = await fetchAllRows<{ owner_id: string }>((from, to) =>
-    supabase
-      .from('establishments')
-      .select('owner_id')
-      .in('owner_id', ownerIds)
-      .order('owner_id', { ascending: true })
-      .range(from, to),
-  )
-  if ('error' in estRes) return estRes
-  const stillHasVenue = new Set(estRes.data.map(r => r.owner_id).filter(Boolean))
 
   const pendingRes = await fetchAllRows<{
     auth_user_id: string
@@ -95,55 +87,90 @@ export async function listOrphanOwners(): Promise<
     supabase
       .from('pending_owner_registrations')
       .select('auth_user_id, full_name, email')
-      .in('auth_user_id', ownerIds)
       .order('auth_user_id', { ascending: true })
       .range(from, to),
   )
-  const pendingById = new Map<string, { fullName: string | null; email: string | null }>()
   if (!('error' in pendingRes)) {
     for (const p of pendingRes.data) {
       if (!p.auth_user_id) continue
-      pendingById.set(p.auth_user_id, { fullName: p.full_name, email: p.email })
+      const prev = candidates.get(p.auth_user_id)
+      if (prev) {
+        candidates.set(p.auth_user_id, {
+          ...prev,
+          email: prev.email || p.email,
+          fullName: prev.fullName || p.full_name,
+          pendingRegistration: true,
+        })
+      } else {
+        candidates.set(p.auth_user_id, {
+          email: p.email,
+          fullName: p.full_name,
+          deletedAt: null,
+          venueName: null,
+          pendingRegistration: true,
+        })
+      }
+    }
+  }
+
+  if (candidates.size === 0) return { owners: [] }
+
+  const ownerIds = [...candidates.keys()]
+  const stillHasVenue = new Set<string>()
+  // PostgREST .in() has URL limits — chunk
+  const chunkSize = 80
+  for (let i = 0; i < ownerIds.length; i += chunkSize) {
+    const chunk = ownerIds.slice(i, i + chunkSize)
+    const estRes = await fetchAllRows<{ owner_id: string }>((from, to) =>
+      supabase
+        .from('establishments')
+        .select('owner_id')
+        .in('owner_id', chunk)
+        .order('owner_id', { ascending: true })
+        .range(from, to),
+    )
+    if ('error' in estRes) return estRes
+    for (const r of estRes.data) {
+      if (r.owner_id) stillHasVenue.add(r.owner_id)
     }
   }
 
   const owners: OrphanOwnerRow[] = []
   const now = Date.now()
-  for (const [authUserId, meta] of latestByOwner) {
+  for (const [authUserId, meta] of candidates) {
     if (stillHasVenue.has(authUserId)) continue
 
     const { data: authUser, error: authErr } = await supabase.auth.admin.getUserById(authUserId)
     if (authErr || !authUser?.user) continue
 
-    const pending = pendingById.get(authUserId)
     const email = (
       authUser.user.email
-      || pending?.email
       || meta.email
       || ''
     ).trim()
     if (!email || isNoiseEmail(email)) continue
 
-    const days = daysSinceIso(meta.deletedAt, now)
+    const days = meta.deletedAt ? daysSinceIso(meta.deletedAt, now) : null
     owners.push({
       authUserId,
       email,
-      fullName: pending?.fullName
+      fullName: meta.fullName
         || (typeof authUser.user.user_metadata?.full_name === 'string'
           ? authUser.user.user_metadata.full_name
           : null),
       lastVenueDeletedAt: meta.deletedAt,
       lastVenueName: meta.venueName,
       daysSinceVenueDelete: days,
-      withinCoolingOff: days < OWNER_DELETE_COOLING_DAYS,
-      pendingRegistration: pendingById.has(authUserId),
+      withinCoolingOff: days != null && days < OWNER_DELETE_COOLING_DAYS,
+      pendingRegistration: meta.pendingRegistration,
     })
   }
 
   owners.sort((a, b) => {
     const at = a.lastVenueDeletedAt ? Date.parse(a.lastVenueDeletedAt) : 0
     const bt = b.lastVenueDeletedAt ? Date.parse(b.lastVenueDeletedAt) : 0
-    return bt - at
+    if (bt !== at) return bt - at
+    return a.email.localeCompare(b.email)
   })
   return { owners }
 }

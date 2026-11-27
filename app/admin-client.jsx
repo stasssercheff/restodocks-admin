@@ -2730,6 +2730,58 @@ function ey() {
                     children: tr("Заведения и филиалы")
                 }), tr(" создаются только в приложении (регистрация, экран \xabМои заведения\xbb / добавление филиала). В этой админке нет кнопки \xabсоздать заведение\xbb — здесь только список из БД, удаление и гео. Если строка \xabвидна в админке, но не в приложении\xbb, это всё равно записи в Supabase; после успешного удаления появится подтверждение; при ошибке — текст в алерте и в красном блоке выше.")]
             })]
+        }), canMutate && (0, r.jsxs)("div", {
+            className: "mb-4 p-3 sm:p-4 bg-gray-900 border border-amber-900/40 rounded-xl space-y-3",
+            children: [(0, r.jsxs)("div", {
+                className: "flex flex-wrap items-baseline justify-between gap-2",
+                children: [(0, r.jsx)("h3", {
+                    className: "text-sm font-semibold text-white",
+                    children: tr("Собственники без заведений")
+                }), (0, r.jsxs)("span", {
+                    className: "text-xs text-gray-500",
+                    children: [orphanOwners.length, " ", tr("шт.")]
+                })]
+            }), (0, r.jsx)("p", {
+                className: "text-xs text-gray-500 leading-relaxed",
+                children: tr("После удаления последнего заведения учётка собственника остаётся в Auth. Здесь видно почту — можно сначала написать предупреждение. Удаление учётки: слово «удалить» (без PIN). Если не прошло 30 дней после удаления заведения — покажем предупреждение.")
+            }), 0 === orphanOwners.length ? (0, r.jsx)("div", {
+                className: "text-sm text-gray-600",
+                children: tr("Сейчас нет собственников без заведений (ни в журнале удалений, ни в незавершённых регистрациях).")
+            }) : (0, r.jsx)("ul", {
+                className: "divide-y divide-gray-800 rounded-lg border border-gray-800 overflow-hidden max-h-80 overflow-y-auto",
+                children: orphanOwners.map(owner => (0, r.jsxs)("li", {
+                    className: "flex flex-wrap items-start justify-between gap-3 px-3 py-3 bg-gray-950/40",
+                    children: [(0, r.jsxs)("div", {
+                        className: "min-w-0 space-y-1",
+                        children: [(0, r.jsx)("a", {
+                            href: "mailto:".concat(owner.email, "?subject=").concat(encodeURIComponent(tr("Restodocks: предупреждение об удалении учётной записи"))),
+                            className: "text-sm text-indigo-300 hover:text-indigo-200 break-all",
+                            children: owner.email
+                        }), owner.fullName ? (0, r.jsx)("div", {
+                            className: "text-xs text-gray-400",
+                            children: owner.fullName
+                        }) : null, owner.lastVenueDeletedAt ? (0, r.jsxs)("div", {
+                            className: "text-[11px] text-gray-500",
+                            children: [tr("Заведение удалено"), ": ", new Date(owner.lastVenueDeletedAt).toLocaleString(localeTag), owner.lastVenueName ? " · " + owner.lastVenueName : "", null != owner.daysSinceVenueDelete ? " · " + owner.daysSinceVenueDelete + " " + tr("дн.") : ""]
+                        }) : (0, r.jsx)("div", {
+                            className: "text-[11px] text-gray-500",
+                            children: owner.pendingRegistration ? tr("Нет заведений · незавершённая регистрация") : tr("Нет заведений")
+                        }), owner.withinCoolingOff ? (0, r.jsx)("div", {
+                            className: "text-[11px] text-amber-400",
+                            children: tr("Ещё не прошло 30 дней после удаления заведения")
+                        }) : owner.lastVenueDeletedAt ? (0, r.jsx)("div", {
+                            className: "text-[11px] text-emerald-500/80",
+                            children: tr("30 дней после удаления заведения уже прошли")
+                        }) : null]
+                    }), (0, r.jsx)("button", {
+                        type: "button",
+                        disabled: orphanBusyId === owner.authUserId,
+                        onClick: () => void deleteOrphanOwnerRow(owner),
+                        className: "shrink-0 text-xs px-3 py-1.5 rounded-lg border border-red-900/60 bg-red-950/40 text-red-200 hover:bg-red-900/40 disabled:opacity-50",
+                        children: orphanBusyId === owner.authUserId ? tr("удаление…") : tr("Удалить собственника")
+                    })]
+                }, owner.authUserId))
+            })]
         }), (0, r.jsxs)("div", {
             className: "grid grid-cols-2 gap-2 mb-3 md:hidden",
             children: [(0, r.jsxs)("select", {
@@ -3328,49 +3380,6 @@ function ey() {
                         })]
                     }, l.id)
                 })
-            })]
-        }), canMutate && (0, r.jsxs)("div", {
-            className: "mt-8 mb-4 p-3 sm:p-4 bg-gray-900 border border-gray-800 rounded-xl space-y-3",
-            children: [(0, r.jsx)("h3", {
-                className: "text-sm font-semibold text-white",
-                children: tr("Собственники без заведений")
-            }), (0, r.jsx)("p", {
-                className: "text-xs text-gray-500 leading-relaxed",
-                children: tr("После удаления последнего заведения учётка собственника остаётся в Auth. Здесь видно почту — можно сначала написать предупреждение. Удаление учётки: слово «удалить» (без PIN). Если не прошло 30 дней после удаления заведения — покажем предупреждение.")
-            }), 0 === orphanOwners.length ? (0, r.jsx)("div", {
-                className: "text-sm text-gray-600",
-                children: tr("Пока нет собственников без заведений в журнале удалений.")
-            }) : (0, r.jsx)("ul", {
-                className: "divide-y divide-gray-800 rounded-lg border border-gray-800 overflow-hidden",
-                children: orphanOwners.map(owner => (0, r.jsxs)("li", {
-                    className: "flex flex-wrap items-start justify-between gap-3 px-3 py-3 bg-gray-950/40",
-                    children: [(0, r.jsxs)("div", {
-                        className: "min-w-0 space-y-1",
-                        children: [(0, r.jsx)("a", {
-                            href: "mailto:".concat(owner.email, "?subject=").concat(encodeURIComponent(tr("Restodocks: предупреждение об удалении учётной записи"))),
-                            className: "text-sm text-indigo-300 hover:text-indigo-200 break-all",
-                            children: owner.email
-                        }), owner.fullName ? (0, r.jsx)("div", {
-                            className: "text-xs text-gray-400",
-                            children: owner.fullName
-                        }) : null, (0, r.jsxs)("div", {
-                            className: "text-[11px] text-gray-500",
-                            children: [tr("Заведение удалено"), ": ", owner.lastVenueDeletedAt ? new Date(owner.lastVenueDeletedAt).toLocaleString(localeTag) : "—", owner.lastVenueName ? " · " + owner.lastVenueName : "", null != owner.daysSinceVenueDelete ? " · " + owner.daysSinceVenueDelete + " " + tr("дн.") : ""]
-                        }), owner.withinCoolingOff ? (0, r.jsx)("div", {
-                            className: "text-[11px] text-amber-400",
-                            children: tr("Ещё не прошло 30 дней после удаления заведения")
-                        }) : (0, r.jsx)("div", {
-                            className: "text-[11px] text-emerald-500/80",
-                            children: tr("30 дней после удаления заведения уже прошли")
-                        })]
-                    }), (0, r.jsx)("button", {
-                        type: "button",
-                        disabled: orphanBusyId === owner.authUserId,
-                        onClick: () => void deleteOrphanOwnerRow(owner),
-                        className: "shrink-0 text-xs px-3 py-1.5 rounded-lg border border-red-900/60 bg-red-950/40 text-red-200 hover:bg-red-900/40 disabled:opacity-50",
-                        children: orphanBusyId === owner.authUserId ? tr("удаление…") : tr("Удалить собственника")
-                    })]
-                }, owner.authUserId))
             })]
         })]
     })
