@@ -2320,8 +2320,6 @@ function eg(e) {
         })]
     })
 }
-let eh = "УДАЛИТЬ";
-
 function ey() {
     let {
         user
@@ -2546,15 +2544,23 @@ function ey() {
     }
     async function V(e) {
         if (!confirm(tr("Удалить заведение \xab").concat(e.name, tr("\xbb?\n\nБудут удалены все данные: номенклатура, ТТК, чеклисты, сотрудники и т.д. Действие необратимо.")))) return;
-        let t = prompt('Для подтверждения введите "'.concat(eh, '":'));
-        if ((null == t ? void 0 : t.trim()) !== eh) {
-            null !== t && alert(tr("Отменено: текст не совпадает."));
+        let typed = prompt(tr("Для подтверждения введите «УДАЛИТЬ» или PIN заведения:"));
+        if (null === typed) return;
+        let confirmText = typed.trim();
+        if (!confirmText) {
+            alert(tr("Отменено: введите «УДАЛИТЬ» или PIN заведения."));
             return
         }
         C(e.id);
         try {
             let t = await fetch("/api/establishments/".concat(e.id), {
-                    method: "DELETE"
+                    method: "DELETE",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        confirm: confirmText
+                    })
                 }),
                 a = await t.json().catch(() => ({}));
             if (!t.ok) {

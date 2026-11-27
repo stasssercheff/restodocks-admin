@@ -577,6 +577,35 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
   }
 }
 
+/** Confirm wipe: exact «УДАЛИТЬ» (legacy) or case-insensitive «удалить», or venue pin_code. */
+export async function confirmEstablishmentDelete(
+  id: string,
+  confirmRaw: unknown,
+): Promise<{ ok: true } | { error: string }> {
+  const confirm = typeof confirmRaw === 'string' ? confirmRaw.trim() : ''
+  if (!confirm) {
+    return { error: 'Для удаления введите «УДАЛИТЬ» или PIN заведения' }
+  }
+  if (confirm === 'УДАЛИТЬ' || confirm.toLocaleLowerCase('ru-RU') === 'удалить') {
+    return { ok: true }
+  }
+
+  const supabase = createServiceClient()
+  if ('error' in supabase) return supabase
+
+  const { data, error } = await supabase
+    .from('establishments')
+    .select('pin_code')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) return { error: error.message }
+
+  const pin = typeof data?.pin_code === 'string' ? data.pin_code.trim() : ''
+  if (pin && confirm === pin) return { ok: true }
+
+  return { error: 'Подтверждение не совпадает (нужно «УДАЛИТЬ» или PIN заведения)' }
+}
+
 export async function deleteEstablishment(id: string): Promise<{ ok: true } | { error: string; code?: string }> {
   const supabase = createServiceClient()
   if ('error' in supabase) return supabase
