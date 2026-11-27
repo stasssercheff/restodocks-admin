@@ -577,17 +577,101 @@ export async function listEstablishments(scope: DataScope | 'all' = 'all'): Prom
   }
 }
 
+/** Confirm wipe: only the venue pin_code (no shared wipe-word). */
+export async function confirmEstablishmentDelete(
+  id: string,
+  confirmRaw: unknown,
+): Promise<{ ok: true } | { error: string }> {
+  const confirm = typeof confirmRaw === 'string' ? confirmRaw.trim() : ''
+  if (!confirm) {
+    return { error: 'Для удаления введите PIN заведения' }
+  }
+
+  const supabase = createServiceClient()
+  if ('error' in supabase) return supabase
+
+  const { data, error } = await supabase
+    .from('establishments')
+    .select('pin_code')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) return { error: error.message }
+
+  const pin = typeof data?.pin_code === 'string' ? data.pin_code.trim() : ''
+  if (!pin) {
+    return { error: 'У заведения нет PIN — удаление из админки недоступно' }
+  }
+  // Exact pin only — wipe-words like «УДАЛИТЬ» are intentionally rejected.
+  if (confirm === pin) return { ok: true }
+
+  return { error: 'PIN не совпадает' }
+}
+
 export async function deleteEstablishment(id: string): Promise<{ ok: true } | { error: string; code?: string }> {
   const supabase = createServiceClient()
   if ('error' in supabase) return supabase
 
-  const rpc = await supabase.rpc('admin_delete_establishment', { p_establishment_id: id })
-  if (!rpc.error) return { ok: true }
+  const { data: estBefore } = await supabase
+    .from('establishments')
+    .select('id, name, owner_id, registration_ip, registration_country, registration_city')
+    .eq('id', id)
+    .maybeSingle()
 
-  const fallback = await supabase.from('establishments').delete().eq('id', id)
-  if (fallback.error) {
-    return { error: rpc.error.message || fallback.error.message, code: rpc.error.code }
+  let ownerEmail: string | null = null
+  let ownerRegisteredAt: string | null = null
+  let registrationIp = estBefore?.registration_ip?.trim() || null
+  let registrationCountry = estBefore?.registration_country?.trim() || null
+  let registrationCity = estBefore?.registration_city?.trim() || null
+  if (estBefore?.owner_id) {
+    const { data: ownerEmp } = await supabase
+      .from('employees')
+      .select('email')
+      .or(`id.eq.${estBefore.owner_id},auth_user_id.eq.${estBefore.owner_id}`)
+      .limit(1)
+      .maybeSingle()
+    ownerEmail = ownerEmp?.email?.trim() || null
+    if (!ownerEmail || !registrationIp || !registrationCountry) {
+      const { data: pending } = await supabase
+        .from('pending_owner_registrations')
+        .select('email, created_at, registration_ip, registration_country, registration_city')
+        .eq('auth_user_id', estBefore.owner_id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      ownerEmail = ownerEmail || pending?.email?.trim() || null
+      ownerRegisteredAt = pending?.created_at || null
+      registrationIp = registrationIp || pending?.registration_ip?.trim() || null
+      registrationCountry = registrationCountry || pending?.registration_country?.trim() || null
+      registrationCity = registrationCity || pending?.registration_city?.trim() || null
+    }
+    const auth = await supabase.auth.admin.getUserById(estBefore.owner_id)
+    ownerEmail = ownerEmail || auth.data?.user?.email?.trim() || null
+    ownerRegisteredAt = ownerRegisteredAt || auth.data?.user?.created_at || null
   }
+
+  const rpc = await supabase.rpc('admin_delete_establishment', { p_establishment_id: id })
+  if (rpc.error) {
+    const fallback = await supabase.from('establishments').delete().eq('id', id)
+    if (fallback.error) {
+      return { error: rpc.error.message || fallback.error.message, code: rpc.error.code }
+    }
+  }
+
+  // Keep orphan owner in Auth for cooling-off; log so admin can purge later.
+  if (estBefore?.owner_id) {
+    const { logOwnerVenueDeletion } = await import('@/lib/orphan-owners')
+    await logOwnerVenueDeletion({
+      ownerAuthId: estBefore.owner_id,
+      ownerEmail,
+      establishmentId: estBefore.id,
+      establishmentName: estBefore.name,
+      ownerRegisteredAt,
+      registrationIp,
+      registrationCountry,
+      registrationCity,
+    })
+  }
+
   return { ok: true }
 }
 

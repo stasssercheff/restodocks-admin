@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dataScopeForUser, requireAdminRequest } from '@/lib/admin-auth'
-import { deleteEstablishment, listEstablishments } from '@/lib/establishments'
+import { confirmEstablishmentDelete, deleteEstablishment, listEstablishments } from '@/lib/establishments'
 import { createServiceClient } from '@/lib/supabase-server'
 
 async function assertEstablishmentAccess(user: Parameters<typeof dataScopeForUser>[0], id: string) {
@@ -52,6 +52,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!id) return NextResponse.json({ error: 'id обязателен' }, { status: 400 })
   const denied = await assertEstablishmentAccess(auth.user, id)
   if (denied) return denied
+
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>
+  const confirm = await confirmEstablishmentDelete(id, body.confirm)
+  if ('error' in confirm) {
+    return NextResponse.json({ error: confirm.error }, { status: 400 })
+  }
+
   const result = await deleteEstablishment(id)
   if ('error' in result) {
     return NextResponse.json({ error: result.error, code: result.code }, { status: 500 })
