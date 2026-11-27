@@ -15,6 +15,10 @@ export type OrphanOwnerRow = {
   authUserId: string
   email: string
   fullName: string | null
+  registeredAt: string | null
+  registrationIp: string | null
+  registrationCountry: string | null
+  registrationCity: string | null
   lastVenueDeletedAt: string | null
   lastVenueName: string | null
   daysSinceVenueDelete: number | null
@@ -40,6 +44,24 @@ type CandidateMeta = {
   deletedAt: string | null
   venueName: string | null
   pendingRegistration: boolean
+  registeredAt: string | null
+  registrationIp: string | null
+  registrationCountry: string | null
+  registrationCity: string | null
+}
+
+function mergeCandidate(prev: CandidateMeta | undefined, next: Partial<CandidateMeta> & { pendingRegistration?: boolean }): CandidateMeta {
+  return {
+    email: prev?.email || next.email || null,
+    fullName: prev?.fullName || next.fullName || null,
+    deletedAt: prev?.deletedAt || next.deletedAt || null,
+    venueName: prev?.venueName || next.venueName || null,
+    pendingRegistration: Boolean(prev?.pendingRegistration || next.pendingRegistration),
+    registeredAt: prev?.registeredAt || next.registeredAt || null,
+    registrationIp: prev?.registrationIp || next.registrationIp || null,
+    registrationCountry: prev?.registrationCountry || next.registrationCountry || null,
+    registrationCity: prev?.registrationCity || next.registrationCity || null,
+  }
 }
 
 export async function listOrphanOwners(): Promise<
@@ -55,10 +77,14 @@ export async function listOrphanOwners(): Promise<
     owner_email: string
     establishment_name: string | null
     deleted_at: string
+    owner_registered_at: string | null
+    registration_ip: string | null
+    registration_country: string | null
+    registration_city: string | null
   }>((from, to) =>
     supabase
       .from('admin_owner_venue_deletions')
-      .select('owner_auth_id, owner_email, establishment_name, deleted_at')
+      .select('owner_auth_id, owner_email, establishment_name, deleted_at, owner_registered_at, registration_ip, registration_country, registration_city')
       .order('deleted_at', { ascending: false })
       .range(from, to),
   )
@@ -69,13 +95,15 @@ export async function listOrphanOwners(): Promise<
   } else {
     for (const row of logsRes.data) {
       if (!row.owner_auth_id || candidates.has(row.owner_auth_id)) continue
-      candidates.set(row.owner_auth_id, {
+      candidates.set(row.owner_auth_id, mergeCandidate(undefined, {
         email: row.owner_email,
-        fullName: null,
         deletedAt: row.deleted_at,
         venueName: row.establishment_name,
-        pendingRegistration: false,
-      })
+        registeredAt: row.owner_registered_at,
+        registrationIp: row.registration_ip,
+        registrationCountry: row.registration_country,
+        registrationCity: row.registration_city,
+      }))
     }
   }
 
@@ -83,33 +111,29 @@ export async function listOrphanOwners(): Promise<
     auth_user_id: string
     full_name: string | null
     email: string | null
+    created_at: string | null
+    registration_ip: string | null
+    registration_country: string | null
+    registration_city: string | null
   }>((from, to) =>
     supabase
       .from('pending_owner_registrations')
-      .select('auth_user_id, full_name, email')
+      .select('auth_user_id, full_name, email, created_at, registration_ip, registration_country, registration_city')
       .order('auth_user_id', { ascending: true })
       .range(from, to),
   )
   if (!('error' in pendingRes)) {
     for (const p of pendingRes.data) {
       if (!p.auth_user_id) continue
-      const prev = candidates.get(p.auth_user_id)
-      if (prev) {
-        candidates.set(p.auth_user_id, {
-          ...prev,
-          email: prev.email || p.email,
-          fullName: prev.fullName || p.full_name,
-          pendingRegistration: true,
-        })
-      } else {
-        candidates.set(p.auth_user_id, {
-          email: p.email,
-          fullName: p.full_name,
-          deletedAt: null,
-          venueName: null,
-          pendingRegistration: true,
-        })
-      }
+      candidates.set(p.auth_user_id, mergeCandidate(candidates.get(p.auth_user_id), {
+        email: p.email,
+        fullName: p.full_name,
+        pendingRegistration: true,
+        registeredAt: p.created_at,
+        registrationIp: p.registration_ip,
+        registrationCountry: p.registration_country,
+        registrationCity: p.registration_city,
+      }))
     }
   }
 
@@ -117,7 +141,6 @@ export async function listOrphanOwners(): Promise<
 
   const ownerIds = [...candidates.keys()]
   const stillHasVenue = new Set<string>()
-  // PostgREST .in() has URL limits — chunk
   const chunkSize = 80
   for (let i = 0; i < ownerIds.length; i += chunkSize) {
     const chunk = ownerIds.slice(i, i + chunkSize)
@@ -151,6 +174,7 @@ export async function listOrphanOwners(): Promise<
     if (!email || isNoiseEmail(email)) continue
 
     const days = meta.deletedAt ? daysSinceIso(meta.deletedAt, now) : null
+    const registeredAt = meta.registeredAt || authUser.user.created_at || null
     owners.push({
       authUserId,
       email,
@@ -158,6 +182,10 @@ export async function listOrphanOwners(): Promise<
         || (typeof authUser.user.user_metadata?.full_name === 'string'
           ? authUser.user.user_metadata.full_name
           : null),
+      registeredAt,
+      registrationIp: meta.registrationIp,
+      registrationCountry: meta.registrationCountry,
+      registrationCity: meta.registrationCity,
       lastVenueDeletedAt: meta.deletedAt,
       lastVenueName: meta.venueName,
       daysSinceVenueDelete: days,
@@ -170,6 +198,9 @@ export async function listOrphanOwners(): Promise<
     const at = a.lastVenueDeletedAt ? Date.parse(a.lastVenueDeletedAt) : 0
     const bt = b.lastVenueDeletedAt ? Date.parse(b.lastVenueDeletedAt) : 0
     if (bt !== at) return bt - at
+    const ar = a.registeredAt ? Date.parse(a.registeredAt) : 0
+    const br = b.registeredAt ? Date.parse(b.registeredAt) : 0
+    if (br !== ar) return br - ar
     return a.email.localeCompare(b.email)
   })
   return { owners }
@@ -228,6 +259,10 @@ export async function logOwnerVenueDeletion(args: {
   ownerEmail: string | null | undefined
   establishmentId: string
   establishmentName: string | null | undefined
+  ownerRegisteredAt?: string | null
+  registrationIp?: string | null
+  registrationCountry?: string | null
+  registrationCity?: string | null
 }): Promise<void> {
   const ownerAuthId = args.ownerAuthId?.trim()
   const ownerEmail = args.ownerEmail?.trim()
@@ -241,5 +276,9 @@ export async function logOwnerVenueDeletion(args: {
     owner_email: ownerEmail,
     establishment_id: args.establishmentId,
     establishment_name: args.establishmentName ?? null,
+    owner_registered_at: args.ownerRegisteredAt ?? null,
+    registration_ip: args.registrationIp ?? null,
+    registration_country: args.registrationCountry ?? null,
+    registration_city: args.registrationCity ?? null,
   })
 }

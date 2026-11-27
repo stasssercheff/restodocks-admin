@@ -613,11 +613,15 @@ export async function deleteEstablishment(id: string): Promise<{ ok: true } | { 
 
   const { data: estBefore } = await supabase
     .from('establishments')
-    .select('id, name, owner_id')
+    .select('id, name, owner_id, registration_ip, registration_country, registration_city')
     .eq('id', id)
     .maybeSingle()
 
   let ownerEmail: string | null = null
+  let ownerRegisteredAt: string | null = null
+  let registrationIp = estBefore?.registration_ip?.trim() || null
+  let registrationCountry = estBefore?.registration_country?.trim() || null
+  let registrationCity = estBefore?.registration_city?.trim() || null
   if (estBefore?.owner_id) {
     const { data: ownerEmp } = await supabase
       .from('employees')
@@ -626,20 +630,23 @@ export async function deleteEstablishment(id: string): Promise<{ ok: true } | { 
       .limit(1)
       .maybeSingle()
     ownerEmail = ownerEmp?.email?.trim() || null
-    if (!ownerEmail) {
+    if (!ownerEmail || !registrationIp || !registrationCountry) {
       const { data: pending } = await supabase
         .from('pending_owner_registrations')
-        .select('email')
+        .select('email, created_at, registration_ip, registration_country, registration_city')
         .eq('auth_user_id', estBefore.owner_id)
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-      ownerEmail = pending?.email?.trim() || null
+      ownerEmail = ownerEmail || pending?.email?.trim() || null
+      ownerRegisteredAt = pending?.created_at || null
+      registrationIp = registrationIp || pending?.registration_ip?.trim() || null
+      registrationCountry = registrationCountry || pending?.registration_country?.trim() || null
+      registrationCity = registrationCity || pending?.registration_city?.trim() || null
     }
-    if (!ownerEmail) {
-      const auth = await supabase.auth.admin.getUserById(estBefore.owner_id)
-      ownerEmail = auth.data?.user?.email?.trim() || null
-    }
+    const auth = await supabase.auth.admin.getUserById(estBefore.owner_id)
+    ownerEmail = ownerEmail || auth.data?.user?.email?.trim() || null
+    ownerRegisteredAt = ownerRegisteredAt || auth.data?.user?.created_at || null
   }
 
   const rpc = await supabase.rpc('admin_delete_establishment', { p_establishment_id: id })
@@ -658,6 +665,10 @@ export async function deleteEstablishment(id: string): Promise<{ ok: true } | { 
       ownerEmail,
       establishmentId: estBefore.id,
       establishmentName: estBefore.name,
+      ownerRegisteredAt,
+      registrationIp,
+      registrationCountry,
+      registrationCity,
     })
   }
 
