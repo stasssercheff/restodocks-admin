@@ -2544,11 +2544,11 @@ function ey() {
     }
     async function V(e) {
         if (!confirm(tr("Удалить заведение \xab").concat(e.name, tr("\xbb?\n\nБудут удалены все данные: номенклатура, ТТК, чеклисты, сотрудники и т.д. Действие необратимо.")))) return;
-        let typed = prompt(tr("Для подтверждения введите «УДАЛИТЬ» или PIN заведения:"));
+        let typed = prompt(tr("Для подтверждения введите PIN заведения:"));
         if (null === typed) return;
         let confirmText = typed.trim();
         if (!confirmText) {
-            alert(tr("Отменено: введите «УДАЛИТЬ» или PIN заведения."));
+            alert(tr("Отменено: введите PIN заведения."));
             return
         }
         C(e.id);
